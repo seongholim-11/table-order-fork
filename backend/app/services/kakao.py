@@ -19,6 +19,38 @@ class KakaoError(Exception):
     pass
 
 
+def normalize_phone(raw: str | None) -> str | None:
+    """카카오 phone_number("+82 10-1234-5678")를 010-1234-5678 형태로. 휴대폰 번호가 아니면 None."""
+    if not raw:
+        return None
+    digits = "".join(c for c in raw if c.isdigit())
+    if digits.startswith("82"):
+        digits = "0" + digits[2:]
+    if len(digits) not in (10, 11) or not digits.startswith("01"):
+        return None
+    return f"{digits[:3]}-{digits[3:-4]}-{digits[-4:]}"
+
+
+def parse_account(account: dict) -> dict:
+    """카카오 kakao_account 에서 동의항목으로 받은 값만 골라낸다. 동의하지 않았거나 없는 값은 None."""
+    year = str(account.get("birthyear") or "")
+    return {"gender": account.get("gender"), "birthday": account.get("birthday") or None,
+            "birth_year": int(year) if year.isdigit() else None,
+            "phone": normalize_phone(account.get("phone_number"))}
+
+
+async def fetch_account(access_token: str) -> dict:
+    """카카오 액세스 토큰으로 /v2/user/me 를 호출해 {kakao_id, nickname, gender, birthday, birth_year, phone} 를 돌려준다."""
+    async with httpx.AsyncClient(timeout=10) as http:
+        r = await http.get(PROFILE_URL, headers={"Authorization": f"Bearer {access_token}"})
+    if r.status_code != 200:
+        raise KakaoError("카카오 사용자 정보를 가져오지 못했습니다.")
+    body = r.json()
+    account = body.get("kakao_account", {})
+    return {"kakao_id": str(body["id"]), "nickname": (account.get("profile") or {}).get("nickname") or "손님",
+            **parse_account(account)}
+
+
 class KakaoClient:
     def __init__(self, settings: Settings):
         self.s = settings
@@ -32,15 +64,16 @@ class KakaoClient:
             return f"{self.s.public_base_url}/api/auth/kakao/mock?state={quote(state)}"
         return AUTHORIZE_URL + "?" + urlencode({
             "client_id": self.s.kakao_rest_api_key, "redirect_uri": self.s.kakao_redirect_uri,
-            "response_type": "code", "state": state})
+            "response_type": "code", "state": state, "scope": ",".join(self.s.kakao_scopes.split())})
 
     async def fetch_profile(self, code: str) -> dict:
-        """인가 코드로 사용자 프로필을 가져온다: {kakao_id, nickname, gender, birthday}."""
+        """인가 코드로 사용자 프로필을 가져온다: {kakao_id, nickname, gender, birthday, birth_year, phone}."""
         if self.mock:
             if not code.startswith("mock-"):
                 raise KakaoError("모의 로그인 코드가 올바르지 않습니다.")
             nickname = code.removeprefix("mock-") or "카카오"
-            return {"kakao_id": f"mock:{nickname}", "nickname": nickname, "gender": None, "birthday": None}
+            return {"kakao_id": f"mock:{nickname}", "nickname": nickname, "gender": None, "birthday": None,
+                    "birth_year": None, "phone": None}
         async with httpx.AsyncClient(timeout=10) as http:
             data = {"grant_type": "authorization_code", "client_id": self.s.kakao_rest_api_key,
                     "redirect_uri": self.s.kakao_redirect_uri, "code": code}
@@ -49,11 +82,5 @@ class KakaoClient:
             r = await http.post(TOKEN_URL, data=data)
             if r.status_code != 200:
                 raise KakaoError("카카오 토큰 발급에 실패했습니다.")
-            r = await http.get(PROFILE_URL, headers={"Authorization": f"Bearer {r.json()['access_token']}"})
-            if r.status_code != 200:
-                raise KakaoError("카카오 사용자 정보를 가져오지 못했습니다.")
-        body = r.json()
-        account = body.get("kakao_account", {})
-        profile = account.get("profile", {})
-        return {"kakao_id": str(body["id"]), "nickname": profile.get("nickname") or "손님",
-                "gender": account.get("gender"), "birthday": account.get("birthday")}
+            token = r.json()["access_token"]
+        return await fetch_account(token)

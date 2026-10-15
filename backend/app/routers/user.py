@@ -36,13 +36,6 @@ class RecommendationIn(BaseModel):
     combo_ids: list[str] = []
 
 
-class ProfileUpdate(BaseModel):
-    phone: str | None = Field(default=None, pattern=r"^01[016789]-?\d{3,4}-?\d{4}$")
-    marketing_consent: bool | None = None
-    birth_year: int | None = Field(default=None, ge=1920, le=2020)
-    gender: str | None = Field(default=None, pattern="^(male|female)$")
-
-
 def _me(m: dict) -> dict:
     return {"id": m["id"], "nickname": m["nickname"], "phone": m["phone"], "birth_year": m["birth_year"],
             "gender": m["gender"], "marketing_consent": bool(m["marketing_consent"]),
@@ -98,12 +91,6 @@ async def log_recommendation(body: RecommendationIn, request: Request, member: d
 @router.get("/members/me")
 async def get_me(member: dict = Depends(current_member)):
     return _me(member)
-
-
-@router.patch("/members/me")
-async def update_me(body: ProfileUpdate, request: Request, member: dict = Depends(current_member)):
-    """카카오로 받지 못하는 정보(휴대폰 번호 등)와 마케팅 수신 동의를 직접 입력받는다."""
-    return _me(request.app.state.members.update_profile(member["id"], **body.model_dump()))
 
 
 @router.post("/members/me/opt-out")

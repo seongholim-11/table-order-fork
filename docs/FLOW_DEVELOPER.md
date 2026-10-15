@@ -72,10 +72,14 @@ sequenceDiagram
     Note over UI: qr_data_uri(qr_url) 로 PNG QR 표시<br/>login_watch 가 2초마다 poll_login_once()
     Note over R: 휴대폰: GET /api/auth/kakao/start?token=…
     R->>LS: mark_scanned(token)
-    R->>KK: authorize_url → 302 로 카카오/Supabase 이동
+    R-->>UI: 광고성 문자 수신 동의(선택) 화면 (휴대폰)
+    Note over R: 휴대폰: GET /api/auth/kakao/continue?token=…&agree=1
+    R->>LS: s.marketing_consent = 동의 여부
+    R->>KK: authorize_url(scope 포함) → 302 로 카카오/Supabase 이동
     Note over R: 로그인 후 /kakao/callback (또는 /supabase/callback/{state})
-    R->>KK: fetch_profile(code)
-    R->>M: upsert_login(...) (가입 또는 visit_count+1)
+    R->>KK: fetch_profile(code) → 성별·생일·출생연도·휴대폰 번호 포함
+    R->>M: upsert_login(...) (가입 또는 visit_count+1, 받은 값은 비어 있지 않을 때만 덮어씀)
+    R->>M: set_marketing_consent(s.marketing_consent)
     R->>LS: complete(s, member, JWT)
     UI->>SV: poll_login(secret) → GET /api/auth/qr/{secret}
     SV->>R: 
@@ -88,6 +92,8 @@ sequenceDiagram
 - **token / secret 분리** (`login_sessions.py` 맨 위 설명): token 은 QR 에 들어가 휴대폰이 쓰고, secret 은 태블릿만 갖고 결과 조회에 씁니다. QR 을 찍은 사람이 태블릿의 로그인 결과(JWT)를 가로채지 못하게 하려는 구조입니다.
 - **상태는 되돌릴 수 없는 한 방향**: `waiting → scanned → logged_in`, 또는 `expired`(기본 TTL 180초, `login_ttl_seconds`). 스캔된 세션만 `complete` 할 수 있고, `claim` 은 한 번만 값을 줍니다(`claimed` 플래그).
 - **CSRF 방어**: 콜백의 `state` 가 우리가 발급한 token 이어야 하고, 상태가 `scanned` 여야 합니다. Supabase 경로는 PKCE verifier 를 서버에만 두고 코드 교환을 한 번만 허용합니다(`s.pkce_verifier` 를 꺼내며 비움).
+- **로그인 때 자동 수집하는 정보**: 요청 scope 는 `KAKAO_SCOPES`(기본 `profile_nickname gender birthday birthyear phone_number`). 카카오 콘솔 동의항목에 없는 항목을 넣으면 `KOE205` 가 납니다. Supabase 경로는 Supabase 사용자 정보에 성별·생일·번호가 없어서, 세션의 `provider_token` 으로 카카오 `/v2/user/me` 를 한 번 더 호출해 채웁니다(실패해도 로그인은 계속). 동의하지 않은 항목은 비어 있고, 이후 로그인에서 빈 값이 기존 값을 지우지 않습니다.
+- **수신 동의는 휴대폰의 `/kakao/start` 화면에서** 받고(`login_sessions.marketing_consent`), 콜백에서 `members.marketing_consent` 로 저장합니다. 가장 최근 로그인에서 고른 값이 적용됩니다. 태블릿 화면의 "회원 정보 입력" 폼과 `PATCH /api/members/me` 는 없어졌습니다.
 - **카카오 키가 없으면 모의 로그인** 화면(`/kakao/mock`)이 열려 로컬에서도 시험할 수 있습니다. 실제 키가 있거나 Supabase 가 켜져 있으면 모의 화면은 404.
 - **세션 저장소는 메모리**입니다. 서버를 재시작하거나 프로세스를 여러 개 띄우면 진행 중인 QR 이 사라집니다(Redis 로 교체 예정이라고 파일에 적혀 있음).
 - 태블릿은 폴링(2초)을 씁니다. 서버에는 `WS /api/auth/ws/{secret}` 도 구현되어 있지만 현재 화면 코드는 폴링만 사용합니다.
@@ -97,7 +103,7 @@ sequenceDiagram
 
 `ss.member`, `ss.access_token`(JWT) 저장 → `ss.members` 에 이 태블릿의 로그인 기록 추가 → 처음 보는 회원 id 면 `eligible=True`(룰렛 기회) 로 기록. **"회원당 1회" 판정은 서버가 아니라 이 태블릿 세션의 `granted_ids`** 입니다. 즉 새로고침하면 초기화되고, 다른 태블릿에서는 다시 받을 수 있습니다(서버에서 막으려면 별도 설계 필요).
 
-이후 서버 호출에 쓰이는 토큰: 주문/추천 기록은 `optional_member`(없거나 잘못되면 비회원), 프로필·수신거부는 `current_member`(없으면 401). JWT 는 `services/tokens.py` 로 발급·검증, 유효시간 `jwt_expire_minutes`(기본 720분).
+이후 서버 호출에 쓰이는 토큰: 주문/추천 기록은 `optional_member`(없거나 잘못되면 비회원), 내 정보 조회·수신거부는 `current_member`(없으면 401). JWT 는 `services/tokens.py` 로 발급·검증, 유효시간 `jwt_expire_minutes`(기본 720분).
 
 ---
 
@@ -258,7 +264,7 @@ routers/admin/*.py        menus / orders / members / stats / sms / content
 | QR 발급 | `user/server.py:create_qr` | `POST /api/auth/qr` | `login_store.create` | 메모리 |
 | 로그인 확인 | `server.poll_login` | `GET /api/auth/qr/{secret}` | `status`/`claim` | 메모리 |
 | 로그인 완료 | (휴대폰 브라우저) | `GET /api/auth/kakao/callback` | `members.upsert_login`, JWT 발급 | `members` |
-| 프로필·수신거부 | `server.update_profile`/`opt_out` | `PATCH /api/members/me`, `POST /api/members/me/opt-out` | `current_member` | `members` |
+| 내 정보 조회·수신거부 | (화면 호출 없음) | `GET /api/members/me`, `POST /api/members/me/opt-out` | `current_member` | `members` |
 | 주문 | `REPO.create_order` | `POST /api/orders` | `shop.add_order` | `orders` |
 | 직원 호출 | `REPO.create_call` | `POST /api/calls` | `shop.add_call` | `calls` |
 | 추천 노출 | `REPO.log_recommendation` | `POST /api/recommendations` | `shop.add_recommendation` | `recommendation_events` |

@@ -16,12 +16,25 @@ def settings(**kw) -> Settings:
     return Settings(**{**base, **kw})
 
 
-def login(c: TestClient, nickname: str) -> dict:
-    """모의 카카오 로그인으로 회원을 만들고 JWT 헤더를 돌려준다."""
+def login(c: TestClient, nickname: str, agree: bool = False) -> dict:
+    """모의 카카오 로그인으로 회원을 만들고 JWT 헤더를 돌려준다. agree=True 면 광고성 문자 수신에 동의한다."""
     q = c.post("/api/auth/qr", json={"table_no": 1}).json()
-    c.get(f"/api/auth/kakao/start?token={q['token']}", follow_redirects=False)
+    c.get(f"/api/auth/kakao/start?token={q['token']}")
+    c.get("/api/auth/kakao/continue", params={"token": q["token"], **({"agree": "1"} if agree else {})},
+          follow_redirects=False)
     c.get("/api/auth/kakao/callback", params={"state": q["token"], "code": f"mock-{nickname}"})
     return {"Authorization": f"Bearer {c.get(f'/api/auth/qr/{q['secret']}').json()['access_token']}"}
+
+
+def set_profile(c, headers, phone=None, birth_year=None, gender=None, consent=None):
+    """카카오에서 받아 오는 값(휴대폰·출생연도·성별)과 로그인 때 받는 수신 동의를 테스트용으로 직접 채운다."""
+    members = c.app.state.members
+    mid = c.get("/api/members/me", headers=headers).json()["id"]
+    for col, val in (("phone", phone), ("birth_year", birth_year), ("gender", gender)):
+        if val is not None:
+            members.db.run(f"UPDATE members SET {col}=? WHERE id=?", (val, mid))
+    if consent is not None:
+        members.set_marketing_consent(mid, consent)
 
 
 @pytest.fixture

@@ -9,7 +9,7 @@ from user.state.login import poll_login_once
 from user.state.roulette import spins_left
 from user.state.session import go
 from user.ui.common import mini_buttons
-from user.ui.login import login_dialog, render_members_log, render_profile_form
+from user.ui.login import login_dialog, render_members_log
 from user.ui.roulette import render_roulette
 
 
@@ -33,6 +33,4 @@ def render_splash():
         with st.container(key="start_cta"):
             st.button("🍴 회원 주문  ›" if member else "🍴 비회원 주문  ›", type="primary", width="stretch",
                       key="start_btn", on_click=go, args=("menu",))
-    if member:
-        render_profile_form()
     render_members_log()

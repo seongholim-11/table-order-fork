@@ -34,7 +34,6 @@ def finish_login(event):
         ss.granted_ids.append(m["id"])
     ss.members.append({"id": m["id"], "nickname": m["nickname"], "at": datetime.now(KST).strftime("%H:%M"),
                        "eligible": first, "prize": None})
-    ss.profile_saved = False
 
 
 def poll_login_once():

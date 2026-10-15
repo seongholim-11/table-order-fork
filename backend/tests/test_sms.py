@@ -3,12 +3,12 @@ from fastapi.testclient import TestClient
 
 from app.factory import create_app
 from app.services import sms
-from tests.conftest import ADMIN, at, login, settings
+from tests.conftest import ADMIN, at, login, set_profile, settings
 
 
 def member(c, nick, phone="010-1234-5678", consent=True):
-    h = login(c, nick)
-    c.patch("/api/members/me", headers=h, json={"phone": phone, "marketing_consent": consent})
+    h = login(c, nick, agree=consent)
+    set_profile(c, h, phone=phone)
     return h
 
 
@@ -46,7 +46,7 @@ def test_targets_exclude_no_consent_no_phone_and_opted_out():
         assert c.post("/api/members/me/opt-out", headers=out).json()["opted_out"] is True
         assert c.post("/admin/api/marketing/sms/preview", headers=ADMIN, json=body()).json()["targets"] == 1
         # 다시 동의하면 수신거부가 풀린다
-        c.patch("/api/members/me", headers=out, json={"marketing_consent": True})
+        set_profile(c, out, consent=True)
         assert c.post("/admin/api/marketing/sms/preview", headers=ADMIN, json=body()).json()["targets"] == 2
 
 

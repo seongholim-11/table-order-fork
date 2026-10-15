@@ -31,12 +31,14 @@ def server():
     api.set_client(None)
 
 
-def phone_login(server, qr_url: str, nickname: str):
+def phone_login(server, qr_url: str, nickname: str, agree: bool = False):
     """휴대폰이 QR을 스캔하고 (모의) 카카오 로그인을 마치는 과정."""
     path = urlparse(qr_url)
-    r = server.get(f"{path.path}?{path.query}", follow_redirects=False)
-    assert r.status_code == 302
     state = path.query.removeprefix("token=")
+    assert server.get(f"{path.path}?{path.query}").status_code == 200  # 광고성 문자 수신 동의 화면
+    r = server.get("/api/auth/kakao/continue", params={"token": state, **({"agree": "1"} if agree else {})},
+                   follow_redirects=False)
+    assert r.status_code == 302
     assert server.get("/api/auth/kakao/callback", params={"state": state, "code": f"mock-{nickname}"}).status_code == 200
 
 
@@ -96,16 +98,15 @@ def test_same_member_logging_in_again_adds_row_but_no_extra_spin(server):
     assert "룰렛은 이미 참여했어요" in log
 
 
-def test_profile_form_after_login_saves(server):
+def test_no_profile_form_and_consent_comes_from_phone_login(server):
     app = AppTest.from_file(APP, default_timeout=30).run()
     app.button(key="login_open").click().run()
-    phone_login(server, ss(app)["login"]["qr_url"], "홍대손님")
+    phone_login(server, ss(app)["login"]["qr_url"], "홍대손님", agree=True)
     app.run()
-    app.text_input[0].set_value("010-1234-5678")
-    app.checkbox[0].check()
-    next(b for b in app.get("button") if b.proto.label == "저장").click().run()
+    assert not app.text_input and not app.checkbox and not app.exception  # 회원 정보 입력 UI 없음
+    assert not any("회원 정보 입력" in e.label for e in app.expander)
     me = server.get("/api/members/me", headers={"Authorization": f"Bearer {ss(app)['access_token']}"}).json()
-    assert me["phone"] == "010-1234-5678" and me["marketing_consent"] is True and not app.exception
+    assert me["marketing_consent"] is True
 
 
 def test_used_qr_is_rejected_and_expired_qr_can_be_refreshed(server):

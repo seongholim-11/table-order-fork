@@ -30,13 +30,25 @@ def make_server(**kw):
     return create_app(s, sms_clock=lambda: datetime(2026, 10, 12, 14, 0, tzinfo=KST))
 
 
+def set_profile(c, h, **cols):
+    """카카오에서 받아 오는 값과 수신 동의를 테스트용으로 직접 채운다."""
+    members = c.app.state.members
+    mid = c.get("/api/members/me", headers=h).json()["id"]
+    consent = cols.pop("marketing_consent", None)
+    for col, val in cols.items():
+        members.db.run(f"UPDATE members SET {col}=? WHERE id=?", (val, mid))
+    if consent is not None:
+        members.set_marketing_consent(mid, consent)
+
+
 def seed_member_and_order(c):
+    consent = True
     q = c.post("/api/auth/qr", json={"table_no": 1}).json()
-    c.get(f"/api/auth/kakao/start?token={q['token']}", follow_redirects=False)
+    c.get(f"/api/auth/kakao/start?token={q['token']}")
+    c.get("/api/auth/kakao/continue", params={"token": q["token"], "agree": "1" if consent else ""}, follow_redirects=False)
     c.get("/api/auth/kakao/callback", params={"state": q["token"], "code": "mock-계약"})
     h = {"Authorization": f"Bearer {c.get(f'/api/auth/qr/{q['secret']}').json()['access_token']}"}
-    c.patch("/api/members/me", headers=h, json={"birth_year": 1995, "gender": "female", "phone": "010-1234-5678",
-                                                "marketing_consent": True})
+    set_profile(c, h, birth_year=1995, gender="female", phone="010-1234-5678")
     line = {"id": "c1", "name": "통닭", "opt": "", "unit": 18000, "qty": 1}
     c.post("/api/orders", headers=h, json={"table_no": 3, "lines": [line], "total": 18000})
 

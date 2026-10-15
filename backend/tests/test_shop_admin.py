@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.factory import create_app
-from tests.conftest import ADMIN, login, settings
+from tests.conftest import ADMIN, login, set_profile, settings
 
 
 def test_menu_seeded_and_admin_edits_reach_users(client):
@@ -58,16 +58,14 @@ def test_members_grades_with_rule_preview_and_profile(client):
     assert members["단골"]["grade"] == "단골" and members["신입"]["grade"] == "신규"
     preview = client.get("/admin/api/members", headers=ADMIN, params={"regular": 10}).json()
     assert {m["nickname"]: m["grade"] for m in preview["members"]}["단골"] == "재방문"
-    r = client.patch("/api/members/me", headers=h, json={"birth_year": 1995, "gender": "female", "phone": "010-1111-2222"})
-    assert r.status_code == 200
-    assert client.patch("/api/members/me", headers=h, json={"gender": "x"}).status_code == 422
+    set_profile(client, h, birth_year=1995, gender="female", phone="010-1111-2222")
     m = next(m for m in client.get("/admin/api/members", headers=ADMIN).json()["members"] if m["nickname"] == "단골")
     assert m["age_group"] == "30대" and m["gender"] == "여" and m["has_phone"] is True
 
 
 def test_stats_and_ai_hit_rate(client):
     h = login(client, "통계")
-    client.patch("/api/members/me", headers=h, json={"birth_year": 2000, "gender": "male"})
+    set_profile(client, h, birth_year=2000, gender="male")
     for _ in range(4):
         client.post("/api/recommendations", json={"table_no": 1, "params": {"people": 2}, "combo_ids": ["classic"]})
     combo = {"id": "combo:classic", "name": "조합", "unit": 1, "qty": 1,

@@ -22,16 +22,17 @@ class MemberStore:
         self.db.script(SCHEMA)
 
     def upsert_login(self, kakao_id: str, nickname: str, gender: str | None = None,
-                     birthday: str | None = None) -> dict:
+                     birthday: str | None = None, birth_year: int | None = None, phone: str | None = None) -> dict:
         """카카오 로그인 때마다 호출: 없으면 가입, 있으면 방문 횟수와 마지막 방문일을 갱신."""
         now = now_iso()
         self.db.run(
-            """INSERT INTO members (kakao_id, nickname, gender, birthday, visit_count, last_visit_at, created_at)
-               VALUES (?, ?, ?, ?, 1, ?, ?)
+            """INSERT INTO members (kakao_id, nickname, gender, birthday, birth_year, phone, visit_count, last_visit_at, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
                ON CONFLICT(kakao_id) DO UPDATE SET nickname=excluded.nickname,
                  gender=COALESCE(excluded.gender, gender), birthday=COALESCE(excluded.birthday, birthday),
+                 birth_year=COALESCE(excluded.birth_year, birth_year), phone=COALESCE(excluded.phone, phone),
                  visit_count=visit_count+1, last_visit_at=excluded.last_visit_at""",
-            (kakao_id, nickname, gender, birthday, now, now))
+            (kakao_id, nickname, gender, birthday, birth_year, phone, now, now))
         return self.get_by_kakao(kakao_id)
 
     def get_by_kakao(self, kakao_id: str) -> dict:
@@ -43,18 +44,10 @@ class MemberStore:
     def all(self) -> list[dict]:
         return self.db.all("SELECT * FROM members ORDER BY id")
 
-    def update_profile(self, member_id: int, phone: str | None = None, marketing_consent: bool | None = None,
-                       birth_year: int | None = None, gender: str | None = None) -> dict | None:
-        if phone is not None:
-            self.db.run("UPDATE members SET phone=? WHERE id=?", (phone, member_id))
-        if birth_year is not None:
-            self.db.run("UPDATE members SET birth_year=? WHERE id=?", (birth_year, member_id))
-        if gender is not None:
-            self.db.run("UPDATE members SET gender=? WHERE id=?", (gender, member_id))
-        if marketing_consent is not None:
-            # 동의를 다시 하면 수신거부 상태도 해제한다.
-            self.db.run("UPDATE members SET marketing_consent=?, marketing_consent_at=?, opted_out=CASE WHEN ?=1 THEN 0 ELSE opted_out END WHERE id=?",
-                        (int(marketing_consent), now_iso() if marketing_consent else None, int(marketing_consent), member_id))
+    def set_marketing_consent(self, member_id: int, consent: bool) -> dict | None:
+        """로그인할 때 받은 광고성 문자 수신 동의 여부를 저장한다. 동의하면 수신거부 상태도 해제한다."""
+        self.db.run("UPDATE members SET marketing_consent=?, marketing_consent_at=?, opted_out=CASE WHEN ?=1 THEN 0 ELSE opted_out END WHERE id=?",
+                    (int(consent), now_iso() if consent else None, int(consent), member_id))
         return self.get(member_id)
 
     def opt_out(self, member_id: int) -> dict | None:

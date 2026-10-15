@@ -1,7 +1,7 @@
 """QR 로그인 API. 흐름은 docs/PRODUCTION_PLAN.md 1장 참고.
 
 태블릿: POST /qr → 화면에 QR 표시 → WS /ws/{secret} 로 대기
-휴대폰: QR(= /kakao/start) → 카카오 로그인 → /kakao/callback
+휴대폰: QR(= /kakao/start) → 광고성 문자 수신 동의(선택) → 카카오 로그인 → /kakao/callback
 """
 
 import asyncio
@@ -68,6 +68,35 @@ async def kakao_start(token: str, request: Request, settings: Settings = Depends
     if not store.mark_scanned(s):
         msg = "이미 사용된 QR입니다." if store.status(s) == "logged_in" else "QR이 만료되었습니다."
         return _page("로그인할 수 없어요", msg + " 태블릿에서 새 QR을 받아 주세요.", 410)
+    return _consent_page(token)
+
+
+def _consent_page(token: str) -> HTMLResponse:
+    """카카오 로그인 전에 광고성 문자 수신 동의(선택)를 받는 화면."""
+    return HTMLResponse(
+        '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        '<body style="font-family:sans-serif;padding:32px 20px;max-width:420px;margin:auto">'
+        '<h2 style="text-align:center">카카오로 로그인</h2>'
+        '<form action="/api/auth/kakao/continue" method="get">'
+        f'<input type="hidden" name="token" value="{html.escape(token)}">'
+        '<label style="display:flex;gap:10px;align-items:flex-start;font-size:16px;margin:24px 0 8px">'
+        '<input type="checkbox" name="agree" value="1" style="width:22px;height:22px;flex:none">'
+        '<span>(선택) 쿠폰·이벤트 등 광고성 문자 수신에 동의합니다.</span></label>'
+        '<p style="color:#777;font-size:13px;margin:0 0 24px">※ 임시 문구입니다. 정식 서비스 전에 개인정보 처리방침과 동의 문구를 확정해야 해요. '
+        '동의하지 않아도 로그인할 수 있어요. 광고 문자는 21시~08시에는 보내지 않고, 문자 하단 안내로 언제든 수신을 거부할 수 있어요. '
+        '로그인하면 카카오 계정의 성별·생일·휴대폰 번호(동의한 항목)를 함께 가져옵니다.</p>'
+        '<button style="width:100%;font-size:18px;padding:12px;background:#fee500;border:0;border-radius:8px">'
+        '카카오로 계속하기</button></form></body>')
+
+
+@router.get("/kakao/continue")
+async def kakao_continue(token: str, request: Request, agree: str = "", settings: Settings = Depends(get_settings)):
+    """동의 선택을 세션에 기록하고 카카오 로그인으로 보낸다."""
+    store = request.app.state.login_store
+    s = store.by_token(token)
+    if not s or store.status(s) != "scanned":
+        return _page("로그인할 수 없어요", "만료되었거나 이미 사용된 QR입니다. 태블릿에서 새 QR을 받아 주세요.", 410)
+    s.marketing_consent = agree == "1"
     if settings.supabase_enabled:  # Supabase Auth 가 카카오 로그인을 처리한다
         s.pkce_verifier, challenge = new_pkce_pair()
         return RedirectResponse(request.app.state.supabase.authorize_url(token, challenge), status_code=302)
@@ -102,7 +131,8 @@ async def kakao_callback(request: Request, state: str, code: str = "", error: st
         profile = await app.state.kakao.fetch_profile(code)
     except KakaoError as e:
         return _page("카카오 로그인에 실패했어요", html.escape(str(e)), 502)
-    member = app.state.members.upsert_login(**profile)
+    member = app.state.members.set_marketing_consent(
+        app.state.members.upsert_login(**profile)["id"], s.marketing_consent)
     access = tokens.issue(member["id"], settings.jwt_secret, settings.jwt_expire_minutes)
     if not store.complete(s, _public_member(member), access):
         return _page("로그인할 수 없어요", "QR이 만료되었습니다.", 410)
@@ -125,7 +155,8 @@ async def supabase_callback(state: str, request: Request, code: str = "", error:
         profile = await app.state.supabase.fetch_profile(code, verifier)
     except SupabaseAuthError as e:
         return _page("카카오 로그인에 실패했어요", html.escape(str(e)), 502)
-    member = app.state.members.upsert_login(**profile)
+    member = app.state.members.set_marketing_consent(
+        app.state.members.upsert_login(**profile)["id"], s.marketing_consent)
     access = tokens.issue(member["id"], settings.jwt_secret, settings.jwt_expire_minutes)
     if not store.complete(s, _public_member(member), access):
         return _page("로그인할 수 없어요", "QR이 만료되었습니다.", 410)

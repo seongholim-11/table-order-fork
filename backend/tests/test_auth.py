@@ -13,8 +13,11 @@ def make(ttl=180):
     return create_app(s)
 
 
-def scan_and_login(c, token, nick="홍길동"):
-    r = c.get(f"/api/auth/kakao/start?token={token}", follow_redirects=False)
+def scan_and_login(c, token, nick="홍길동", agree=False):
+    r = c.get(f"/api/auth/kakao/start?token={token}")
+    assert r.status_code == 200 and "광고성 문자 수신" in r.text  # 카카오로 가기 전에 동의(선택)를 받는다
+    r = c.get("/api/auth/kakao/continue", params={"token": token, **({"agree": "1"} if agree else {})},
+              follow_redirects=False)
     assert r.status_code == 302 and "/kakao/mock" in r.headers["location"]
     return c.get("/api/auth/kakao/callback", params={"state": token, "code": f"mock-{nick}"})
 
@@ -80,20 +83,53 @@ def test_unknown_websocket_secret_rejected():
                 pass
 
 
-def test_returning_member_and_profile_update():
+def test_returning_member_and_consent_at_login():
     with TestClient(make()) as c:
         tokens = []
-        for _ in range(2):
+        for agree in (False, True):
             q = c.post("/api/auth/qr", json={"table_no": 1}).json()
-            scan_and_login(c, q["token"], "단골")
+            scan_and_login(c, q["token"], "단골", agree=agree)
             tokens.append(c.get(f"/api/auth/qr/{q['secret']}").json()["access_token"])
         h = {"Authorization": f"Bearer {tokens[1]}"}
-        assert c.get("/api/members/me", headers=h).json()["visit_count"] == 2
-        r = c.patch("/api/members/me", headers=h, json={"phone": "010-1234-5678", "marketing_consent": True})
-        assert r.json()["phone"] == "010-1234-5678" and r.json()["marketing_consent"] is True
-        assert c.patch("/api/members/me", headers=h, json={"phone": "123"}).status_code == 422
+        me = c.get("/api/members/me", headers=h).json()
+        assert me["visit_count"] == 2 and me["marketing_consent"] is True  # 두 번째 로그인에서 동의
+        assert c.patch("/api/members/me", headers=h, json={"phone": "010-1234-5678"}).status_code == 405  # 직접 입력 기능 없음
         assert c.get("/api/members/me").status_code == 401
         assert c.get("/api/members/me", headers={"Authorization": "Bearer bad"}).status_code == 401
+
+
+def test_consent_defaults_to_no_and_latest_choice_wins():
+    with TestClient(make()) as c:
+        def once(agree):
+            q = c.post("/api/auth/qr", json={"table_no": 1}).json()
+            scan_and_login(c, q["token"], "손님", agree=agree)
+            h = {"Authorization": f"Bearer {c.get(f'/api/auth/qr/{q['secret']}').json()['access_token']}"}
+            return c.get("/api/members/me", headers=h).json()["marketing_consent"]
+        assert once(False) is False and once(True) is True and once(False) is False
+
+
+def test_continue_requires_scanned_session():
+    with TestClient(make()) as c:
+        q = c.post("/api/auth/qr", json={"table_no": 1}).json()
+        assert c.get("/api/auth/kakao/continue", params={"token": q["token"]}, follow_redirects=False).status_code == 410
+        assert c.get("/api/auth/kakao/continue", params={"token": "nope"}, follow_redirects=False).status_code == 410
+
+
+def test_kakao_account_parsing():
+    from app.services.kakao import normalize_phone, parse_account
+    assert normalize_phone("+82 10-1234-5678") == "010-1234-5678" and normalize_phone("010 123 4567") == "010-123-4567"
+    assert normalize_phone("+82 2-123-4567") is None and normalize_phone(None) is None
+    assert parse_account({"gender": "female", "birthday": "0312", "birthyear": "1995", "phone_number": "+82 10-1234-5678"}) == {
+        "gender": "female", "birthday": "0312", "birth_year": 1995, "phone": "010-1234-5678"}
+    assert parse_account({}) == {"gender": None, "birthday": None, "birth_year": None, "phone": None}
+
+
+def test_login_profile_fills_member_without_overwriting_with_blanks():
+    from app.stores.members import MemberStore
+    store = MemberStore()
+    store.upsert_login("k1", "가", gender="female", birthday="0312", birth_year=1995, phone="010-1234-5678")
+    m = store.upsert_login("k1", "가")  # 이후 로그인에서 동의 안 한 값은 기존 값을 지우지 않는다
+    assert (m["gender"], m["birth_year"], m["phone"], m["visit_count"]) == ("female", 1995, "010-1234-5678", 2)
 
 
 def test_mock_page_hidden_when_real_keys_set():
@@ -101,9 +137,11 @@ def test_mock_page_hidden_when_real_keys_set():
     with TestClient(create_app(s)) as c:
         assert c.get("/api/auth/kakao/mock?state=x").status_code == 404
         q = c.post("/api/auth/qr", json={"table_no": 1}).json()
-        loc = c.get(f"/api/auth/kakao/start?token={q['token']}", follow_redirects=False).headers["location"]
+        c.get(f"/api/auth/kakao/start?token={q['token']}")
+        loc = c.get("/api/auth/kakao/continue", params={"token": q["token"]}, follow_redirects=False).headers["location"]
         qs = parse_qs(urlparse(loc).query)
         assert loc.startswith("https://kauth.kakao.com/oauth/authorize") and qs["state"] == [q["token"]]
+        assert set(qs["scope"][0].split(",")) >= {"gender", "birthday", "birthyear", "phone_number"}
 
 
 # --- Supabase Auth (카카오 로그인을 Supabase 가 처리) ---
@@ -131,11 +169,12 @@ def test_supabase_flow(monkeypatch):
     monkeypatch.setattr(app.state.supabase, "fetch_profile", fake_profile)
     with TestClient(app) as c:
         q = c.post("/api/auth/qr", json={"table_no": 3}).json()
-        r = c.get(f"/api/auth/kakao/start?token={q['token']}", follow_redirects=False)
+        c.get(f"/api/auth/kakao/start?token={q['token']}")
+        r = c.get("/api/auth/kakao/continue", params={"token": q["token"]}, follow_redirects=False)
         loc = urlparse(r.headers["location"])
         assert r.status_code == 302 and loc.netloc == "abc.supabase.co" and loc.path == "/auth/v1/authorize"
         params = parse_qs(loc.query)
-        assert params["provider"] == ["kakao"] and params["code_challenge_method"] == ["s256"]
+        assert "gender" in params["scopes"][0].split() and params["provider"] == ["kakao"] and params["code_challenge_method"] == ["s256"]
         assert params["redirect_to"] == [f"http://t/api/auth/supabase/callback/{q['token']}"]
         assert c.get("/api/auth/kakao/mock", params={"state": q["token"]}).status_code == 404  # 모의 화면 꺼짐
         ok = c.get(f"/api/auth/supabase/callback/{q['token']}", params={"code": "abc"})
@@ -151,7 +190,8 @@ def test_supabase_callback_rejects_unscanned_error_and_unknown_state():
         q = c.post("/api/auth/qr", json={"table_no": 1}).json()
         assert c.get(f"/api/auth/supabase/callback/{q['token']}", params={"code": "x"}).status_code == 410  # 스캔 전
         assert c.get("/api/auth/supabase/callback/nope", params={"code": "x"}).status_code == 410
-        c.get(f"/api/auth/kakao/start?token={q['token']}", follow_redirects=False)
+        c.get(f"/api/auth/kakao/start?token={q['token']}")
+        c.get("/api/auth/kakao/continue", params={"token": q["token"]}, follow_redirects=False)
         assert c.get(f"/api/auth/supabase/callback/{q['token']}", params={"error": "access_denied"}).status_code == 400
 
 

@@ -1,4 +1,4 @@
-"""QR 로그인 팝업과 회원 정보 입력·회원 기록.
+"""QR 로그인 팝업과 회원 기록.
 """
 
 import time
@@ -81,28 +81,6 @@ def login_dialog(reason="spin"):
     st.html(f'<div class="login-pop"><b>{title}</b><small>{sub}</small></div>')
     login_watch()
     st.html('<div class="login-foot">로그인하지 않아도 주문은 할 수 있어요. 창을 닫아도 됩니다.</div>')
-
-
-def render_profile_form():
-    """카카오로 받지 못하는 정보(휴대폰 번호 등)와 마케팅 수신 동의를 직접 입력받는다. 모두 선택."""
-    ss = st.session_state
-    with st.expander(f"📱 {escape(ss.member['nickname'])}님 회원 정보 입력 (선택)", expanded=not ss.get("profile_saved")):
-        with st.form("profile_form"):
-            phone = st.text_input("휴대폰 번호", placeholder="010-1234-5678")
-            c1, c2 = st.columns(2)
-            year = c1.number_input("출생연도", 1920, 2020, value=None, step=1)
-            gender = c2.selectbox("성별", ["선택 안 함", "남", "여"])
-            consent = st.checkbox("(선택) 쿠폰·이벤트 등 광고성 문자 수신에 동의합니다.")
-            st.caption("※ 임시 문구입니다. 정식 서비스 전에 개인정보 처리방침과 동의 문구를 확정해야 해요. "
-                       "광고 문자는 21시~08시에는 보내지 않고, 문자 하단 안내로 언제든 수신을 거부할 수 있어요.")
-            if st.form_submit_button("저장", type="primary"):
-                ok, msg = server.update_profile(
-                    ss.access_token, phone=phone.strip() or None, birth_year=int(year) if year else None,
-                    gender={"남": "male", "여": "female"}.get(gender), marketing_consent=consent)
-                ss.profile_saved = ok
-                (st.success if ok else st.error)(msg)
-        if st.button("문자 수신거부", key="opt_out_btn"):
-            st.toast("수신거부 처리했어요." if server.opt_out(ss.access_token) else "처리하지 못했어요.", icon="🔕")
 
 
 def render_members_log():
