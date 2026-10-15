@@ -14,6 +14,7 @@ from app.stores.login_sessions import LoginSessionStore
 from app.stores.members import MemberStore
 from app.stores.shop import ShopStore
 from app.stores.sms_logs import SmsLogStore
+from app.stores.tablet_logins import TabletLoginStore
 
 DEFAULT_SECRET = "change-me"
 
@@ -32,6 +33,7 @@ def create_app(settings: Settings | None = None, sms_clock=None, sms_http=None) 
     db = Database(settings.database_url)
     app.state.login_store = LoginSessionStore(settings.login_ttl_seconds)
     app.state.members = MemberStore(db)
+    app.state.tablet_logins = TabletLoginStore(db, settings.jwt_expire_minutes)
     app.state.shop = ShopStore(db)
     app.state.content = ContentStore(db)
     app.state.sms_logs = SmsLogStore(db)

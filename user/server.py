@@ -56,3 +56,13 @@ def restore_member(token: str):
     except api.ApiUnavailable:
         mark_offline()
         return None
+
+
+def tablet_logins(token: str, table_no: int):
+    """이 태블릿에서 로그인한 회원 기록 [{id, nickname, at(UTC ISO), eligible, prize}] 또는 None."""
+    return safe_call(api.get, f"/api/tables/{table_no}/logins", token)
+
+
+def save_prize(token: str, table_no: int, member_id: int, prize: str) -> None:
+    """룰렛 결과를 서버에 남겨 새로고침 뒤에도 '이미 돌렸다'가 유지되게 한다 (실패해도 화면은 진행)."""
+    safe_call(api.put, f"/api/tables/{table_no}/logins/prize", token, json={"member_id": member_id, "prize": prize})

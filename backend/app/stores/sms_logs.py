@@ -13,7 +13,7 @@ class SmsLogStore:
     def __init__(self, db: Database):
         self.db = db
         db.script(SCHEMA)
-        if not any(c["name"] == "scheduled_at" for c in db.all("PRAGMA table_info(sms_logs)")):  # 예약 기능 이전 DB
+        if "scheduled_at" not in db.columns("sms_logs"):  # 예약 기능 이전 DB
             db.run("ALTER TABLE sms_logs ADD COLUMN scheduled_at TEXT")
 
     def add(self, month: str, kind: str, content: str, count: int, status: str,

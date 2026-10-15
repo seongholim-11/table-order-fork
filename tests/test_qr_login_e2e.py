@@ -187,3 +187,24 @@ def test_login_survives_reload_via_url_token_and_bad_token_is_dropped(server):
     bad.query_params["t"] = "garbage"
     bad.run()
     assert not bad.exception and ss(bad)["member"] is None and "t" not in bad.query_params
+
+
+def test_reload_restores_all_tablet_members_and_roulette_usage(server):
+    app = AppTest.from_file(APP, default_timeout=30).run()
+    for name in ("가", "나"):
+        app.button(key="login_open").click().run()
+        phone_login(server, ss(app)["login"]["qr_url"], name)
+        app.run()
+        ss(app)["login"] = None
+    app.button(key="roulette_btn").click().run()  # 첫 회원이 룰렛을 돌린다
+    assert ss(app)["members"][0]["prize"]
+    token = ss(app)["access_token"]
+
+    fresh = AppTest.from_file(APP, default_timeout=30)  # 새로고침: 마지막 회원의 토큰만 URL 에 남는다
+    fresh.query_params["t"] = token
+    fresh.run()
+    assert not fresh.exception
+    rows = ss(fresh)["members"]
+    assert [m["nickname"] for m in rows] == ["가", "나"] and ss(fresh)["member"]["nickname"] == "나"
+    assert rows[0]["prize"] and rows[1]["prize"] is None and rows[1]["eligible"]  # 룰렛 사용 여부가 유지된다
+    assert ss(fresh)["granted_ids"] == [m["id"] for m in rows]

@@ -59,11 +59,22 @@ def restore_login():
     elif me:
         m = {"id": me["id"], "nickname": me["nickname"]}
         ss.member, ss.access_token = m, token
-        if m["id"] not in ss.granted_ids:  # 룰렛 기회는 로그인 때 이미 한 번 받은 것으로 본다
-            ss.granted_ids.append(m["id"])
-        if all(r["id"] != m["id"] for r in ss.members):  # 이 태블릿 로그인 기록에도 남겨 중복 로그인을 막는다
-            ss.members.append({"id": m["id"], "nickname": m["nickname"], "at": datetime.now(KST).strftime("%H:%M"),
-                               "eligible": False, "prize": None})
+        _restore_members(token, m)
+
+
+def _restore_members(token, m):
+    """서버에 남은 '이 태블릿 로그인 기록'(룰렛 사용 여부 포함)을 되살린다. 못 받으면 현재 회원만 기록한다."""
+    ss = st.session_state
+    rows = server.tablet_logins(token, ss.table)
+    if not rows:  # 서버가 기록을 못 줘도 현재 회원은 룰렛을 이미 쓴 것으로 보고 중복 로그인을 막는다
+        rows = [{"id": m["id"], "nickname": m["nickname"], "at": None, "eligible": False, "prize": None}]
+    ss.members = [{"id": r["id"], "nickname": r["nickname"], "at": _hhmm(r["at"]),
+                   "eligible": r["eligible"], "prize": r["prize"]} for r in rows]
+    ss.granted_ids = [r["id"] for r in rows]
+
+
+def _hhmm(iso):
+    return datetime.fromisoformat(iso).astimezone(KST).strftime("%H:%M") if iso else ""
 
 
 def sync_login_url():

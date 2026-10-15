@@ -96,3 +96,32 @@ async def get_me(member: dict = Depends(current_member)):
 @router.post("/members/me/opt-out")
 async def opt_out(request: Request, member: dict = Depends(current_member)):
     return _me(request.app.state.members.opt_out(member["id"]))
+
+
+class PrizeIn(BaseModel):
+    member_id: int
+    prize: str = Field(min_length=1, max_length=50)
+
+
+def _tablet_rows(request: Request, table_no: int, member: dict) -> list[dict]:
+    """이 태블릿에 로그인한 회원만 그 태블릿의 기록을 볼 수 있다."""
+    rows = request.app.state.tablet_logins.list(table_no)
+    if all(r["id"] != member["id"] for r in rows):
+        raise HTTPException(403, "이 태블릿에서 로그인한 회원이 아닙니다.")
+    return rows
+
+
+@router.get("/tables/{table_no}/logins")
+async def tablet_logins(table_no: int, request: Request, member: dict = Depends(current_member)):
+    """새로고침 후 '이 태블릿에서 로그인한 회원'(룰렛 사용 여부 포함)을 되살리기 위한 기록."""
+    return _tablet_rows(request, table_no, member)
+
+
+@router.put("/tables/{table_no}/logins/prize")
+async def tablet_login_prize(table_no: int, body: PrizeIn, request: Request, member: dict = Depends(current_member)):
+    rows = _tablet_rows(request, table_no, member)
+    if all(r["id"] != body.member_id for r in rows):
+        raise HTTPException(404, "이 태블릿에서 로그인한 회원이 아닙니다.")
+    if not request.app.state.tablet_logins.set_prize(table_no, body.member_id, body.prize):
+        raise HTTPException(409, "이미 룰렛을 돌린 회원입니다.")
+    return {"ok": True}

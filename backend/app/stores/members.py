@@ -29,9 +29,9 @@ class MemberStore:
             """INSERT INTO members (kakao_id, nickname, gender, birthday, birth_year, phone, visit_count, last_visit_at, created_at)
                VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
                ON CONFLICT(kakao_id) DO UPDATE SET nickname=excluded.nickname,
-                 gender=COALESCE(excluded.gender, gender), birthday=COALESCE(excluded.birthday, birthday),
-                 birth_year=COALESCE(excluded.birth_year, birth_year), phone=COALESCE(excluded.phone, phone),
-                 visit_count=visit_count+1, last_visit_at=excluded.last_visit_at""",
+                 gender=COALESCE(excluded.gender, members.gender), birthday=COALESCE(excluded.birthday, members.birthday),
+                 birth_year=COALESCE(excluded.birth_year, members.birth_year), phone=COALESCE(excluded.phone, members.phone),
+                 visit_count=members.visit_count+1, last_visit_at=excluded.last_visit_at""",
             (kakao_id, nickname, gender, birthday, birth_year, phone, now, now))
         return self.get_by_kakao(kakao_id)
 

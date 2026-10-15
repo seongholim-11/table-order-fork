@@ -8,7 +8,7 @@ MENU_FIELDS = ("name", "cat", "price", "desc", "image_url", "soldout", "spicy", 
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS menus (
-    id TEXT PRIMARY KEY, cat TEXT NOT NULL, name TEXT NOT NULL, desc TEXT NOT NULL DEFAULT '',
+    id TEXT PRIMARY KEY, cat TEXT NOT NULL, name TEXT NOT NULL, "desc" TEXT NOT NULL DEFAULT '',
     price INTEGER NOT NULL, emoji TEXT NOT NULL DEFAULT '🍽️', tags TEXT NOT NULL DEFAULT '[]',
     soldout INTEGER NOT NULL DEFAULT 0, spicy INTEGER NOT NULL DEFAULT 0, weight INTEGER NOT NULL DEFAULT 50,
     set_ok INTEGER NOT NULL DEFAULT 0, image_url TEXT NOT NULL DEFAULT '', sort INTEGER NOT NULL DEFAULT 0);
@@ -47,9 +47,9 @@ class MenuMixin:
             row = self.db.one("SELECT sort FROM menus WHERE id=?", (menu_id,))
             sort = row["sort"] if row else (self.db.one("SELECT COALESCE(MAX(sort),0)+1 AS n FROM menus")["n"])
         self.db.run(
-            """INSERT INTO menus (id, cat, name, desc, price, emoji, tags, soldout, spicy, weight, set_ok, image_url, sort)
+            """INSERT INTO menus (id, cat, name, "desc", price, emoji, tags, soldout, spicy, weight, set_ok, image_url, sort)
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-               ON CONFLICT(id) DO UPDATE SET cat=excluded.cat, name=excluded.name, desc=excluded.desc,
+               ON CONFLICT(id) DO UPDATE SET cat=excluded.cat, name=excluded.name, "desc"=excluded."desc",
                  price=excluded.price, emoji=excluded.emoji, tags=excluded.tags, soldout=excluded.soldout,
                  spicy=excluded.spicy, weight=excluded.weight, set_ok=excluded.set_ok, image_url=excluded.image_url""",
             (menu_id, data["cat"], data["name"], data["desc"], data["price"], data["emoji"],

@@ -5,6 +5,8 @@ import random
 
 import streamlit as st
 
+import server
+
 from user.state import context as ctx
 from user.state.cart import cart_add
 
@@ -34,6 +36,8 @@ def spin_roulette():
     ss.roulette = {"idx": idx, "angle": round(angle, 1), "animate": True}
     prize = ctx.ROULETTE_PRIZES[idx]
     row["prize"] = prize["short"]
+    if ss.access_token:  # 새로고침해도 '이미 돌렸다'가 유지되도록 서버에 남긴다
+        server.save_prize(ss.access_token, ss.table, row["id"], prize["short"])
     ss.just_spun = True
     if prize["kind"] == "discount":
         ss.roulette_percent = max(ss.roulette_percent, prize["percent"])
