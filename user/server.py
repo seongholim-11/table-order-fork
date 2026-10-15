@@ -43,3 +43,16 @@ def create_qr(table_no: int, previous_secret: str | None = None, logged_in_membe
 def poll_login(secret: str):
     """{event:'status', status, remaining} / {event:'logged_in', member, access_token} 또는 None."""
     return safe_call(api.get, f"/api/auth/qr/{secret}")
+
+
+def restore_member(token: str):
+    """저장해 둔 토큰으로 회원을 다시 확인한다. 'invalid'(만료·위조), None(서버 연결 불가), 회원 dict 중 하나."""
+    if not is_online():
+        return None
+    try:
+        return api.get("/api/members/me", token)
+    except api.ApiError as e:
+        return "invalid" if e.status in (401, 403, 404) else None
+    except api.ApiUnavailable:
+        mark_offline()
+        return None

@@ -17,6 +17,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))  # 저장소 루트
 
 import user_repository as repository  # noqa: E402
 from user.state import context as ctx  # noqa: E402
+from user.state.login import restore_login, sync_login_cookie  # noqa: E402
 from user.state.session import init_state, sync_url  # noqa: E402
 from user.ui.cart import render_cart  # noqa: E402
 from user.ui.common import scroll_to_top_on_view_change  # noqa: E402
@@ -39,11 +40,13 @@ st.set_page_config(page_title=f"{ctx.STORE['name']} 테이블오더", page_icon=
 
 def main():
     init_state()
+    restore_login()
     sync_url()
     st.html(Path(__file__).with_name("app.css"))
     if st.session_state.theme == "light":
         st.html(Path(__file__).with_name("app_light.css"))
     scroll_to_top_on_view_change()
+    sync_login_cookie()
     if st.session_state.page == "splash":
         render_splash()
         return

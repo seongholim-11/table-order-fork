@@ -15,6 +15,7 @@ from app.core.settings import Settings, get_settings
 from app.services import tokens
 from app.services.kakao import KakaoError
 from app.services.supabase_auth import SupabaseAuthError, new_pkce_pair
+from app.services.supabase_members import sync_member
 
 router = APIRouter(prefix="/api/auth", tags=["QR 로그인"])
 
@@ -168,6 +169,7 @@ async def supabase_callback(state: str, request: Request, code: str = "", error:
     member = app.state.members.upsert_login(**profile)
     if s.marketing_consent:  # 체크하지 않았다고 이전 동의를 지우지 않는다 (철회는 수신거부로)
         member = app.state.members.set_marketing_consent(member["id"], True)
+    await sync_member(settings, profile)
     access = tokens.issue(member["id"], settings.jwt_secret, settings.jwt_expire_minutes)
     if not store.complete(s, _public_member(member), access):
         return _page("로그인할 수 없어요", "QR이 만료되었습니다.", 410)
