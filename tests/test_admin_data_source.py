@@ -28,7 +28,7 @@ RULE = ar.DEFAULT_RULE
 def go_page(app, page):
     """사이드바에서 메뉴를 연다 (주문 이력·마케팅은 하위 메뉴의 첫 항목)."""
     if page in {"주문 이력": 0, "마케팅": 0}:
-        sub = {"주문 이력": "전체 주문", "마케팅": "문자"}[page]
+        sub = {"주문 이력": "전체 주문", "마케팅": "AI 문자"}[page]
         return app.sidebar.radio(key=f"nav_sub_{page}").set_value(sub).run()
     return app.sidebar.radio(key="nav_top").set_value(page).run()
 
@@ -245,7 +245,7 @@ def test_wrong_token_is_rejected_in_every_mode(server, monkeypatch):
 def test_marketing_screen_in_dummy_mode_can_preview_and_send(monkeypatch):
     monkeypatch.setenv("ADMIN_TOKEN", "change-me")
     app = login(monkeypatch, "dummy", "change-me")
-    app.sidebar.radio(key="nav_sub_마케팅").set_value("문자").run()
+    app.sidebar.radio(key="nav_sub_마케팅").set_value("AI 문자").run()
     assert not app.exception and any("더미 데이터로 만든 화면" in c.value for c in app.caption)
     assert any("발송 대상" in c.value for c in app.caption)  # 기본값(휴면)으로 바로 미리보기
     before = len(app.session_state["repo"].sms_logs())

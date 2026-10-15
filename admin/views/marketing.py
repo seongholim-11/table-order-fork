@@ -1,4 +1,4 @@
-"""마케팅 화면 (문자 발송 + AI 추천).
+"""마케팅 화면 (AI 챗봇 · AI 추천 · AI 문자).
 """
 
 from datetime import datetime, timedelta, timezone
@@ -224,7 +224,7 @@ def pick_recommendations(recs, round_no):
     return chosen, page + 1, pages
 
 
-def marketing_ai_tab(repo):
+def marketing_recommend_tab(repo):
     ctx = marketing_ai.build_context(repo, ss["grade_rule"])
     sec_title("사장님을 위한 마케팅 추천", "매장의 모든 데이터를 바탕으로 정리했어요")
     recs, page, pages = pick_recommendations(marketing_ai.recommend(ctx), ss.get("mk_rec_round", 0))
@@ -237,6 +237,10 @@ def marketing_ai_tab(repo):
                  help="다른 마케팅 방법을 추천받아요")
     c_note.caption(f"추천 {page}/{pages} · 눌러서 다른 마케팅 방법을 추천받아요" if pages > 1
                    else "지금은 추천할 방법이 이것뿐이에요. 데이터가 쌓이면 더 다양해져요.")
+
+
+def marketing_chatbot_tab(repo):
+    ctx = marketing_ai.build_context(repo, ss["grade_rule"])
     sec_title("AI 챗봇", "궁금한 점을 물어보세요")
     st.caption("🧪 지금은 규칙 기반 모의 응답이에요. 실제 AI(Claude API) 연동 지점은 `marketing_ai.py` 에 분리돼 있어요.")
     chat = ss.setdefault("mk_chat", [{"role": "assistant", "content": marketing_ai.GREETING}])
@@ -251,7 +255,7 @@ def marketing_ai_tab(repo):
             box.chat_message(msg["role"]).write(msg["content"])
 
 
-def page_marketing(repo, tab="문자"):
-    """문자 / AI 탭은 사이드바 하위 메뉴에서 고른다 (admin/app.py 의 SUBPAGES)."""
+def page_marketing(repo, tab="AI 챗봇"):
+    """AI 챗봇 / AI 추천 / AI 문자 탭은 사이드바 하위 메뉴에서 고른다 (admin/app.py 의 SUBPAGES)."""
     page_head("마케팅", "수신 동의한 회원에게 문자를 보내 재방문을 이끌어요")
-    {"문자": marketing_dashboard, "AI": marketing_ai_tab}[tab](repo)
+    {"AI 챗봇": marketing_chatbot_tab, "AI 추천": marketing_recommend_tab, "AI 문자": marketing_dashboard}[tab](repo)

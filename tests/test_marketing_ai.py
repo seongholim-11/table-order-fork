@@ -40,33 +40,40 @@ def test_ai_context_and_recommendations():
     assert "가장 많이 팔린 메뉴" in answer
 
 
-def test_default_tab_is_sms():
+def test_default_tab_is_chatbot_and_other_tabs_render_separately():
     app = open_marketing()
     assert not app.exception
-    assert app.query_params["tab"] == "문자"
-    assert app.text_area  # 문자 작성 화면
-
-
-def test_ai_tab_from_url_shows_recommendations_and_chat():
-    app = open_marketing("AI")
-    assert not app.exception
-    assert not app.text_area  # 문자 탭의 문자 작성 화면은 보이지 않는다
+    assert app.query_params["tab"] == "AI 챗봇"
+    assert app.chat_input and not app.text_area
     app.chat_input[0].set_value("휴면 고객 어떻게 되찾을까?").run()
     assert not app.exception
     texts = [m.markdown[0].value if m.markdown else "" for m in app.chat_message]
     assert len(texts) == 3 and "휴면" in texts[-1]
 
 
+def test_recommend_tab_has_only_recommendations():
+    app = open_marketing("AI 추천")
+    assert not app.exception
+    assert not app.chat_input and not app.text_area
+    assert any('class="recs"' in h.value for h in app.get("html"))
+
+
+def test_sms_tab_has_the_message_editor():
+    app = open_marketing("AI 문자")
+    assert not app.exception
+    assert app.text_area and not app.chat_input
+
+
 def test_switching_tab_updates_url():
     app = open_marketing()
-    app.sidebar.radio(key="nav_sub_마케팅").set_value("AI").run()
-    assert app.query_params["tab"] == "AI" and app.query_params["page"] == "마케팅"
-    assert not app.text_area
+    app.sidebar.radio(key="nav_sub_마케팅").set_value("AI 문자").run()
+    assert app.query_params["tab"] == "AI 문자" and app.query_params["page"] == "마케팅"
+    assert app.text_area
 
 
 def test_sidebar_sub_menus_are_collapsible_and_select_tabs():
-    app = open_marketing("AI")
-    assert app.sidebar.radio(key="nav_sub_마케팅").options == ["문자", "AI"]
+    app = open_marketing("AI 추천")
+    assert app.sidebar.radio(key="nav_sub_마케팅").options == ["AI 챗봇", "AI 추천", "AI 문자"]
     assert app.sidebar.radio(key="nav_sub_주문 이력").options == ["전체 주문", "고객별 주문"]
     assert [e.label for e in app.sidebar.expander] == ["🧾 주문 이력", "💬 마케팅"]
     assert [e.proto.expanded for e in app.sidebar.expander] == [False, True]  # 선택된 묶음만 펼쳐서 시작
@@ -92,7 +99,7 @@ def test_rerecommend_cycles_through_recommendations():
 
 
 def test_rerecommend_button_changes_cards():
-    app = open_marketing("AI")
+    app = open_marketing("AI 추천")
     before = [h.value for h in app.get("html") if 'class="recs"' in h.value]
     app.button(key="mk_rerecommend").click().run()
     after = [h.value for h in app.get("html") if 'class="recs"' in h.value]
@@ -139,7 +146,7 @@ def test_suggest_candidates_gives_up_to_five_with_recipients(monkeypatch):
 
 def test_ai_button_shows_candidates_and_editable_recipients(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    app = open_marketing()
+    app = open_marketing("AI 문자")
     assert not [b for b in app.button if b.label.startswith("🆕") or b.label.startswith("💤 휴면 복귀")]  # 빠른 문구 제거
     app.button(key="ai_sms_generate").click().run()
     assert not app.exception

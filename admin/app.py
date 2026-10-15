@@ -51,7 +51,7 @@ st.set_page_config(page_title="식당도우미 관리자", page_icon="🍺", lay
 st.html(Path(__file__).with_name("admin.css"))
 
 # 사이드바 메뉴. 화면 안에 탭이 있는 페이지(주문 이력·마케팅)는 탭을 접고 펼 수 있는 하위 메뉴로 보여 준다.
-SUBPAGES = {"주문 이력": ["전체 주문", "고객별 주문"], "마케팅": ["문자", "AI"]}
+SUBPAGES = {"주문 이력": ["전체 주문", "고객별 주문"], "마케팅": ["AI 챗봇", "AI 추천", "AI 문자"]}
 SUBPAGE_ICON = {"주문 이력": "🧾", "마케팅": "💬"}
 TOP_PAGES = ["대시보드", "메뉴 관리", "추천 가중치", "이벤트", "고객 등급"]
 PAGES = [*TOP_PAGES, *SUBPAGES]

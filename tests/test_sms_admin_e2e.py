@@ -23,7 +23,7 @@ PAGES = ["대시보드", "메뉴 관리", "추천 가중치", "고객 등급", "
 def go_page(app, page):
     """사이드바에서 메뉴를 연다 (주문 이력·마케팅은 하위 메뉴의 첫 항목)."""
     if page in {"주문 이력": 0, "마케팅": 0}:
-        sub = {"주문 이력": "전체 주문", "마케팅": "문자"}[page]
+        sub = {"주문 이력": "전체 주문", "마케팅": "AI 문자"}[page]
         return app.sidebar.radio(key=f"nav_sub_{page}").set_value(sub).run()
     return app.sidebar.radio(key="nav_top").set_value(page).run()
 
@@ -70,7 +70,7 @@ def login(token="admin-secret"):
 
 
 def open_marketing(app):
-    app.sidebar.radio(key="nav_sub_마케팅").set_value("문자").run()
+    app.sidebar.radio(key="nav_sub_마케팅").set_value("AI 문자").run()
     assert not app.exception
     return app
 
