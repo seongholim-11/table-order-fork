@@ -21,6 +21,7 @@ router = APIRouter(prefix="/api/auth", tags=["QR 로그인"])
 
 class QrRequest(BaseModel):
     table_no: int = Field(ge=1)
+    previous_secret: str | None = None  # QR 재생성: 이전 세션을 먼저 정리한다
 
 
 def _page(title: str, body: str, status: int = 200) -> HTMLResponse:
@@ -37,6 +38,8 @@ def _public_member(m: dict) -> dict:
 @router.post("/qr")
 async def create_qr(body: QrRequest, request: Request, settings: Settings = Depends(get_settings)):
     store = request.app.state.login_store
+    if body.previous_secret:
+        store.discard(body.previous_secret)
     s = store.create(body.table_no)
     return {"token": s.token, "secret": s.secret, "expires_in": int(store.ttl),
             "qr_url": f"{settings.public_base_url}/api/auth/kakao/start?token={s.token}"}

@@ -33,9 +33,10 @@ def safe_call(fn, *args, **kw):
     return None
 
 
-def create_qr(table_no: int):
-    """{token, secret, qr_url, expires_in} 또는 None."""
-    return safe_call(api.post, "/api/auth/qr", None, json={"table_no": table_no})
+def create_qr(table_no: int, previous_secret: str | None = None):
+    """{token, secret, qr_url, expires_in} 또는 None. previous_secret 을 주면 이전 QR 세션을 정리하고 새로 발급한다."""
+    body = {"table_no": table_no, **({"previous_secret": previous_secret} if previous_secret else {})}
+    return safe_call(api.post, "/api/auth/qr", None, json=body)
 
 
 def poll_login(secret: str):

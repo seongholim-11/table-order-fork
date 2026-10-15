@@ -11,9 +11,11 @@ from user.ui.common import KST
 
 
 def new_login():
-    """서버에서 일회용 QR 로그인 세션을 발급받는다. 서버가 없으면 None."""
-    qr = server.create_qr(st.session_state.table)
-    st.session_state.login = {**qr, "created": time.time()} if qr else None
+    """서버에서 일회용 QR 로그인 세션을 발급받는다. 서버가 없으면 None. 이전 QR 세션은 서버에서 정리한다."""
+    prev = st.session_state.login
+    qr = server.create_qr(st.session_state.table, prev["secret"] if prev else None)
+    if qr or not prev:
+        st.session_state.login = {**qr, "created": time.time()} if qr else None
 
 
 def ensure_login():

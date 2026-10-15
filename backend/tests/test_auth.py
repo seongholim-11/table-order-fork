@@ -153,3 +153,21 @@ def test_supabase_callback_rejects_unscanned_error_and_unknown_state():
         assert c.get("/api/auth/supabase/callback/nope", params={"code": "x"}).status_code == 410
         c.get(f"/api/auth/kakao/start?token={q['token']}", follow_redirects=False)
         assert c.get(f"/api/auth/supabase/callback/{q['token']}", params={"error": "access_denied"}).status_code == 400
+
+
+def test_regenerate_discards_previous_session():
+    with TestClient(make()) as c:
+        old = c.post("/api/auth/qr", json={"table_no": 1}).json()
+        new = c.post("/api/auth/qr", json={"table_no": 1, "previous_secret": old["secret"]}).json()
+        assert new["token"] != old["token"] and new["secret"] != old["secret"]
+        assert c.get(f"/api/auth/qr/{old['secret']}").status_code == 404
+        assert c.get(f"/api/auth/kakao/start?token={old['token']}", follow_redirects=False).status_code == 404
+        assert c.get(f"/api/auth/qr/{new['secret']}").json()["status"] == "waiting"
+
+
+def test_regenerate_keeps_completed_login():
+    with TestClient(make()) as c:
+        old = c.post("/api/auth/qr", json={"table_no": 1}).json()
+        scan_and_login(c, old["token"])
+        c.post("/api/auth/qr", json={"table_no": 1, "previous_secret": old["secret"]})
+        assert c.get(f"/api/auth/qr/{old['secret']}").json()["event"] == "logged_in"
