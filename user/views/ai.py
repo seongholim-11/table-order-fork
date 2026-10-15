@@ -54,23 +54,15 @@ def render_combo_cards(combos):
                 st.rerun()
 
 
+DEFAULT_PREFERENCES = (2, 40000, "상관없어요", "맥주")  # 인원, 예산, 맵기, 음료
+
+
 def render_recommendations():
     st.html('<div class="ai-hero"><div class="ai-eyebrow">✨ 오늘의 맞춤 메뉴</div>'
             '<h2>AI 추천 조합</h2><p>취향에 맞는 한 상, 조합 할인까지 한 번에.</p>'
             + (f'<span class="ai-offer">회원 혜택 · 조합 주문 시 {ctx.DISCOUNT_PERCENT}% 할인 적용 중</span></div>' if st.session_state.member
                else f'<span class="ai-offer">회원 전용 · QR 로그인하면 조합 {ctx.DISCOUNT_PERCENT}% 할인</span></div>'))
-    with st.container(key="ai_preferences"):
-        st.html('<div class="ai-preference-title">어떤 한 상을 원하세요?</div>')
-        with st.container(key="ai_preference_fields"):
-            c1, c2, c3, c4 = st.columns(4, wrap=False)
-            people = c1.selectbox("주문 인원", list(range(1, 7)), index=1,
-                                  format_func=lambda n: f"{n}명", key="ai_people")
-            budget = c2.selectbox("조합 예산", [20000, 30000, 40000, 60000, 100000], index=2,
-                                  format_func=lambda n: f"{won(n)} 이하", key="ai_budget")
-            spicy = c3.selectbox("맵기 취향", ["상관없어요", "맵지 않게", "매콤하게"], key="ai_spicy")
-            drink = c4.selectbox("함께 마실 음료", ["맥주", "소주", "음료", "없이"], key="ai_drink")
-        st.caption("선택한 조건에 따라 추천이 바로 바뀝니다. 예산은 한 조합의 " +
-                   ("할인 후 " if st.session_state.member else "") + "총액 기준입니다.")
+    people, budget, spicy, drink = DEFAULT_PREFERENCES  # 조건 선택 영역 없이 기본 조건으로 추천한다 (세부 조건은 AI 질문에서)
     lines = list(st.session_state.cart.values()) + [line for order in st.session_state.orders for line in order["lines"]]
     combos = recommend_combos(people, budget, spicy, drink, lines, menu_by_id=ctx.MENU_BY_ID, rules=ctx.RULES,
                               member=bool(st.session_state.member))
@@ -78,7 +70,7 @@ def render_recommendations():
     st.html(f'<div class="section-title ai-results-title">나에게 맞는 추천 <span>{len(combos)}</span>'
             f'<small>{people}명 · {won(budget)} 이하</small></div>')
     if not combos:
-        st.info("선택한 조건에 맞는 조합이 없어요. 예산을 높이거나 음료·인원 조건을 바꿔 주세요.")
+        st.info("지금 추천할 수 있는 조합이 없어요. AI 질문으로 조건을 바꿔 보세요.")
     render_combo_cards(combos)
     st.caption("현재는 취향과 주문 정보를 반영한 데모 추천입니다. 조합 할인은 회원에게만, 세트 단위로 적용됩니다.")
 

@@ -50,19 +50,21 @@ from admin_repository import DEFAULT_RULE  # noqa: E402
 st.set_page_config(page_title="식당도우미 관리자", page_icon="🍺", layout="wide", initial_sidebar_state="auto")
 st.html(Path(__file__).with_name("admin.css"))
 
-# 사이드바 메뉴. 화면 안에 탭이 있는 페이지는 탭을 하위 항목으로 펼쳐 보여 준다 (하위 항목 → 상위 페이지).
+# 사이드바 메뉴. 화면 안에 탭이 있는 페이지(주문 이력·마케팅)는 탭을 접고 펼 수 있는 하위 메뉴로 보여 준다.
 SUBPAGES = {"주문 이력": ["전체 주문", "고객별 주문"], "마케팅": ["문자", "AI"]}
-PAGES = ["대시보드", "메뉴 관리", "추천 가중치", "이벤트", "고객 등급", "주문 이력", "마케팅"]
-NAV_ITEMS = [x for p in PAGES for x in [p, *SUBPAGES.get(p, [])]]
-PARENT_OF = {sub: p for p, subs in SUBPAGES.items() for sub in subs}
+SUBPAGE_ICON = {"주문 이력": "🧾", "마케팅": "💬"}
+TOP_PAGES = ["대시보드", "메뉴 관리", "추천 가중치", "이벤트", "고객 등급"]
+PAGES = [*TOP_PAGES, *SUBPAGES]
+NAV_KEYS = ["nav_top", *(f"nav_sub_{p}" for p in SUBPAGES)]  # 메뉴 묶음마다 라디오 하나 (한 번에 하나만 선택된다)
 
 ss = st.session_state
 
 
-def _open_first_sub():
-    """하위 항목이 있는 상위 메뉴(주문 이력·마케팅)를 누르면 첫 하위 항목으로 연다."""
-    if ss["nav_page"] in SUBPAGES:
-        ss["nav_page"] = SUBPAGES[ss["nav_page"]][0]
+def _select_nav(key):
+    """한 묶음에서 고르면 나머지 묶음의 선택은 지운다."""
+    for other in NAV_KEYS:
+        if other != key:
+            ss[other] = None
 
 
 ss.setdefault("owner", False)
@@ -94,12 +96,24 @@ with st.sidebar:
     st.html(f'<div class="sb-brand"><div class="sb-logo">🍺</div><div><div class="sb-name">식당도우미</div>'
             f'<div class="sb-sub">관리자 콘솔</div></div></div><div class="sb-label">MENU</div>')
     # 새로고침해도 보던 메뉴가 유지되도록 URL(?page=...&tab=...)에 저장하고 거기서 복원한다.
-    if "nav_page" not in ss:
+    if "nav_top" not in ss:
         url_page = st.query_params["page"] if st.query_params.get("page") in PAGES else PAGES[0]
         url_tab = st.query_params.get("tab")
-        ss["nav_page"] = url_tab if url_tab in SUBPAGES.get(url_page, []) else (SUBPAGES.get(url_page) or [url_page])[0]
-    page = st.radio("메뉴", NAV_ITEMS, key="nav_page", label_visibility="collapsed", on_change=_open_first_sub)
-    page, sub = PARENT_OF.get(page, page), (page if page in PARENT_OF else None)
+        for key in NAV_KEYS:
+            ss[key] = None
+        if url_page in SUBPAGES:
+            ss[f"nav_sub_{url_page}"] = url_tab if url_tab in SUBPAGES[url_page] else SUBPAGES[url_page][0]
+        else:
+            ss["nav_top"] = url_page
+    active_group = next((p for p in SUBPAGES if ss.get(f"nav_sub_{p}")), None)
+    st.radio("메뉴", TOP_PAGES, key="nav_top", index=None, label_visibility="collapsed",
+             on_change=_select_nav, args=("nav_top",))
+    for group, subs in SUBPAGES.items():  # 접고 펼 수 있는 하위 메뉴: 선택된 묶음은 펼친 채로 시작한다
+        with st.expander(f"{SUBPAGE_ICON[group]} {group}", expanded=group == active_group):
+            st.radio(group, subs, key=f"nav_sub_{group}", index=None, label_visibility="collapsed",
+                     on_change=_select_nav, args=(f"nav_sub_{group}",))
+    page = active_group or ss.get("nav_top") or TOP_PAGES[0]
+    sub = ss.get(f"nav_sub_{active_group}") if active_group else None
     if st.query_params.get("page") != page:
         st.query_params["page"] = page
     if sub and st.query_params.get("tab") != sub:

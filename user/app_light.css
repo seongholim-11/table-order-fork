@@ -14,7 +14,7 @@
 .brand .sub, .mdesc, .cart-line .o, .cart-empty, .qr-text .c, .login-pop small, .qz-hint, .login-timer, .login-foot, .mlog li .t, .qz-progress .t, .qz-auto small, .rw-title .s { color: #6b6b76; }
 .table-chip { background: #fff; border-color: #d4d4dc; }
 .table-chip b, .section-title span, .cart-title span, .mprice, .total-row b, .combo-pricing strong, .mlog-title span, .mlog li em, .qz-progress .n, .qz-group, .splash .big span, .promo .h { color: #d98200; }
-[class*="st-key-card_"], .st-key-cart_panel, .st-key-ai_preferences, [class*="st-key-ai_combo_"], .st-key-qr_card, .mlog, [class*="st-key-quiz_opt_"] { background: #fff; border-color: #dcdce3; }
+[class*="st-key-card_"], .st-key-cart_panel, [class*="st-key-ai_combo_"], .st-key-qr_card, .mlog, [class*="st-key-quiz_opt_"] { background: #fff; border-color: #dcdce3; }
 .st-key-ai_combo_1 { background: linear-gradient(135deg, #f1eaff, #fff 70%); border-color: #a68ad4; }
 .thumb > .beverage-photo { background: #efeff3; }
 .total-row, .order-item, .qz-auto, .splash .slogan { color: #3c3c46; }

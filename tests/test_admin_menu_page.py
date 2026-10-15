@@ -41,7 +41,7 @@ def open_menu_page(monkeypatch, mode):
     app = AppTest.from_file(APP, default_timeout=30).run()
     app.text_input[0].set_value("change-me" if mode == "dummy" else "admin-secret")
     app.button[0].click().run()
-    app.sidebar.radio[0].set_value("메뉴 관리").run()
+    app.sidebar.radio(key="nav_top").set_value("메뉴 관리").run()
     assert not app.exception
     return app
 
@@ -201,7 +201,7 @@ def test_menu_editor_undo_button_sits_next_to_save_and_is_disabled_without_chang
 
 def test_weights_page_uses_menu_layout_with_category_panel_and_table(monkeypatch):
     app = open_menu_page(monkeypatch, "dummy")
-    app.sidebar.radio[0].set_value("추천 가중치").run()
+    app.sidebar.radio(key="nav_top").set_value("추천 가중치").run()
     assert not app.exception
     keys = [b.key for b in app.button if str(b.key).startswith("mcat_w_")]
     assert keys == ["mcat_w_chicken", "mcat_w_anju", "mcat_w_soup", "mcat_w_beer", "mcat_w_soju", "mcat_w_side"]
@@ -217,7 +217,7 @@ def test_weights_page_uses_menu_layout_with_category_panel_and_table(monkeypatch
 
 def test_weights_save_persists_changes(monkeypatch):
     app = open_menu_page(monkeypatch, "dummy")
-    app.sidebar.radio[0].set_value("추천 가중치").run()
+    app.sidebar.radio(key="nav_top").set_value("추천 가중치").run()
     repo = app.session_state["repo"]
     first = repo.menus().query("카테고리 == '치킨·튀김'").iloc[0]["id"]
     # data_editor 는 AppTest 에서 직접 편집할 수 없으므로 저장 경로(repo.save_menus)와 같은 변환을 검증한다
@@ -234,7 +234,7 @@ def test_weights_save_persists_changes(monkeypatch):
 
 def test_grade_rule_reset_returns_to_defaults(monkeypatch):
     app = open_menu_page(monkeypatch, "dummy")
-    app.sidebar.radio[0].set_value("고객 등급").run()
+    app.sidebar.radio(key="nav_top").set_value("고객 등급").run()
     assert app.button(key="rule_reset").disabled
     app.number_input(key="rule_dormant").set_value(120).run()
     assert not app.button(key="rule_reset").disabled
@@ -255,7 +255,7 @@ def test_page_and_category_are_kept_in_url_and_restored_on_reload(monkeypatch):
     fresh.text_input[0].set_value("change-me")
     fresh.button[0].click().run()
     assert not fresh.exception
-    assert fresh.sidebar.radio[0].value == "메뉴 관리" and fresh.session_state["menu_cat"] == "soup"
+    assert fresh.sidebar.radio(key="nav_top").value == "메뉴 관리" and fresh.session_state["menu_cat"] == "soup"
 
 
 def test_skip_token_enters_without_login(monkeypatch):

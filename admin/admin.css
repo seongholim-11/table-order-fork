@@ -46,17 +46,21 @@ hr { border-color: var(--line) !important; }
 [data-testid="stRadioOption"] > div > div:first-child { display: none !important; }
 [data-testid="stSidebar"] [data-testid="stRadioOption"] p { color: var(--nav-ink); font-size: 14.5px; font-weight: 600; margin: 0; }
 [data-testid="stSidebar"] [data-testid="stRadioOption"] p::before { display: inline-block; width: 26px; font-size: 15px; filter: grayscale(.2); }
-[data-testid="stSidebar"] [role="radiogroup"] > div:nth-child(1) p::before { content: "📊"; }
-[data-testid="stSidebar"] [role="radiogroup"] > div:nth-child(2) p::before { content: "🍽️"; }
-[data-testid="stSidebar"] [role="radiogroup"] > div:nth-child(3) p::before { content: "🎚️"; }
-[data-testid="stSidebar"] [role="radiogroup"] > div:nth-child(4) p::before { content: "🎉"; }
-[data-testid="stSidebar"] [role="radiogroup"] > div:nth-child(5) p::before { content: "👥"; }
-[data-testid="stSidebar"] [role="radiogroup"] > div:nth-child(6) p::before { content: "🧾"; }
-[data-testid="stSidebar"] [role="radiogroup"] > div:nth-child(9) p::before { content: "💬"; }
-/* 하위 항목: 주문 이력(7·8), 마케팅(10·11) */
-[data-testid="stSidebar"] [role="radiogroup"] > div:is(:nth-child(7), :nth-child(8), :nth-child(10), :nth-child(11)) { margin-left: 22px; width: calc(100% - 22px); padding-top: 6px; padding-bottom: 6px; }
-[data-testid="stSidebar"] [role="radiogroup"] > div:is(:nth-child(7), :nth-child(8), :nth-child(10), :nth-child(11)) p { font-size: 13.5px; font-weight: 500; }
-[data-testid="stSidebar"] [role="radiogroup"] > div:is(:nth-child(7), :nth-child(8), :nth-child(10), :nth-child(11)) p::before { content: "└"; width: 20px; color: #7d776f; }
+.st-key-nav_top [role="radiogroup"] > div:nth-child(1) p::before { content: "📊"; }
+.st-key-nav_top [role="radiogroup"] > div:nth-child(2) p::before { content: "🍽️"; }
+.st-key-nav_top [role="radiogroup"] > div:nth-child(3) p::before { content: "🎚️"; }
+.st-key-nav_top [role="radiogroup"] > div:nth-child(4) p::before { content: "🎉"; }
+.st-key-nav_top [role="radiogroup"] > div:nth-child(5) p::before { content: "👥"; }
+/* 접고 펼 수 있는 하위 메뉴 (주문 이력·마케팅) */
+[data-testid="stSidebar"] [data-testid="stExpander"] details { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+[data-testid="stSidebar"] [data-testid="stExpander"] summary { background: transparent !important; padding: 11px 12px; border-radius: 10px; font-size: 14.5px; font-weight: 600; color: var(--nav-ink); }
+[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover { background: #2a2623 !important; color: var(--nav-ink); }
+[data-testid="stSidebar"] [data-testid="stExpander"] summary p { color: var(--nav-ink); font-size: 14.5px; font-weight: 600; }
+[data-testid="stSidebar"] [data-testid="stExpander"] summary svg { color: #a8a29a; }
+[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] { padding: 0 0 4px 22px; }
+[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stRadioOption"] { padding: 8px 12px; }
+[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stRadioOption"] p { font-size: 13.5px; font-weight: 500; }
+[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stRadioOption"] p::before { content: "└"; width: 20px; color: #7d776f; }
 [data-testid="stSidebar"] [data-testid="stRadioOption"]:has(input:checked) p::before { color: #fff; }
 [data-testid="stSidebar"] [data-testid="stRadioOption"]:hover { background: #2a2623; }
 [data-testid="stSidebar"] [data-testid="stRadioOption"]:has(input:checked) { background: var(--brand); }

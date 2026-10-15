@@ -24,6 +24,14 @@ PAGES = ["대시보드", "메뉴 관리", "추천 가중치", "고객 등급", "
 RULE = ar.DEFAULT_RULE
 
 
+
+def go_page(app, page):
+    """사이드바에서 메뉴를 연다 (주문 이력·마케팅은 하위 메뉴의 첫 항목)."""
+    if page in {"주문 이력": 0, "마케팅": 0}:
+        sub = {"주문 이력": "전체 주문", "마케팅": "문자"}[page]
+        return app.sidebar.radio(key=f"nav_sub_{page}").set_value(sub).run()
+    return app.sidebar.radio(key="nav_top").set_value(page).run()
+
 def make_server(**kw):
     s = Settings(database_url="sqlite:///:memory:", kakao_rest_api_key="", public_base_url="http://t",
                  jwt_secret="x" * 32, admin_token="admin-secret", store_branch="서버지점", _env_file=None, **kw)
@@ -197,7 +205,7 @@ def test_every_page_renders_in_dummy_mode_even_with_server_up(server, monkeypatc
     assert app.session_state["repo"].source == "dummy" and not app.exception
     assert any("더미 데이터" in c.value for c in app.sidebar.caption)
     for page in PAGES:
-        app.sidebar.radio[0].set_value(page).run()
+        go_page(app, page)
         assert_clean(app, page)
     assert any("더미 데이터로 만든 화면" in c.value for c in app.caption)  # 마케팅도 더미로 동작
 
@@ -207,7 +215,7 @@ def test_every_page_renders_in_api_mode_with_real_data(server, monkeypatch):
     assert app.session_state["repo"].source == "api" and any("서버 데이터" in c.value for c in app.sidebar.caption)
     assert any("서버지점" in c.value for c in app.sidebar.caption)
     for page in PAGES:
-        app.sidebar.radio[0].set_value(page).run()
+        go_page(app, page)
         assert_clean(app, page)
 
 
@@ -237,7 +245,7 @@ def test_wrong_token_is_rejected_in_every_mode(server, monkeypatch):
 def test_marketing_screen_in_dummy_mode_can_preview_and_send(monkeypatch):
     monkeypatch.setenv("ADMIN_TOKEN", "change-me")
     app = login(monkeypatch, "dummy", "change-me")
-    app.sidebar.radio[0].set_value("마케팅").run()
+    app.sidebar.radio(key="nav_sub_마케팅").set_value("문자").run()
     assert not app.exception and any("더미 데이터로 만든 화면" in c.value for c in app.caption)
     assert any("발송 대상" in c.value for c in app.caption)  # 기본값(휴면)으로 바로 미리보기
     before = len(app.session_state["repo"].sms_logs())

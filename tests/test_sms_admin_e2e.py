@@ -19,6 +19,14 @@ APP = str(ROOT / "admin" / "app.py")
 PAGES = ["대시보드", "메뉴 관리", "추천 가중치", "고객 등급", "주문 이력", "마케팅"]
 
 
+
+def go_page(app, page):
+    """사이드바에서 메뉴를 연다 (주문 이력·마케팅은 하위 메뉴의 첫 항목)."""
+    if page in {"주문 이력": 0, "마케팅": 0}:
+        sub = {"주문 이력": "전체 주문", "마케팅": "문자"}[page]
+        return app.sidebar.radio(key=f"nav_sub_{page}").set_value(sub).run()
+    return app.sidebar.radio(key="nav_top").set_value(page).run()
+
 def make_server(hour=14, **kw):
     s = Settings(database_url="sqlite:///:memory:", kakao_rest_api_key="", public_base_url="http://t",
                  jwt_secret="x" * 32, admin_token="admin-secret", _env_file=None, **kw)
@@ -62,7 +70,7 @@ def login(token="admin-secret"):
 
 
 def open_marketing(app):
-    app.sidebar.radio[0].set_value("마케팅").run()
+    app.sidebar.radio(key="nav_sub_마케팅").set_value("문자").run()
     assert not app.exception
     return app
 
@@ -79,7 +87,7 @@ def test_login_needs_valid_server_token(server):
 def test_all_admin_pages_render_after_login(server):
     app = login()
     for page in PAGES:
-        app.sidebar.radio[0].set_value(page).run()
+        go_page(app, page)
         assert not app.exception, page
 
 

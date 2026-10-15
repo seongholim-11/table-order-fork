@@ -70,7 +70,7 @@ def test_page_shows_event_and_preview(monkeypatch):
     app = AppTest.from_file(APP, default_timeout=30).run()
     app.text_input[0].set_value("change-me")
     app.button[0].click().run()
-    app.sidebar.radio[0].set_value("이벤트").run()
+    app.sidebar.radio(key="nav_top").set_value("이벤트").run()
     assert not app.exception
     assert any("행운의 룰렛" in h.value for h in app.get("html"))
     assert any("conic-gradient" in h.value and "%" in h.value for h in app.get("html"))

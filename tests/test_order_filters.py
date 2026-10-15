@@ -57,7 +57,7 @@ def open_orders(monkeypatch):
     app = AppTest.from_file(APP, default_timeout=30).run()
     app.text_input[0].set_value("change-me")
     app.button[0].click().run()
-    app.sidebar.radio[0].set_value("주문 이력").run()
+    app.sidebar.radio(key="nav_sub_주문 이력").set_value("전체 주문").run()
     assert not app.exception
     return app
 
