@@ -31,7 +31,7 @@ def server():
     api.set_client(None)
 
 
-def phone_login(server, qr_url: str, nickname: str, agree: bool = False):
+def phone_login(server, qr_url: str, nickname: str, agree: bool = False, expect: int = 200):
     """휴대폰이 QR을 스캔하고 (모의) 카카오 로그인을 마치는 과정."""
     path = urlparse(qr_url)
     state = path.query.removeprefix("token=")
@@ -39,7 +39,9 @@ def phone_login(server, qr_url: str, nickname: str, agree: bool = False):
     r = server.get("/api/auth/kakao/continue", params={"token": state, **({"agree": "1"} if agree else {})},
                    follow_redirects=False)
     assert r.status_code == 302
-    assert server.get("/api/auth/kakao/callback", params={"state": state, "code": f"mock-{nickname}"}).status_code == 200
+    r = server.get("/api/auth/kakao/callback", params={"state": state, "code": f"mock-{nickname}"})
+    assert r.status_code == expect
+    return r
 
 
 def ss(app):
@@ -83,19 +85,26 @@ def test_login_then_spin_then_second_spin_needs_another_login(server):
     assert "가님" in log and "나님" in log and "로그인한 회원 <span>2</span>" in log
 
 
-def test_same_member_logging_in_again_adds_row_but_no_extra_spin(server):
+def test_same_member_cannot_log_in_again_on_same_tablet(server):
     app = AppTest.from_file(APP, default_timeout=30).run()
-    for _ in range(2):
-        app.button(key="login_open").click().run()
-        phone_login(server, ss(app)["login"]["qr_url"], "같은사람")
-        app.run()
+    app.button(key="login_open").click().run()
+    phone_login(server, ss(app)["login"]["qr_url"], "같은사람")
+    app.run()
+    assert len(ss(app)["members"]) == 1
+    app.button(key="login_open").click().run()
+    r = phone_login(server, ss(app)["login"]["qr_url"], "같은사람", expect=409)  # 이미 로그인한 회원은 거절
+    assert "이미 로그인" in r.text
+    app.run()
     rows = ss(app)["members"]
-    assert len(rows) == 2 and rows[0]["eligible"] is True and rows[1]["eligible"] is False
-    app.button(key="roulette_btn").click().run()
-    app.button(key="roulette_btn").click().run()  # 두 번째 START → 기회 없음 → 팝업
-    assert rows[0]["prize"] and rows[1]["prize"] is None and ss(app)["login"]
-    log = next(h.value for h in app.get("html") if "mlog" in h.value)
-    assert "룰렛은 이미 참여했어요" in log
+    assert len(rows) == 1 and rows[0]["eligible"] is True and ss(app)["login"]  # 기록은 그대로, 팝업은 열려 있음
+    assert server.get(f"/api/auth/qr/{ss(app)['login']['secret']}").json()["status"] == "rejected"
+    assert server.get("/api/members/me", headers={"Authorization": f"Bearer {ss(app)['access_token']}"}).json()["visit_count"] == 1
+    # 다른 회원은 로그인할 수 있다
+    ss(app)["login"]["created"] -= 10_000  # 새 QR 받기 (재생성 버튼과 같은 효과)
+    app.button(key="login_open").click().run()
+    phone_login(server, ss(app)["login"]["qr_url"], "다른사람")
+    app.run()
+    assert [m["nickname"] for m in ss(app)["members"]] == ["같은사람", "다른사람"]
 
 
 def test_no_profile_form_and_consent_comes_from_phone_login(server):

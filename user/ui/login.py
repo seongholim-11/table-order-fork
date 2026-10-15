@@ -50,6 +50,8 @@ def login_watch():
             + ('<span class="login-qr-badge">만료됨</span>' if dim else "") + '</div>')
     if status == "expired":
         st.html(login_steps_html(-1) + '<div class="login-status expired">QR이 만료되었어요. 아래 버튼으로 새 QR을 받아 주세요.</div>')
+    elif status == "rejected":
+        st.html(login_steps_html(-1) + '<div class="login-status expired">이미 이 태블릿에서 로그인한 회원이에요. 다른 회원이 로그인해 주세요.</div>')
     elif status == "scanned":
         st.html(login_steps_html(1) + '<div class="login-status scanned">📱 스캔 완료! 휴대폰에서 카카오 로그인을 마쳐 주세요</div>'
                 f'<div class="login-timer">남은 시간 {left // 60}:{left % 60:02d}</div>')
@@ -58,7 +60,7 @@ def login_watch():
                 f'<div class="login-timer">남은 시간 {left // 60}:{left % 60:02d}</div>')
     # 재생성: 상태와 관계없이 항상 노출 (만료 시에는 주 버튼, 그 외에는 보조 버튼)
     st.button("🔄 QR 재생성", key="login_refresh", on_click=new_login, width="stretch",
-              type="primary" if status == "expired" else "secondary")
+              type="primary" if status in ("expired", "rejected") else "secondary")
 
 
 LOGIN_REASON = {"spin": ("룰렛을 돌리려면 로그인해 주세요", "로그인하면 룰렛을 한 번 돌릴 수 있어요 (회원당 1회)"),

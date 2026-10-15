@@ -13,7 +13,8 @@ from user.ui.common import KST
 def new_login():
     """서버에서 일회용 QR 로그인 세션을 발급받는다. 서버가 없으면 None. 이전 QR 세션은 서버에서 정리한다."""
     prev = st.session_state.login
-    qr = server.create_qr(st.session_state.table, prev["secret"] if prev else None)
+    qr = server.create_qr(st.session_state.table, prev["secret"] if prev else None,
+                         [m["id"] for m in st.session_state.members])
     if qr or not prev:
         st.session_state.login = {**qr, "created": time.time()} if qr else None
 
@@ -28,6 +29,9 @@ def finish_login(event):
     """로그인 완료: 이 태블릿의 회원 기록에 누적하고, 처음 로그인한 회원에게만 룰렛 기회를 준다."""
     ss = st.session_state
     m = event["member"]
+    if any(r["id"] == m["id"] for r in ss.members):  # 서버가 막지만, 못 막은 경우에도 중복 기록은 만들지 않는다
+        ss.login = None
+        return
     ss.member, ss.access_token, ss.login = m, event["access_token"], None
     first = m["id"] not in ss.granted_ids
     if first:

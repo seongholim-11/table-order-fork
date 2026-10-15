@@ -1,6 +1,6 @@
 """QR 로그인 세션 저장소 (메모리). 정식 운영에서 여러 프로세스를 쓰면 Redis로 교체한다.
 
-상태: waiting → scanned → logged_in, 또는 expired. 되돌리기 없음.
+상태: waiting → scanned → logged_in, 또는 rejected(이미 이 태블릿에서 로그인한 회원), expired. 되돌리기 없음.
 token  : QR에 들어가는 값. 휴대폰이 사용한다.
 secret : 태블릿만 가지는 값. WebSocket/폴링 인증에 쓴다 (QR을 찍은 사람이 로그인 결과를 가로채지 못하게 분리).
 """
@@ -22,6 +22,7 @@ class LoginSession:
     member: dict | None = None
     access_token: str | None = None
     pkce_verifier: str | None = None  # Supabase PKCE 용. 서버만 보관한다
+    blocked_member_ids: frozenset = frozenset()  # 이 태블릿에서 이미 로그인한 회원 id. 다시 로그인하지 못하게 막는다
     marketing_consent: bool = False  # 휴대폰에서 받은 광고성 문자 수신 동의 (로그인 완료 때 회원에 저장)
     claimed: bool = False  # 로그인 결과를 태블릿이 이미 받아갔는지
     subscribers: list[asyncio.Queue] = field(default_factory=list)
@@ -34,9 +35,10 @@ class LoginSessionStore:
         self._by_token: dict[str, LoginSession] = {}
         self._by_secret: dict[str, LoginSession] = {}
 
-    def create(self, table_no: int) -> LoginSession:
+    def create(self, table_no: int, blocked_member_ids=()) -> LoginSession:
         self._purge()
-        s = LoginSession(secrets.token_urlsafe(16), secrets.token_urlsafe(24), table_no, self.clock())
+        s = LoginSession(secrets.token_urlsafe(16), secrets.token_urlsafe(24), table_no, self.clock(),
+                         blocked_member_ids=frozenset(blocked_member_ids))
         self._by_token[s.token] = s
         self._by_secret[s.secret] = s
         return s
@@ -58,7 +60,7 @@ class LoginSessionStore:
         return self._by_secret.get(secret)
 
     def status(self, s: LoginSession) -> str:
-        if s.status != "logged_in" and self.clock() - s.created > self.ttl:
+        if s.status not in ("logged_in", "rejected") and self.clock() - s.created > self.ttl:
             s.status = "expired"
         return s.status
 
@@ -78,6 +80,14 @@ class LoginSessionStore:
             return False
         s.status, s.member, s.access_token = "logged_in", member, access_token
         self._publish(s, {"event": "logged_in"})
+        return True
+
+    def reject(self, s: LoginSession) -> bool:
+        """이미 이 태블릿에서 로그인한 회원이라 거절한다. 스캔된 세션만."""
+        if self.status(s) != "scanned":
+            return False
+        s.status = "rejected"
+        self._publish(s, {"event": "status", "status": "rejected"})
         return True
 
     def claim(self, s: LoginSession) -> dict | None:
