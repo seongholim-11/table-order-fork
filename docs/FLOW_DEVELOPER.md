@@ -92,7 +92,7 @@ sequenceDiagram
 - **token / secret 분리** (`login_sessions.py` 맨 위 설명): token 은 QR 에 들어가 휴대폰이 쓰고, secret 은 태블릿만 갖고 결과 조회에 씁니다. QR 을 찍은 사람이 태블릿의 로그인 결과(JWT)를 가로채지 못하게 하려는 구조입니다.
 - **상태는 되돌릴 수 없는 한 방향**: `waiting → scanned → logged_in`, 또는 `expired`(기본 TTL 180초, `login_ttl_seconds`). 스캔된 세션만 `complete` 할 수 있고, `claim` 은 한 번만 값을 줍니다(`claimed` 플래그).
 - **CSRF 방어**: 콜백의 `state` 가 우리가 발급한 token 이어야 하고, 상태가 `scanned` 여야 합니다. Supabase 경로는 PKCE verifier 를 서버에만 두고 코드 교환을 한 번만 허용합니다(`s.pkce_verifier` 를 꺼내며 비움).
-- **로그인 때 자동 수집하는 정보**: 요청 scope 는 `KAKAO_SCOPES`(기본 `profile_nickname gender birthday birthyear phone_number`). 카카오 콘솔 동의항목에 없는 항목을 넣으면 `KOE205` 가 납니다. Supabase 경로는 Supabase 사용자 정보에 성별·생일·번호가 없어서, 세션의 `provider_token` 으로 카카오 `/v2/user/me` 를 한 번 더 호출해 채웁니다(실패해도 로그인은 계속). 동의하지 않은 항목은 비어 있고, 이후 로그인에서 빈 값이 기존 값을 지우지 않습니다.
+- **로그인 때 자동 수집하는 정보**: 요청 scope 는 `KAKAO_SCOPES`(기본 `name gender birthday birthyear phone_number`). 카카오 콘솔 동의항목에 없는 항목을 넣으면 `KOE205` 가 납니다. Supabase 경로는 Supabase 사용자 정보에 성별·생일·번호가 없어서, 세션의 `provider_token` 으로 카카오 `/v2/user/me` 를 한 번 더 호출해 채웁니다(실패해도 로그인은 계속). 동의하지 않은 항목은 비어 있고, 이후 로그인에서 빈 값이 기존 값을 지우지 않습니다.
 - **수신 동의는 휴대폰의 `/kakao/start` 화면에서** 받고(`login_sessions.marketing_consent`), 콜백에서 `members.marketing_consent` 로 저장합니다. 가장 최근 로그인에서 고른 값이 적용됩니다. 태블릿 화면의 "회원 정보 입력" 폼과 `PATCH /api/members/me` 는 없어졌습니다.
 - **카카오 키가 없으면 모의 로그인** 화면(`/kakao/mock`)이 열려 로컬에서도 시험할 수 있습니다. 실제 키가 있거나 Supabase 가 켜져 있으면 모의 화면은 404.
 - **세션 저장소는 메모리**입니다. 서버를 재시작하거나 프로세스를 여러 개 띄우면 진행 중인 QR 이 사라집니다(Redis 로 교체 예정이라고 파일에 적혀 있음).

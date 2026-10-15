@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     kakao_client_secret: str = ""
     kakao_redirect_uri: str = "http://localhost:8000/api/auth/kakao/callback"
     # 로그인 때 자동으로 받아올 카카오 동의항목(scope). 카카오 콘솔에 설정되지 않은 항목이 있으면 KOE205 오류가 난다.
-    kakao_scopes: str = "profile_nickname gender birthday birthyear phone_number"
+    kakao_scopes: str = "name gender birthday birthyear phone_number"
     # Supabase Auth 로 카카오 로그인 처리 (URL 과 anon 키가 모두 있으면 직접 카카오 호출 대신 이 방식을 쓴다)
     supabase_url: str = ""
     supabase_anon_key: str = ""

@@ -67,6 +67,8 @@ class SupabaseAuthClient:
             try:
                 kakao = await fetch_account(session["provider_token"])
                 extra = {k: kakao[k] for k in extra}
+                if kakao["nickname"] != "손님":
+                    nickname = kakao["nickname"]  # 카카오 이름(name)을 우선 사용
             except (KakaoError, httpx.HTTPError):
                 pass  # 추가 정보를 못 받아도 로그인은 계속한다
         return {"kakao_id": f"sb:{user['id']}", "nickname": nickname, **extra}

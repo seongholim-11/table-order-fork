@@ -40,14 +40,14 @@ def parse_account(account: dict) -> dict:
 
 
 async def fetch_account(access_token: str) -> dict:
-    """카카오 액세스 토큰으로 /v2/user/me 를 호출해 {kakao_id, nickname, gender, birthday, birth_year, phone} 를 돌려준다."""
+    """카카오 액세스 토큰으로 /v2/user/me 를 호출해 (이름 name 을 nickname 으로 쓰고, 없으면 프로필 닉네임) {kakao_id, nickname, gender, birthday, birth_year, phone} 를 돌려준다."""
     async with httpx.AsyncClient(timeout=10) as http:
         r = await http.get(PROFILE_URL, headers={"Authorization": f"Bearer {access_token}"})
     if r.status_code != 200:
         raise KakaoError("카카오 사용자 정보를 가져오지 못했습니다.")
     body = r.json()
     account = body.get("kakao_account", {})
-    return {"kakao_id": str(body["id"]), "nickname": (account.get("profile") or {}).get("nickname") or "손님",
+    return {"kakao_id": str(body["id"]), "nickname": account.get("name") or (account.get("profile") or {}).get("nickname") or "손님",
             **parse_account(account)}
 
 
