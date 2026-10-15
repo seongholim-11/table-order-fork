@@ -23,14 +23,22 @@ def reachable_steps():
     return steps
 
 
+def first_unanswered():
+    """아직 답하지 않은 첫 질문 번호. 모두 답했으면 질문 수(=결과 화면)."""
+    answers = st.session_state.quiz["answers"]
+    return next((i for i, q in enumerate(ctx.QUESTIONS) if q["id"] not in answers), len(ctx.QUESTIONS))
+
+
 def quiz_answer(qid, value):
     q = st.session_state.quiz
     edited = qid in q["answers"]
     q["answers"][qid] = value
-    if edited and len(q["answers"]) == len(ctx.QUESTIONS):
+    index = next(i for i, x in enumerate(ctx.QUESTIONS) if x["id"] == qid)
+    if edited and first_unanswered() == len(ctx.QUESTIONS):
         q["step"] = len(ctx.QUESTIONS)  # 이미 끝낸 질문을 고쳤다면 바로 결과로
     else:
-        q["step"] = min(q["step"] + 1, len(ctx.QUESTIONS))  # 선택하면 바로 다음 질문으로
+        # 눌린 질문 기준으로 다음 질문으로 (같은 버튼이 두 번 눌려도 건너뛰지 않는다)
+        q["step"] = min(index + 1, len(ctx.QUESTIONS))
 
 
 def quiz_back():

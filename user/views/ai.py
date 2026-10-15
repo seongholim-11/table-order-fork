@@ -10,7 +10,7 @@ from menu_images import menu_image_html
 from recommendations import recommend_combos
 from user.state import context as ctx
 from user.state.cart import add_combo
-from user.state.quiz import quiz_answer, quiz_back, quiz_goto, quiz_restart, reachable_steps
+from user.state.quiz import quiz_answer, quiz_back, quiz_goto, quiz_restart, first_unanswered, reachable_steps
 from user.state.session import go
 from user.ui.common import won
 
@@ -132,7 +132,10 @@ def render_quiz_result():
 
 
 def render_ai_quiz():
-    step = st.session_state.quiz["step"]
+    quiz = st.session_state.quiz
+    if quiz["step"] >= len(ctx.QUESTIONS) and first_unanswered() < len(ctx.QUESTIONS):
+        quiz["step"] = first_unanswered()  # 답하지 않은 질문이 남았으면 결과 대신 그 질문으로
+    step = quiz["step"]
     with st.container(key="quiz_page"):
         if step < len(ctx.QUESTIONS):
             render_quiz_question(step)

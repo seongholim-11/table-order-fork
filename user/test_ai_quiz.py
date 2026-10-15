@@ -129,6 +129,18 @@ class QuizScreenTests(unittest.TestCase):
         self.assertEqual(app.session_state["quiz"]["answers"]["stress"], "낮음")
         self.assertFalse(app.exception)
 
+    def test_stale_double_click_cannot_skip_a_question_or_crash_result(self):
+        app = self.open_quiz()
+        app.button(key=f"quiz_pick_{QUESTIONS[0]['id']}_1").click().run()
+        # 이미 넘어간 첫 질문의 버튼이 한 번 더 처리돼도 다음 질문(1번)에 머문다
+        app.session_state["quiz"]["step"] = 5  # 건너뛴 것처럼 꼬인 상태
+        for i in range(1, len(QUESTIONS)):
+            app.session_state["quiz"]["answers"].pop(QUESTIONS[i]["id"], None)
+        app.session_state["quiz"]["step"] = len(QUESTIONS)  # 결과 화면인데 답이 비어 있음
+        app.run()
+        self.assertFalse(app.exception)
+        self.assertEqual(app.session_state["quiz"]["step"], 1)
+
     def test_full_flow_shows_result_and_adds_combo_to_cart(self):
         app = self.open_quiz()
         for q, pick in zip(QUESTIONS, PICKS):
