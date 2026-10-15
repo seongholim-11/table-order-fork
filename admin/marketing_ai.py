@@ -72,7 +72,7 @@ def recommend(ctx: dict) -> list[dict]:
         n = int(pool.get("휴면", 0))
         recs.append({"title": f"휴면 고객 {dormant}명 되찾기",
                      "why": f"전체 회원 {m['total']}명 중 {_pct(dormant, m['total'])}가 한동안 오지 않았어요. 문자를 받을 수 있는 분은 {n}명이에요.",
-                     "action": "‘휴면’ 등급에게 재방문 쿠폰 문자(예: 안주 10% 할인)를 보내 보세요. 마케팅 > 대시보드 탭의 ‘빠른 문구’를 쓰면 돼요."})
+                     "action": "‘휴면’ 등급에게 재방문 쿠폰 문자(예: 안주 10% 할인)를 보내 보세요. 마케팅 > 문자 탭의 ‘빠른 문구’를 쓰면 돼요."})
     regular = int(grades.get("단골", 0))
     if regular:
         recs.append({"title": f"단골 {regular}명에게 감사 혜택",

@@ -26,6 +26,7 @@ button:focus-visible { outline: 3px solid #ffcf54 !important; outline-offset: 3p
 .brand .logo { flex: 0 0 48px; width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg,#ffb703,#e63946); display: flex; align-items: center; justify-content: center; font-size: 28px; }
 .brand .name { font-size: 24px; font-weight: 900; letter-spacing: -.5px; line-height: 1.3; word-break: keep-all; }
 .brand .sub { font-size: 13px; color: #a8a8b2; margin-top: 3px; }
+.splash-brand { justify-content: center; margin: 8px 0 4px; }
 .table-chip { background: #26262b; border: 1px solid #3a3a42; border-radius: 999px; padding: 8px 12px; font-weight: 800; font-size: 14px; text-align: center; white-space: nowrap; }
 .table-chip b { color: #ffb703; }
 
@@ -78,30 +79,33 @@ button:focus-visible { outline: 3px solid #ffcf54 !important; outline-offset: 3p
 .st-key-ai_preferences [data-testid="stCaptionContainer"] p { font-size: 11px; line-height: 1.4; }
 .ai-results-title { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 .ai-results-title small { margin-left: auto; color: #aaa8b4; font-size: 12px; font-weight: 500; }
-[class*="st-key-ai_combo_"] { padding: 12px 14px; background: #1c1c20; border: 1px solid #39323f; border-radius: 14px; gap: 8px; }
+[class*="st-key-ai_combo_"] { padding: 18px 20px; background: #1c1c20; border: 1px solid #39323f; border-radius: 16px; gap: 12px; }
 .st-key-ai_combo_1 { border-color: #a68ad4; background: linear-gradient(135deg, #2b2134, #1c1c20 70%); }
-.combo-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.combo-heading h3 { margin: 0; font-size: 16px; font-weight: 800; line-height: 1.4; }
-.combo-rank { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 26px; padding: 0 6px; background: #3b3444; border-radius: 7px; color: #ddd0ef; font-size: 12px; font-weight: 900; }
+.combo-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.combo-heading h3 { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.4; word-break: keep-all; }
+.combo-rank { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; height: 30px; padding: 0 8px; background: #3b3444; border-radius: 8px; color: #ddd0ef; font-size: 14px; font-weight: 900; }
 .combo-rank.rank-1 { background: #ffb703; color: #21180a; }
-.combo-top { font-size: 11px; color: #d6b8ff; margin-left: auto; font-weight: 700; }
-.combo-items { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px 10px; padding: 10px 0; }
-.combo-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
-.combo-item > span:nth-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.combo-item small { display: block; color: #aaa8b4; font-size: 10px; }
-.combo-emoji { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 28px; height: 28px; border-radius: 7px; background: #302b36; font-size: 18px; }
-.combo-photo { display: block; flex-shrink: 0; width: 36px; height: 36px; border-radius: 7px; object-fit: cover; }
-.combo-item b { color: #d5c9e3; white-space: nowrap; }
-.combo-reason { padding: 8px 10px; border-radius: 8px; background: #29232f; }
-.combo-reason strong { font-size: 12px; color: #d7baff; }
-.combo-reason p { font-size: 12px; color: #c7bfce; margin: 3px 0 0; line-height: 1.5; word-break: keep-all; }
-.combo-pricing { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin-top: 8px; }
-.combo-discount { font-size: 13px; font-weight: 800; color: #d0acff; }
-.combo-pricing del { color: #a5a0ab; font-size: 13px; }
-.combo-pricing strong { font-size: 21px; font-weight: 900; color: #ffb703; }
-.combo-pricing small { color: #c0b1d0; font-size: 12px; margin-left: auto; }
-[class*="st-key-ai_combo_"] button { min-height: 38px; padding: 6px 10px; }
-[class*="st-key-ai_combo_"] button p { font-size: 13px; }
+.combo-top { font-size: 13px; color: #d6b8ff; margin-left: auto; font-weight: 700; }
+.combo-section-label { font-size: 13px; font-weight: 800; color: #aaa8b4; }
+.combo-items { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.combo-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px; background: #26232c; font-size: 15px; font-weight: 700; }
+.combo-item > .combo-name { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.35; }
+.combo-item small { display: block; color: #aaa8b4; font-size: 12px; font-weight: 500; }
+.combo-emoji { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 48px; height: 48px; border-radius: 10px; background: #302b36; font-size: 26px; }
+.combo-photo { display: block; flex-shrink: 0; width: 48px; height: 48px; border-radius: 10px; object-fit: cover; }
+.combo-item b { color: #ffb703; font-size: 16px; white-space: nowrap; }
+.combo-reason { padding: 12px 14px; border-radius: 12px; background: #29232f; }
+.combo-reason strong { font-size: 14px; color: #d7baff; }
+.combo-reason p { font-size: 14px; color: #d3cbd9; margin: 6px 0 0; line-height: 1.65; word-break: keep-all; }
+.combo-pricing { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; padding-top: 10px; border-top: 1px dashed #4a4254; }
+.combo-price-main { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+.combo-discount { padding: 3px 8px; border-radius: 6px; background: #3a2a55; font-size: 13px; font-weight: 800; color: #dcbfff; }
+.combo-pricing del { color: #a5a0ab; font-size: 15px; }
+.combo-pricing strong { font-size: 28px; font-weight: 900; color: #ffb703; }
+.combo-pricing small { color: #c8bad8; font-size: 14px; }
+.combo-member-note { padding: 4px 10px; border-radius: 8px; background: #2d2a36; color: #d0acff !important; font-weight: 700; }
+[class*="st-key-ai_combo_"] button { min-height: 50px; padding: 8px 12px; }
+[class*="st-key-ai_combo_"] button p { font-size: 16px; font-weight: 800; }
 .cart-savings { font-size: 12px; color: #d5b6ff; border-radius: 8px; padding: 10px; background: #2b2235; }
 
 .st-key-cart_panel { background: #1a1a1e; border: 1px solid #2c2c33; border-radius: 18px; padding: 18px; gap: 16px; }
@@ -168,8 +172,10 @@ button:focus-visible { outline: 3px solid #ffcf54 !important; outline-offset: 3p
   .ai-hero h2 { font-size: 25px; }
   .st-key-ai_preferences { padding: 10px 12px; }
   .st-key-ai_preference_fields [data-testid="stHorizontalBlock"] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 8px; }
-  [class*="st-key-ai_combo_"] { padding: 10px 12px; }
-  .combo-heading h3 { font-size: 15px; }
+  [class*="st-key-ai_combo_"] { padding: 14px; }
+  .combo-heading h3 { font-size: 17px; }
+  .combo-items { grid-template-columns: minmax(0, 1fr); }
+  .combo-pricing strong { font-size: 24px; }
   .block-container { padding: 16px 12px 24px !important; }
   .st-key-header { padding-bottom: 16px; }
   .st-key-header > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] { grid-template-columns: minmax(0, 1fr) 92px; gap: 12px; }
@@ -324,6 +330,15 @@ button:focus-visible { outline: 3px solid #ffcf54 !important; outline-offset: 3p
 [class*="st-key-quiz_opt_"] [data-testid="stBaseButton-primary"] { background: linear-gradient(#ff9a40, #f0560a); border-color: #f0560a; box-shadow: 0 6px 16px rgba(240,86,10,.4); }
 [class*="st-key-quiz_opt_"] [data-testid="stBaseButton-primary"] p { color: #fff !important; }
 [class*="st-key-quiz_opt_"] [data-testid="stBaseButton-secondary"]:hover { border-color: #ff9a40; color: #ff9a40; }
+.st-key-quiz_steps { justify-content: center; gap: 6px !important; flex-wrap: wrap; }
+.st-key-quiz_steps > [data-testid="stElementContainer"] { width: auto !important; flex: 0 0 auto; }
+.st-key-quiz_steps button { min-height: 36px; min-width: 36px; padding: 2px 8px; border-radius: 999px; }
+.st-key-quiz_steps button p { font-size: 14px; font-weight: 800; }
+.st-key-quiz_answers { justify-content: center; gap: 8px !important; flex-wrap: wrap; }
+.st-key-quiz_answers > [data-testid="stElementContainer"] { width: auto !important; flex: 0 0 auto; }
+.st-key-quiz_answers button { min-height: 36px; padding: 4px 14px; border-radius: 999px; border-color: #3a3a42; }
+.st-key-quiz_answers button p { font-size: 13px; font-weight: 700; }
+.st-key-quiz_answers button:hover { border-color: #ff9a40; color: #ff9a40; }
 .qz-hint { text-align: center; color: #8c8c96; font-size: 13px; margin-top: 8px; }
 .qz-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 4px 0 10px; }
 .qz-chip { background: #26262b; border: 1px solid #3a3a42; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 700; }

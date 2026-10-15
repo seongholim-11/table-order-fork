@@ -1,4 +1,4 @@
-"""다이얼로그 (주문 확인·주문내역·직원 호출·장바구니).
+"""다이얼로그 (주문 확인·주문내역·직원 호출).
 """
 
 import time
@@ -71,8 +71,3 @@ def staff_dialog():
         st.session_state.calls.append((datetime.now(KST).strftime("%H:%M"), picks))
         st.toast("직원이 곧 도착합니다 🙋", icon="🔔")
         st.rerun()
-
-
-@st.dialog("장바구니", width="medium", on_dismiss="rerun")
-def cart_dialog():
-    render_cart(dialog=True)

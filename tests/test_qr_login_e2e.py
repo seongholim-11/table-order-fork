@@ -51,6 +51,7 @@ def ss(app):
 def test_guest_sees_guest_order_button_and_roulette_asks_for_login(server):
     app = AppTest.from_file(APP, default_timeout=30).run()
     assert app.button(key="start_btn").label == "🍴 비회원 주문  ›"
+    assert any("splash-brand" in h.value and "역전할머니맥주" in h.value and "홍대점" in h.value for h in app.get("html"))  # 서버(DB)의 매장 정보
     assert not ss(app)["members"] and any("로그인 후 룰렛" in h.value for h in app.get("html"))
     app.button(key="roulette_btn").click().run()  # 로그인 안 한 상태로 START → 로그인 팝업
     assert ss(app)["roulette"] is None

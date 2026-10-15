@@ -5,6 +5,7 @@ from html import escape
 
 import streamlit as st
 
+from user.state import context as ctx
 from user.state.login import poll_login_once
 from user.state.roulette import spins_left
 from user.state.session import go
@@ -17,6 +18,9 @@ def render_splash():
     ss = st.session_state
     poll_login_once()  # 팝업을 닫았거나 다시 그려진 뒤에도 완료된 로그인은 반영
     mini_buttons("splash", home=False)
+    store = ctx.STORE  # 매장 정보(이름·지점)는 서버가 Supabase store_info 테이블에서 읽어 준다
+    st.html(f'<div class="brand splash-brand"><div class="logo">🍺</div><div><div class="name">{escape(store["name"])}</div>'
+            f'<div class="sub">{escape(store["branch"])}</div></div></div>')
     render_roulette()
     member = ss.member
     with st.container(horizontal=True, key="splash_bottom"):

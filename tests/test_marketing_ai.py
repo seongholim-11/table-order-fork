@@ -40,17 +40,17 @@ def test_ai_context_and_recommendations():
     assert "가장 많이 팔린 메뉴" in answer
 
 
-def test_default_tab_is_dashboard():
+def test_default_tab_is_sms():
     app = open_marketing()
     assert not app.exception
-    assert app.query_params["tab"] == "대시보드"
+    assert app.query_params["tab"] == "문자"
     assert app.text_area  # 문자 작성 화면
 
 
 def test_ai_tab_from_url_shows_recommendations_and_chat():
     app = open_marketing("AI")
     assert not app.exception
-    assert not app.text_area  # 대시보드 탭의 문자 작성 화면은 보이지 않는다
+    assert not app.text_area  # 문자 탭의 문자 작성 화면은 보이지 않는다
     app.chat_input[0].set_value("휴면 고객 어떻게 되찾을까?").run()
     assert not app.exception
     texts = [m.markdown[0].value if m.markdown else "" for m in app.chat_message]
@@ -59,8 +59,45 @@ def test_ai_tab_from_url_shows_recommendations_and_chat():
 
 def test_switching_tab_updates_url():
     app = open_marketing()
-    app.radio(key="mk_tab").set_value("AI").run()
-    assert app.query_params["tab"] == "AI"
+    app.sidebar.radio[0].set_value("AI").run()
+    assert app.query_params["tab"] == "AI" and app.query_params["page"] == "마케팅"
+    assert not app.text_area
+
+
+def test_sidebar_shows_tabs_as_sub_items_and_parent_opens_first_one():
+    app = open_marketing("AI")
+    options = app.sidebar.radio[0].options
+    assert options[options.index("마케팅") + 1:options.index("마케팅") + 3] == ["문자", "AI"]
+    assert options[options.index("주문 이력") + 1:options.index("주문 이력") + 3] == ["전체 주문", "고객별 주문"]
+    assert "직원 호출" not in options
+    app.sidebar.radio[0].set_value("주문 이력").run()
+    assert not app.exception and app.sidebar.radio[0].value == "전체 주문"
+    assert app.query_params["page"] == "주문 이력" and app.query_params["tab"] == "전체 주문"
+    app.sidebar.radio[0].set_value("고객별 주문").run()
+    assert not app.exception and any("고객" in s.label for s in app.selectbox)
+    app.sidebar.radio[0].set_value("대시보드").run()
+    assert "tab" not in app.query_params
+
+
+def test_rerecommend_cycles_through_recommendations():
+    from admin.views.marketing import pick_recommendations
+    recs = [{"title": str(i)} for i in range(7)]
+    first, p1, pages = pick_recommendations(recs, 0)
+    second, p2, _ = pick_recommendations(recs, 1)
+    assert pages == 2 and (p1, p2) == (1, 2)
+    assert [r["title"] for r in first] == ["0", "1", "2", "3"]
+    assert [r["title"] for r in second] == ["4", "5", "6", "0"]
+    assert pick_recommendations(recs, 2)[0] == first  # 끝까지 보면 처음으로
+    assert pick_recommendations(recs[:2], 5)[2] == 1
+
+
+def test_rerecommend_button_changes_cards():
+    app = open_marketing("AI")
+    before = [h.value for h in app.get("html") if 'class="recs"' in h.value]
+    app.button(key="mk_rerecommend").click().run()
+    after = [h.value for h in app.get("html") if 'class="recs"' in h.value]
+    assert not app.exception and before and after and before != after
+    assert app.session_state["mk_rec_round"] == 1
 
 
 def test_keyword_recipients_and_combos():

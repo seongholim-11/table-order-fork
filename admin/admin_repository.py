@@ -30,7 +30,7 @@ from shared import api  # noqa: E402
 from user.menu_images import bundled_photo_uri  # noqa: E402
 
 ENDPOINTS = {
-    "store": "/api/store",
+    "store": "/api/v1/store",
     "menus": "/admin/api/menus",              # GET {categories, menus} / PUT·DELETE /{id}
     "roulette": "/api/content/roulette_prizes",  # GET 칸 목록 / PUT /admin/api/content/roulette_prizes 통째로 교체
     "categories": "/api/content/categories",  # GET 전체 목록(가상 카테고리 포함) / PUT /admin/api/content/categories 통째로 교체

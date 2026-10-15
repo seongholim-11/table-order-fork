@@ -52,8 +52,12 @@ hr { border-color: var(--line) !important; }
 [data-testid="stSidebar"] [role="radiogroup"] > div:nth-child(4) p::before { content: "🎉"; }
 [data-testid="stSidebar"] [role="radiogroup"] > div:nth-child(5) p::before { content: "👥"; }
 [data-testid="stSidebar"] [role="radiogroup"] > div:nth-child(6) p::before { content: "🧾"; }
-[data-testid="stSidebar"] [role="radiogroup"] > div:nth-child(7) p::before { content: "🔔"; }
-[data-testid="stSidebar"] [role="radiogroup"] > div:nth-child(8) p::before { content: "💬"; }
+[data-testid="stSidebar"] [role="radiogroup"] > div:nth-child(9) p::before { content: "💬"; }
+/* 하위 항목: 주문 이력(7·8), 마케팅(10·11) */
+[data-testid="stSidebar"] [role="radiogroup"] > div:is(:nth-child(7), :nth-child(8), :nth-child(10), :nth-child(11)) { margin-left: 22px; width: calc(100% - 22px); padding-top: 6px; padding-bottom: 6px; }
+[data-testid="stSidebar"] [role="radiogroup"] > div:is(:nth-child(7), :nth-child(8), :nth-child(10), :nth-child(11)) p { font-size: 13.5px; font-weight: 500; }
+[data-testid="stSidebar"] [role="radiogroup"] > div:is(:nth-child(7), :nth-child(8), :nth-child(10), :nth-child(11)) p::before { content: "└"; width: 20px; color: #7d776f; }
+[data-testid="stSidebar"] [data-testid="stRadioOption"]:has(input:checked) p::before { color: #fff; }
 [data-testid="stSidebar"] [data-testid="stRadioOption"]:hover { background: #2a2623; }
 [data-testid="stSidebar"] [data-testid="stRadioOption"]:has(input:checked) { background: var(--brand); }
 [data-testid="stSidebar"] [data-testid="stRadioOption"]:has(input:checked) p { color: #fff; font-weight: 800; }
@@ -196,9 +200,3 @@ button:focus-visible { outline: 3px solid rgba(232,89,12,.4) !important; outline
 [data-testid="stSidebar"] [data-testid="stButton"],
 [data-testid="stSidebar"] [data-testid="stButton"] button { width: 100% !important; }
 
-/* 직원 호출 */
-.call-table { white-space: nowrap; font-size: 28px; font-weight: 800; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
-.call-table small { font-size: 12px; font-weight: 600; color: var(--ink-3); margin-left: 4px; }
-.call-items { display: flex; flex-wrap: wrap; gap: 8px; }
-.call-chip { background: var(--brand-soft); color: var(--brand-ink); font-weight: 700; font-size: 14px; padding: 5px 12px; border-radius: 999px; }
-.call-wait { font-weight: 700; font-size: 15px; text-align: right; } .call-wait small { display: block; color: var(--ink-3); font-size: 12px; font-weight: 500; margin-top: 2px; }

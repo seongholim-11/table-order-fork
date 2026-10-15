@@ -17,6 +17,9 @@ def load() -> None:
 
 
 def __getattr__(name: str):
+    # Streamlit 파일 감시기가 세션 밖에서 hasattr(module, "__path__") 를 부르면 KeyError 대신 AttributeError 여야 한다.
+    if name.startswith("__") or "_ctx" not in st.session_state:
+        raise AttributeError(name)
     repo, c = st.session_state["_ctx"]
     values = {
         "REPO": repo, "CONTENT": c, "STORE": c.store, "CATEGORIES": c.categories, "CATEGORY_BY_ID": c.category_by_id,

@@ -14,8 +14,6 @@ from admin_repository import GRADES
 
 ss = st.session_state
 
-MARKETING_TABS = ["대시보드", "AI"]
-
 
 STATUS_LABEL = {"sent": ("발송됨", "ok"), "dry_run": ("테스트(DRY RUN)", "warn"), "failed": ("실패", "bad"),
                 "scheduled": ("예약됨", "ok"), "canceled": ("취소됨", "warn")}
@@ -208,13 +206,37 @@ def marketing_dashboard(repo):
                 st.rerun()
 
 
+REC_PAGE_SIZE = 4  # 한 번에 보여 주는 추천 수. [재추천]을 누르면 다음 묶음으로 넘어간다.
+
+
+def next_rec_round():
+    ss["mk_rec_round"] = ss.get("mk_rec_round", 0) + 1
+
+
+def pick_recommendations(recs, round_no):
+    """추천 목록에서 round_no 번째 묶음을 고른다. 끝까지 보면 처음으로 돌아간다. → (고른 목록, 묶음 번호, 전체 묶음 수)"""
+    pages = -(-len(recs) // REC_PAGE_SIZE)
+    page = round_no % pages
+    start = page * REC_PAGE_SIZE
+    chosen = recs[start:start + REC_PAGE_SIZE]
+    if len(chosen) < REC_PAGE_SIZE and pages > 1:
+        chosen += recs[:REC_PAGE_SIZE - len(chosen)]  # 마지막 묶음은 앞의 추천으로 채운다
+    return chosen, page + 1, pages
+
+
 def marketing_ai_tab(repo):
     ctx = marketing_ai.build_context(repo, ss["grade_rule"])
     sec_title("사장님을 위한 마케팅 추천", "매장의 모든 데이터를 바탕으로 정리했어요")
+    recs, page, pages = pick_recommendations(marketing_ai.recommend(ctx), ss.get("mk_rec_round", 0))
     cards = "".join(f'<div class="rec"><div class="rt">{i}. {escape(r["title"])}</div>'
                     f'<div class="rw">{escape(r["why"])}</div><div class="ra">👉 {escape(r["action"])}</div></div>'
-                    for i, r in enumerate(marketing_ai.recommend(ctx), 1))
+                    for i, r in enumerate(recs, 1))
     st.html(f'<div class="recs">{cards}</div>')
+    c_btn, c_note = st.columns([1, 4], vertical_alignment="center")
+    c_btn.button("🔄 재추천", key="mk_rerecommend", on_click=next_rec_round, width="stretch",
+                 help="다른 마케팅 방법을 추천받아요")
+    c_note.caption(f"추천 {page}/{pages} · 눌러서 다른 마케팅 방법을 추천받아요" if pages > 1
+                   else "지금은 추천할 방법이 이것뿐이에요. 데이터가 쌓이면 더 다양해져요.")
     sec_title("AI 챗봇", "궁금한 점을 물어보세요")
     st.caption("🧪 지금은 규칙 기반 모의 응답이에요. 실제 AI(Claude API) 연동 지점은 `marketing_ai.py` 에 분리돼 있어요.")
     chat = ss.setdefault("mk_chat", [{"role": "assistant", "content": marketing_ai.GREETING}])
@@ -229,12 +251,7 @@ def marketing_ai_tab(repo):
             box.chat_message(msg["role"]).write(msg["content"])
 
 
-def page_marketing(repo):
+def page_marketing(repo, tab="문자"):
+    """문자 / AI 탭은 사이드바 하위 메뉴에서 고른다 (admin/app.py 의 SUBPAGES)."""
     page_head("마케팅", "수신 동의한 회원에게 문자를 보내 재방문을 이끌어요")
-    # 새로고침해도 보던 탭이 유지되도록 URL(?tab=...)에 저장하고 거기서 복원한다.
-    if "mk_tab" not in ss:
-        ss["mk_tab"] = st.query_params["tab"] if st.query_params.get("tab") in MARKETING_TABS else MARKETING_TABS[0]
-    tab = st.radio("마케팅 탭", MARKETING_TABS, key="mk_tab", horizontal=True, label_visibility="collapsed")
-    if st.query_params.get("tab") != tab:
-        st.query_params["tab"] = tab
-    {"대시보드": marketing_dashboard, "AI": marketing_ai_tab}[tab](repo)
+    {"문자": marketing_dashboard, "AI": marketing_ai_tab}[tab](repo)

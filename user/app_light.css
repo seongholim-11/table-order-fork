@@ -33,6 +33,9 @@
 .combo-rank { background: #e6dcf5; color: #4a3a6a; }
 .combo-top, .combo-reason strong, .combo-discount { color: #6b3fd0; }
 .combo-emoji { background: #eeeaf3; }
+.combo-item { background: #f6f2fb; }
+.combo-discount, .combo-member-note { background: #ebe1fb; }
+.combo-pricing { border-top-color: #d9cdee; }
 .combo-reason { background: #f3eefa; }
 .cart-savings { background: #f1e9fb; color: #6b3fd0; }
 .login-steps .ls { background: #e9e9ef; color: #6b6b76; }

@@ -34,16 +34,17 @@ def item_spicy(item):
 
 def recommend_combos(people=2, budget=40000, spicy="상관없어요", drink="맥주", lines=(),
                      menu_by_id=None, hour=None, weather=None, hunger="적당해요", stress="보통",
-                     kind="any", intent=None, gender=None, rules=None):
+                     kind="any", intent=None, gender=None, rules=None, member=True):
     """예산/품절/맵기/세트 가능 조건을 지킨 후보를 점수순으로 최대 세 개 반환.
 
     kind·intent·gender·hour·weather 는 점수에만 약하게 반영하고 조건을 어기게 만들지 않는다
     (그래서 항상 예산 안의 결과가 나온다). 비 오는 날이라고 파전을 밀어 주지는 않는다(뻔한 조합 지양):
     비·눈에는 국물 조합 대신 매콤한 조합을 가산한다.
+    조합 할인은 회원에게만 적용한다(member=False 면 정가, 예산도 정가 기준으로 비교).
     """
     menu_by_id = menu_by_id or MENU_BY_ID
     rules = rules or RULES
-    discount_percent, drinks, pair_meta = rules["discount_percent"], rules["drinks"], rules["pair_meta"]
+    discount_percent, drinks, pair_meta = rules["discount_percent"] if member else 0, rules["drinks"], rules["pair_meta"]
     hot_themed, kind_label, intent_label = set(rules["hot_themed"]), rules["kind_label"], rules["intent_label"]
     counts = ordered_counts(lines)
     preferred_categories = Counter()

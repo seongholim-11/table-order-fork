@@ -28,7 +28,7 @@ from shared import api
 
 # 서버 경로 한 곳 정리. 서버 주소(API_URL)는 shared/api.py 에서 정한다.
 ENDPOINTS = {
-    "store": "/api/store",                    # {name, branch, tables}
+    "store": "/api/v1/store",                    # {name, branch, tables}
     "menus": "/api/menus",                    # [메뉴...]
     "content": "/api/content",                # {categories, roulette_prizes, staff_calls, quiz_questions, weather, rules}
     "orders": "/api/orders",                  # POST

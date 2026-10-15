@@ -10,7 +10,7 @@ from user.state.cart import cart_add, cart_count
 from user.state.menu_groups import group_spicy_variants
 from user.state.quiz import open_quiz
 from user.ui.common import mini_buttons, thumb_html, won
-from user.ui.dialogs import cart_dialog, orders_dialog, staff_dialog
+from user.ui.dialogs import orders_dialog, staff_dialog
 from user.views.ai import render_recommendations
 
 
@@ -26,8 +26,6 @@ def render_header():
             n_orders = len(st.session_state.orders)
             if st.button(f"🧾 주문내역{f' ({n_orders})' if n_orders else ''}", width="stretch"):
                 orders_dialog()
-            if st.button(f"🛒 장바구니 ({cart_count()})", width="stretch"):
-                cart_dialog()
         with c_mini:
             mini_buttons("header")
 

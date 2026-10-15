@@ -43,9 +43,10 @@ def _me(m: dict) -> dict:
 
 
 @router.get("/store")
-async def store_info(settings: Settings = Depends(get_settings)):
-    return {"name": settings.store_name, "branch": settings.store_branch, "slogan": settings.store_slogan,
-            "tables": settings.store_tables}
+@router.get("/v1/store")  # 기획서(API 명세) 경로. 화면은 기존 /api/store 도 그대로 쓴다.
+async def store_info(request: Request):
+    """매장 정보(이름·지점 등) 조회. 스플래시·헤더에 매장명을 보여 줄 때 쓴다. 값은 store_info 테이블(Supabase)에서 읽는다."""
+    return request.app.state.store_info.get()
 
 
 @router.get("/content")

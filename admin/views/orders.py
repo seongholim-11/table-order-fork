@@ -60,11 +60,11 @@ def render_order_filters(orders):
                          min_amount=min_amount or None, max_amount=max_amount or None)
 
 
-def page_orders(repo):
+def page_orders(repo, sub="전체 주문"):
     page_head("주문 이력", "기간·테이블·메뉴·금액으로 주문을 골라 볼 수 있어요")
     orders = repo.orders()
     cust = repo.members(ss["grade_rule"]).set_index("customer_id")
-    mode = st.radio("보기", ["전체 주문", "고객별 주문"], horizontal=True)
+    mode = sub  # 전체 주문 / 고객별 주문은 사이드바 하위 메뉴에서 고른다
     if mode == "고객별 주문":
         if cust.empty:
             st.info("아직 회원이 없어요.")

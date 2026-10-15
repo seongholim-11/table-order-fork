@@ -50,11 +50,30 @@ class RecommendationTests(unittest.TestCase):
         self.assertEqual(ordered_counts([line])["b1"], 2)
         self.assertTrue(ordered_counts([line])[first["components"][0]["id"]])
 
+    def test_discount_is_member_only(self):
+        member = recommend_combos(member=True)[0]
+        guest = recommend_combos(member=False)
+        self.assertGreater(member["discount"], 0)
+        self.assertTrue(all(c["discount"] == 0 and c["price"] == c["original"] for c in guest))
+        self.assertTrue(all(c["price"] <= 40000 for c in guest))  # 예산은 정가 기준
+
+    def test_guest_sees_full_price_and_login_hint(self):
+        app = AppTest.from_file("app.py").run()
+        app.button(key="start_btn").click().run()
+        app.button(key="cat_ai").click().run()
+        html = " ".join(h.value for h in app.get("html"))
+        self.assertIn("회원 로그인 시", html)
+        app.button(key="add_combo_1").click().run()
+        line = next(iter(app.session_state["cart"].values()))
+        self.assertEqual(line["unit"], line["original_unit"])
+
     def test_empty_results_for_impossible_budget(self):
         self.assertEqual(recommend_combos(people=6, budget=1), [])
 
     def test_cart_and_order_preserve_discount(self):
-        app = AppTest.from_file("app.py").run()
+        app = AppTest.from_file("app.py")
+        app.session_state["member"] = {"id": 1, "nickname": "회원"}  # 조합 할인은 회원 전용
+        app.run()
         app.button(key="start_btn").click().run()
         self.assertLess([b.key for b in app.button].index("cat_ai"), [b.key for b in app.button].index("cat_best"))
         app.button(key="cat_ai").click().run()
