@@ -166,3 +166,24 @@ def test_order_screen_and_category_are_restored_from_url_on_reload():
         assert fresh.session_state["page"] == "order" and fresh.session_state["cat"] == "soup"
     finally:
         api.set_client(None)
+
+
+def test_login_survives_reload_via_url_token_and_bad_token_is_dropped(server):
+    app = AppTest.from_file(APP, default_timeout=30).run()
+    app.button(key="login_open").click().run()
+    phone_login(server, ss(app)["login"]["qr_url"], "새로고침손님")
+    app.run()
+    token = ss(app)["access_token"]
+    assert app.query_params["t"] == token  # 로그인하면 토큰이 URL 에 반영된다
+
+    fresh = AppTest.from_file(APP, default_timeout=30)  # 새로고침: 세션은 비고 URL 만 남는다
+    fresh.query_params["t"] = token
+    fresh.run()
+    assert not fresh.exception
+    assert ss(fresh)["member"]["nickname"] == "새로고침손님" and ss(fresh)["access_token"] == token
+    assert [m["nickname"] for m in ss(fresh)["members"]] == ["새로고침손님"]
+
+    bad = AppTest.from_file(APP, default_timeout=30)  # 위조·만료된 토큰은 비회원으로 시작하고 URL 에서 지운다
+    bad.query_params["t"] = "garbage"
+    bad.run()
+    assert not bad.exception and ss(bad)["member"] is None and "t" not in bad.query_params
