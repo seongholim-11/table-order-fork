@@ -22,7 +22,7 @@ from user.state.session import init_state, sync_url  # noqa: E402
 from user.ui.cart import render_cart  # noqa: E402
 from user.ui.common import scroll_to_top_on_view_change  # noqa: E402
 from user.ui.dialogs import confirm_dialog  # noqa: E402
-from user.views.ai import render_ai_quiz  # noqa: E402
+from user.views.ai import quiz_at_result, render_ai_quiz  # noqa: E402
 from user.views.order import render_categories, render_header, render_menu  # noqa: E402
 from user.views.splash import render_splash  # noqa: E402
 
@@ -52,7 +52,15 @@ def main():
         return
     render_header()
     if st.session_state.page == "ai_quiz":
-        render_ai_quiz()
+        if quiz_at_result():  # 결과 화면에는 주문 화면처럼 오른쪽에 장바구니를 함께 보여 준다
+            with st.container(key="quiz_result_layout"):
+                c_quiz, c_cart = st.columns([5.2, 2.5], gap="medium")
+            with c_quiz:
+                render_ai_quiz()
+            with c_cart:
+                render_cart()
+        else:
+            render_ai_quiz()
         if st.session_state.pop("confirm_order", False):
             confirm_dialog()
         return

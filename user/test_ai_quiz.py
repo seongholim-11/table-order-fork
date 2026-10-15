@@ -151,6 +151,7 @@ class QuizScreenTests(unittest.TestCase):
         self.assertIn("자동 반영", html)
         adds = [b for b in app.button if str(b.key).startswith("add_combo_")]
         self.assertGreaterEqual(len(adds), 1)
+        self.assertTrue([b for b in app.button if b.key == "order_btn"])  # 결과 화면 오른쪽 장바구니
         adds[0].click().run()
         line = next(iter(app.session_state["cart"].values()))
         self.assertTrue(line["id"].startswith("combo:"))
