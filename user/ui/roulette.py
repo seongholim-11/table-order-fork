@@ -21,7 +21,7 @@ def render_roulette():
     stops = ",".join(f'{p["color"]} {i * seg}deg {(i + 1) * seg - gap}deg,#fff {(i + 1) * seg - gap}deg {(i + 1) * seg}deg'
                      for i, p in enumerate(prizes))
     labels = "".join(
-        f'<div class="rw-label" style="transform:rotate({i * seg}deg)"><span style="transform:rotate({-i * seg}deg)">'
+        f'<div class="rw-label" style="transform:rotate({i * seg}deg)"><span style="transform:rotate(calc({-i * seg}deg - var(--to, 0deg)))">'
         f'{p["label"]}<em>{p["emoji"]}</em></span></div>' for i, p in enumerate(prizes))
     dots = "".join(f'<div class="rw-dot" style="transform:rotate({k * 360 / 16}deg)"><i></i></div>' for k in range(16))
     conf = "".join(f'<div class="rw-conf" style="left:{x}%;top:{y}%;width:{w}px;height:{h}px;background:{col};transform:rotate({r}deg)"></div>'
