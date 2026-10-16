@@ -9,7 +9,6 @@ import streamlit as st
 from user.state import context as ctx
 from user.state.cart import cart_discount, cart_total, roulette_discount
 from user.state.coupons import consume_applied, pending_coupon_ids
-from user.ui.cart import render_cart
 from user.ui.common import KST, won
 
 

@@ -11,16 +11,14 @@
 [data-testid="stBaseButton-primary"]:disabled p,
 [data-testid="stBaseButton-secondary"]:disabled p { color: #7a7a86 !important; }
 .st-key-header { border-bottom-color: #dcdce3; }
-.brand .sub, .mdesc, .cart-line .o, .cart-empty, .qr-text .c, .login-pop small, .qz-hint, .login-timer, .login-foot, .mlog li .t, .qz-progress .t, .qz-auto small, .rw-title .s { color: #6b6b76; }
+.brand .sub, .mdesc, .cart-line .o, .cart-empty, .qr-text .c, .login-pop small, .qz-hint, .login-timer, .login-foot, .mlog li .t, .qz-auto small, .rw-title .s { color: #6b6b76; }
 .table-chip { background: #fff; border-color: #d4d4dc; }
-.table-chip b, .section-title span, .cart-title span, .mprice, .total-row b, .combo-pricing strong, .mlog-title span, .mlog li em, .qz-progress .n, .qz-group, .splash .big span, .promo .h { color: #d98200; }
+.table-chip b, .section-title span, .cart-title span, .mprice, .total-row b, .combo-pricing strong, .mlog-title span, .mlog li em, .qz-group, .splash .big span { color: #d98200; }
 [class*="st-key-card_"], .st-key-cart_panel, [class*="st-key-ai_combo_"], .st-key-qr_card, .mlog, [class*="st-key-quiz_opt_"] { background: #fff; border-color: #dcdce3; }
 .st-key-ai_combo_1 { background: linear-gradient(135deg, #f1eaff, #fff 70%); border-color: #a68ad4; }
 .thumb > .beverage-photo { background: #efeff3; }
 .total-row, .order-item, .qz-auto, .splash .slogan { color: #3c3c46; }
-.order-box, .qz-chip { background: #eeeef3; border-color: #dcdce3; }
-.promo { background: linear-gradient(135deg, #fff, #eeeef3); border-color: #dcdce3; }
-.promo .t { color: #6b6b76; }
+.order-box { background: #eeeef3; border-color: #dcdce3; }
 .rw-title, .rw-title h2, .qr-text, .login-status { color: #1c1c20; }
 .rw-title .q, .rw-hint { color: #55555f; }
 .rw-result { background: #fff4d6; }
@@ -46,7 +44,6 @@
 .login-qr img { box-shadow: 0 6px 20px rgba(0,0,0,.15); }
 .mlog li { border-top-color: #e6e6ec; }
 .mlog li .n { background: #ffeab8; color: #8a5a00; }
-.qz-progress .bar { background: #dcdce3; }
 .qz-auto { color: #55555f; }
 [class*="st-key-quiz_opt_"] [data-testid="stBaseButton-secondary"]:hover { border-color: #f0560a; color: #f0560a; }
 [role="dialog"], [data-testid="stDialog"] [role="dialog"] { background: #fff !important; color: #1c1c20; }

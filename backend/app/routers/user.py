@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.core.dependencies import current_member, optional_member
-from app.core.settings import Settings, get_settings
 from app import dummy
 
 router = APIRouter(prefix="/api", tags=["사용자"])

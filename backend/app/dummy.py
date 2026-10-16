@@ -28,7 +28,6 @@ DUMMY_ENDPOINTS = {
     "GET /api/tables/{table_no}/coupons": "table_coupons",
     "GET /admin/api/menus": "admin_menus",
     "GET /admin/api/orders": "orders",
-    "GET /admin/api/calls": "calls",
     "GET /admin/api/stats": "dashboard_stats",
     "POST /api/orders": "order_created",
     "POST /api/calls": "call_created",
@@ -36,7 +35,6 @@ DUMMY_ENDPOINTS = {
     "PUT /api/tables/{table_no}/logins/prize": "prize_saved",
     "PUT /admin/api/menus/{menu_id}": "menu_saved",
     "PUT /admin/api/content/{name}": "content_saved",
-    "POST /admin/api/calls/{call_id}/done": "call_finished",
 }
 
 
@@ -132,12 +130,6 @@ def orders() -> list[dict]:
             for i, t, mid, total, ai, ts, lines in rows]
 
 
-def calls() -> list[dict]:
-    return [{"id": 3, "ts": _ago(minutes=3), "table_no": 5, "items": ["물", "앞접시"], "done": False},
-            {"id": 2, "ts": _ago(minutes=20), "table_no": 3, "items": ["수저"], "done": False},
-            {"id": 1, "ts": _ago(hours=2), "table_no": 8, "items": ["물티슈"], "done": True}]
-
-
 def dashboard_stats() -> dict:
     """대시보드 통계(고정 값). 실제 구현에서는 services/stats.py 의 dashboard() 가 주문·회원으로 계산한다."""
     return {
@@ -185,7 +177,3 @@ def menu_saved(menu_id: str, fields: dict) -> dict:
 def content_saved(data):
     return data
 
-
-def call_finished(call_id: int) -> dict:
-    base = next((c for c in calls() if c["id"] == call_id), calls()[0])
-    return {**base, "id": call_id, "done": True}

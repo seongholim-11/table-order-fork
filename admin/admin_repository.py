@@ -25,9 +25,8 @@ import pandas as pd
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from admin_dummy_data import DummyBackend, Unsupported  # noqa: E402
+from admin_dummy_data import GRADES, DummyBackend  # noqa: E402, F401  (GRADES 는 화면에서 여기서 가져간다)
 from shared import api  # noqa: E402
-from user.menu_images import bundled_photo_uri  # noqa: E402
 
 ENDPOINTS = {
     "store": "/api/v1/store",
@@ -36,8 +35,6 @@ ENDPOINTS = {
     "categories": "/api/content/categories",  # GET 전체 목록(가상 카테고리 포함) / PUT /admin/api/content/categories 통째로 교체
     "members": "/admin/api/members",          # GET ?repeat&regular&dormant
     "orders": "/admin/api/orders",
-    "calls": "/admin/api/calls",              # GET 호출 목록 / POST /{id}/done 처리 완료
-    "staff_calls": "/api/content/staff_calls",  # GET 손님 화면의 호출 항목 / PUT /admin/api/content/staff_calls 통째로 교체
     "stats": "/admin/api/stats",
     "sms": "/admin/api/marketing/sms",        # /usage /preview /send /logs
     "opt_out": "/admin/api/members/{id}/opt-out",
@@ -46,7 +43,6 @@ KST = timezone(timedelta(hours=9))
 SPICY_LABELS = {0: "안 매움", 1: "순한맛", 2: "보통맛", 3: "아주 매움"}
 SPICY_VALUES = {v: k for k, v in SPICY_LABELS.items()}
 MODES = ("dummy", "api", "auto")
-GRADES = ["신규", "재방문", "단골", "휴면"]
 DEFAULT_RULE = {"repeat": 2, "regular": 5, "dormant": 60}
 MENU_COLUMNS = ["id", "메뉴명", "카테고리", "가격", "설명", "이미지 URL", "판매 여부", "매운 정도", "추천 가중치", "세트 가능"]
 
@@ -86,18 +82,6 @@ class ApiBackend:
 
     def save_roulette_prizes(self, prizes):
         return api.put("/admin/api/content/roulette_prizes", self.token, json=prizes)
-
-    def calls(self):
-        return api.get(ENDPOINTS["calls"], self.token)
-
-    def finish_call(self, call_id):
-        return api.post(f"{ENDPOINTS['calls']}/{call_id}/done", self.token)
-
-    def staff_call_items(self):
-        return api.get(ENDPOINTS["staff_calls"])
-
-    def save_staff_call_items(self, items):
-        return api.put("/admin/api/content/staff_calls", self.token, json=items)
 
     def save_menu(self, menu_id, fields):
         return api.put(f"{ENDPOINTS['menus']}/{menu_id}", self.token, json=fields)
@@ -149,7 +133,6 @@ COLOR_PRESETS = {"주황": ["#f6b93b", "#e55039"], "초록": ["#b8e994", "#38ada
                  "노랑": ["#fbc531", "#c27c0e"], "파랑": ["#74b9ff", "#2d3a8c"], "보라": ["#a29bfe", "#4b3f9e"]}
 
 
-STAFF_CALL_MAX_ITEMS, STAFF_CALL_MAX_LEN = 12, 20
 ROULETTE_MIN_SLOTS, ROULETTE_MAX_SLOTS = 2, 8
 ROULETTE_COLUMNS = ["칸 문구", "이모지", "종류", "할인율(%)", "서비스 메뉴", "색상", "확률 가중치", "당첨 안내문"]
 ROULETTE_KINDS = {"discount": "할인", "free": "서비스"}
@@ -182,14 +165,6 @@ class AdminRepository:
                  "매운 정도": SPICY_LABELS.get(m["spicy"], "안 매움"), "추천 가중치": m["weight"], "세트 가능": m["set_ok"]}
                 for m in payload["menus"]]
         return pd.DataFrame(rows, columns=MENU_COLUMNS)
-
-    def menu_visuals(self) -> dict[str, dict]:
-        """메뉴 id → 카드 썸네일에 쓸 {emoji, image_url, colors} (사진이 없으면 이모지+카테고리 색)."""
-        payload = self.backend.menus()
-        colors = {c["id"]: c.get("colors") or COLOR_PRESETS["보라"] for c in self.backend.categories_full()}
-        return {m["id"]: {"emoji": m.get("emoji") or "🍽️",
-                          "image_url": m.get("image_url") or bundled_photo_uri(m["id"]) or "",
-                          "colors": colors.get(m["cat"], COLOR_PRESETS["보라"])} for m in payload["menus"]}
 
     # ---- 카테고리 CRUD (왼쪽 패널) ----
     def category_list(self) -> list[dict]:
@@ -278,35 +253,6 @@ class AdminRepository:
         for menu_id in deleted:
             self.backend.delete_menu(menu_id)
         return {"saved": saved, "deleted": len(deleted)}
-
-    # ---- 직원 호출 ----
-    def staff_calls(self) -> pd.DataFrame:
-        """손님이 보낸 호출 목록 (최신순). 처리 여부는 '처리 완료' 열."""
-        rows = [{"call_id": c["id"], "호출 시각": datetime.fromisoformat(c["ts"]).astimezone(KST).replace(tzinfo=None),
-                 "테이블": c["table_no"], "요청 항목": ", ".join(c["items"]), "처리 완료": bool(c["done"])}
-                for c in self.backend.calls()]
-        df = pd.DataFrame(rows, columns=["call_id", "호출 시각", "테이블", "요청 항목", "처리 완료"])
-        return df.sort_values("호출 시각", ascending=False, ignore_index=True)
-
-    def finish_call(self, call_id: int) -> None:
-        self.backend.finish_call(int(call_id))
-
-    def staff_call_items(self) -> list[str]:
-        """손님 호출 화면에 보이는 요청 항목 목록."""
-        return list(self.backend.staff_call_items())
-
-    def save_staff_call_items(self, items: list[str]) -> None:
-        """항목을 다듬고(앞뒤 공백 제거·빈 칸 삭제) 검사한 뒤 통째로 저장한다."""
-        clean = [_text(i).strip() for i in items if _text(i).strip()]
-        if not clean:
-            raise CategoryError("호출 항목을 하나 이상 입력해 주세요.")
-        if len(clean) > STAFF_CALL_MAX_ITEMS:
-            raise CategoryError(f"호출 항목은 {STAFF_CALL_MAX_ITEMS}개까지 둘 수 있어요.")
-        if any(len(i) > STAFF_CALL_MAX_LEN for i in clean):
-            raise CategoryError(f"항목 이름은 {STAFF_CALL_MAX_LEN}자 이하로 입력해 주세요.")
-        if len(set(clean)) != len(clean):
-            raise CategoryError("같은 이름의 호출 항목이 있어요.")
-        self.backend.save_staff_call_items(clean)
 
     # ---- 이벤트: 룰렛 ----
     def roulette_table(self) -> pd.DataFrame:

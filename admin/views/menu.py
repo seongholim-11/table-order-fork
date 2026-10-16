@@ -3,7 +3,7 @@
 
 import streamlit as st
 
-from admin.ui.widgets import bars, page_head, panel, sec_title
+from admin.ui.widgets import bars, page_head, panel
 from admin_repository import COLOR_PRESETS, ICON_DEFAULT, SPICY_LABELS, CategoryError
 
 ss = st.session_state

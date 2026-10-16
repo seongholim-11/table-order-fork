@@ -5,11 +5,11 @@
 [뼈대] issued_today 는 QR 로그인(routers/auth.py)이 쓰므로 남겨 두었고, 나머지는 시그니처만 남겼다.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
+from app.services.grades import KST
 from app.stores.db import Database
 
-KST = timezone(timedelta(hours=9))
 
 SCHEMA = """CREATE TABLE IF NOT EXISTS coupons (
     id INTEGER PRIMARY KEY AUTOINCREMENT, member_id INTEGER NOT NULL, table_no INTEGER NOT NULL,

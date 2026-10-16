@@ -67,9 +67,6 @@ hr { border-color: var(--line) !important; }
 [data-testid="stSidebar"] [data-testid="stRadioOption"]:has(input:checked) p { color: #fff; font-weight: 800; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] { background: transparent; border: 1px solid var(--nav-line); color: var(--nav-ink); width: 100%; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover { border-color: #6b645d; color: #fff; background: #2a2623; }
-.sb-status { display: inline-flex; align-items: center; gap: 8px; margin: 0 12px; padding: 5px 10px; border-radius: 999px; background: #2a2623; color: #d6d0c8; font-size: 12px; font-weight: 600; }
-.sb-status i { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 0 3px rgba(74,222,128,.2); }
-.sb-status.dummy i { background: #fbbf24; box-shadow: 0 0 0 3px rgba(251,191,36,.2); }
 
 /* ---------- 페이지 머리말 ---------- */
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 0 0 26px; }
@@ -99,7 +96,6 @@ hr { border-color: var(--line) !important; }
 .bar-row .c { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 32px; text-align: right; }
 .rank-list .bar-row .n::before { content: attr(data-r); display: inline-block; width: 22px; color: var(--brand-ink); font-weight: 800; }
 .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--brand-soft); color: var(--brand-ink); }
-.login-wrap { display: grid; place-items: center; min-height: 70vh; }
 
 /* ---------- 입력 위젯 ---------- */
 [data-testid="stWidgetLabel"] p { font-size: 13px; font-weight: 700; color: var(--ink-2); }

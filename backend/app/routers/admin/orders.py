@@ -1,6 +1,6 @@
-"""관리자: 주문 이력, 직원 호출."""
+"""관리자: 주문 이력."""
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 
 from app import dummy
 
@@ -18,15 +18,3 @@ async def list_orders(request: Request, member_id: int | None = None):
         m = members.get(o["member_id"])
         out.append({**o, "nickname": m["nickname"] if m else None})
     return out
-
-
-@router.get("/calls")
-async def list_calls():
-    """[더미] 직원 호출 목록."""
-    return dummy.calls()
-
-
-@router.post("/calls/{call_id}/done")
-async def finish_call(call_id: int, request: Request):
-    """호출 처리 완료. [더미] 저장하지 않고 완료된 호출을 돌려준다. TODO: shop.finish_call(call_id), 없으면 404."""
-    return dummy.call_finished(call_id)

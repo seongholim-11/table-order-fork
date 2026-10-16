@@ -20,11 +20,3 @@ class CallMixin:
     def call(self, call_id: int) -> dict:
         """TODO: 한 건 조회. items 는 db.from_list, done 은 done_at 이 있으면 True."""
         raise NotImplementedError
-
-    def calls(self) -> list[dict]:
-        """TODO: 최신순 전체 목록."""
-        raise NotImplementedError
-
-    def finish_call(self, call_id: int) -> dict | None:
-        """TODO: 없으면 None, 있으면 done_at 을 채우고 call() 반환."""
-        raise NotImplementedError

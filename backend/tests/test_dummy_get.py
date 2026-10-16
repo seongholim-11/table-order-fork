@@ -30,7 +30,6 @@ def test_admin_get_dummies(client):
     assert {"id", "ts", "table_no", "total", "lines", "ai_combo", "member_id", "nickname"} <= orders[0].keys()
     mine = client.get("/admin/api/orders", headers=ADMIN, params={"member_id": 1}).json()
     assert mine and all(o["member_id"] == 1 for o in mine)
-    assert {"id", "ts", "table_no", "items", "done"} <= client.get("/admin/api/calls", headers=ADMIN).json()[0].keys()
     stats = client.get("/admin/api/stats", headers=ADMIN).json()
     assert stats["today_orders"] > 0 and stats["popular_menus"] and stats["ai"]["recommendations"] == 9
 
@@ -65,7 +64,5 @@ def test_admin_write_dummies(client):
     assert client.put("/admin/api/menus/c2", headers=ADMIN, json={"weight": 101}).status_code == 422  # 스키마 검증은 그대로
     assert client.delete("/admin/api/menus/c2", headers=ADMIN).status_code == 204
     assert client.put("/admin/api/content/staff_calls", headers=ADMIN, json=["💧 물"]).json() == ["💧 물"]
-    done = client.post("/admin/api/calls/3/done", headers=ADMIN).json()
-    assert done["id"] == 3 and done["done"] is True
-    for method, path in (("put", "/admin/api/menus/c2"), ("delete", "/admin/api/menus/c2"), ("post", "/admin/api/calls/3/done")):
+    for method, path in (("put", "/admin/api/menus/c2"), ("delete", "/admin/api/menus/c2")):
         assert getattr(client, method)(path).status_code in (401, 422)  # 인증은 그대로

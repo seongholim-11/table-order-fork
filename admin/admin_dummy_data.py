@@ -5,21 +5,20 @@
 """
 import copy
 import random
+import sys
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+from user import menu_data  # noqa: E402
 
 TODAY = date(2026, 10, 12)
-GRADES = ["신규", "재방문", "단골", "휴면"]
+GRADES = ["신규", "재방문", "단골", "휴면"]  # admin_repository 도 여기 것을 가져다 쓴다
 AGE_GROUPS = ["20대 미만", "20대", "30대", "40대", "50대 이상"]
 
-# 손님 화면의 카테고리 콘텐츠와 같은 모양 (id, icon, name, colors). 서버에는 AI 추천 조합·인기메뉴 같은 가상 카테고리도 섞여 있다.
-CATEGORIES = [
-    {"id": "chicken", "icon": "🍗", "name": "치킨·튀김", "colors": ["#f6b93b", "#e55039"]},
-    {"id": "anju", "icon": "🍢", "name": "안주", "colors": ["#b8e994", "#38ada9"]},
-    {"id": "soup", "icon": "🍲", "name": "탕·전골", "colors": ["#ff6b6b", "#7d1d3f"]},
-    {"id": "beer", "icon": "🍺", "name": "맥주", "colors": ["#fbc531", "#c27c0e"]},
-    {"id": "soju", "icon": "🍶", "name": "소주·막걸리", "colors": ["#74b9ff", "#2d3a8c"]},
-    {"id": "side", "icon": "🥤", "name": "음료·사이드", "colors": ["#a29bfe", "#4b3f9e"]},
-]
+# 손님 화면(user/menu_data.py)과 같은 카테고리. 서버에는 AI 추천 조합·인기메뉴 같은 가상 카테고리도 섞여 있으나 관리자 더미는 실제 카테고리만 쓴다.
+CATEGORIES = [c for c in menu_data.CATEGORIES if c["id"] not in ("ai", "best")]
 
 
 def _menu(id_, cat, name, price, spicy=0, soldout=False, weight=50, set_ok=True, desc=""):
@@ -43,14 +42,8 @@ MENUS = [
     _menu("d1", "side", "콜라", 2000, set_ok=False),
 ]
 
-STAFF_CALLS = ["💧 물", "🥄 수저·젓가락", "🍽️ 앞접시", "🧻 휴지·물티슈", "🧊 얼음", "🔥 가스불 점검", "💳 계산 요청", "🙋 기타 문의"]
-
-# 손님 화면 룰렛 칸과 같은 모양 (user/menu_data.py ROULETTE_PRIZES). weight 는 당첨 확률 가중치.
-ROULETTE_PRIZES = [
-    {"label": "모든 메뉴<br><b>5% 할인</b>", "short": "전 메뉴 5% 할인", "emoji": "🎟️", "color": "#f0556b", "kind": "discount", "percent": 5, "weight": 1},
-    {"label": "계란말이<br><b>서비스</b>", "short": "계란말이 서비스", "emoji": "🥚", "color": "#ff9f1a", "kind": "free", "item_id": "a4", "weight": 1},
-    {"label": "음료<br><b>서비스</b>", "short": "콜라 서비스", "emoji": "🥤", "color": "#f5c518", "kind": "free", "item_id": "d1", "weight": 1},
-]
+# 손님 화면 룰렛 칸(user/menu_data.py)의 앞 3칸에 당첨 확률 가중치(weight)를 더한 것.
+ROULETTE_PRIZES = [{**p, "weight": 1} for p in menu_data.ROULETTE_PRIZES[:3]]
 
 
 class Unsupported(Exception):
@@ -81,14 +74,6 @@ class DummyBackend:
         self.menus_ = [dict(m) for m in MENUS]
         self.categories_ = [dict(c) for c in CATEGORIES]
         self.roulette_ = copy.deepcopy(ROULETTE_PRIZES)
-        self.staff_calls_ = list(STAFF_CALLS)
-        now = datetime.now(timezone.utc)
-        self.calls_ = [
-            {"id": i, "ts": _iso(now - timedelta(minutes=ago)), "table_no": table, "items": items, "done": done}
-            for i, (ago, table, items, done) in enumerate([
-                (1, 7, ["💧 물", "🥄 수저·젓가락"], False), (4, 12, ["💳 계산 요청"], False),
-                (9, 3, ["🔥 가스불 점검"], False), (26, 21, ["🧊 얼음"], True), (41, 5, ["🍽️ 앞접시", "🧻 휴지·물티슈"], True),
-                (75, 18, ["🙋 기타 문의"], True)], 1)][::-1]
         self.members_ = []
         for i in range(1, 61):
             self.members_.append({
@@ -135,23 +120,6 @@ class DummyBackend:
     def save_roulette_prizes(self, prizes: list) -> list:
         self.roulette_ = copy.deepcopy(prizes)
         return self.roulette_prizes()
-
-    def calls(self) -> list:
-        return [dict(c, items=list(c["items"])) for c in sorted(self.calls_, key=lambda c: c["id"], reverse=True)]
-
-    def finish_call(self, call_id: int) -> dict:
-        call = next((c for c in self.calls_ if c["id"] == call_id), None)
-        if call is None:
-            raise Unsupported("없는 호출입니다.")
-        call["done"] = True
-        return dict(call)
-
-    def staff_call_items(self) -> list:
-        return list(self.staff_calls_)
-
-    def save_staff_call_items(self, items: list) -> list:
-        self.staff_calls_ = list(items)
-        return self.staff_call_items()
 
     def save_menu(self, menu_id: str, fields: dict) -> dict:
         cur = next((m for m in self.menus_ if m["id"] == menu_id), None)

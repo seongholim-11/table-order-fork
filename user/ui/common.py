@@ -1,15 +1,12 @@
 """여러 화면이 같이 쓰는 UI 조각 (금액 표기·상단 버튼·썸네일).
 """
 
-from datetime import timedelta, timezone
-
 import streamlit as st
 
+from ai_quiz_data import KST  # noqa: F401  (다른 화면이 여기서 가져간다)
 from menu_images import menu_image_html
 from user.state import context as ctx
 from user.state.session import go, toggle_theme
-
-KST = timezone(timedelta(hours=9))
 
 
 def won(n):

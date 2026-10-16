@@ -57,7 +57,7 @@ DATA_SOURCE=dummy streamlit run user/app.py                   # 서버 없이 �
 | 파일 | 같이 쓰는 담당 |
 |---|---|
 | `backend/app/stores/shop_menus.py` / `shop_orders.py` / `shop_calls.py` / `shop_recommendations.py` (테이블별로 나뉨, `shop.py` 가 `ShopStore` 로 합침) | 메뉴·주문 D, 직원 호출 E, 추천 기록 C (+ B 통계) |
-| `backend/app/stores/content.py` 의 `NAMES`, `seed/content.json` | C, D, E |
+| `backend/app/seed/content.json` (`tools/export_dummy_seed.py` 로 생성) | C, D, E |
 | `admin/admin_repository.py`, `admin/admin_dummy_data.py` | 전원 |
 | `backend/app/services/stats.py` | B, C |
 | 주문 테이블 스키마 | B, D (바꾸면 서로 알리기) |

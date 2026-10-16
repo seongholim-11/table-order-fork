@@ -1,6 +1,6 @@
 """관리자: 메뉴 관리."""
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from app import dummy
@@ -13,7 +13,7 @@ NON_MENU_CATEGORIES = {"ai", "best"}  # 화면용 가상 카테고리(AI 추천 
 def menu_categories(request: Request) -> list[dict]:
     """메뉴를 넣을 수 있는 카테고리 (ai·best 제외). [더미] 더미 콘텐츠에서 가져온다.
 
-    TODO: request.app.state.content.get("categories") 로 저장된 카테고리를 읽는다.
+    TODO: categories 테이블(db/fbgrowth_schema.sql)에서 카테고리를 읽는다.
     """
     return [{"id": c["id"], "name": c["name"]} for c in dummy.content_item("categories")
             if c["id"] not in NON_MENU_CATEGORIES]

@@ -6,9 +6,9 @@ Supabase 의 table_logins 테이블을 쓴다 (회원·테이블·로그인 날�
 
 from datetime import datetime, timedelta, timezone
 
+from app.services.grades import KST
 from app.stores.db import Database
 
-KST = timezone(timedelta(hours=9))
 
 SCHEMA = """CREATE TABLE IF NOT EXISTS table_logins (
     id INTEGER PRIMARY KEY AUTOINCREMENT, table_no INTEGER NOT NULL, member_id INTEGER NOT NULL, login_day TEXT NOT NULL,

@@ -100,12 +100,6 @@ MENU = [
 ]
 MENU_BY_ID = {m["id"]: m for m in MENU}
 
-PROMOS = [
-    ("🍻", "생맥주 3000cc 주문 시", "땅콩 서비스!"),
-    ("🐟", "먹태구이 + 골뱅이 소면", "세트 3,000원 할인"),
-    ("🕙", "오후 10시 이후", "전 메뉴 10% 할인"),
-]
-
 # 첫 화면 행운의 룰렛 (5칸, 시계 방향 순서, 첫 칸이 12시 방향). kind: discount(주문 할인) / free(서비스 메뉴)
 ROULETTE_PRIZES = [
     {"label": "모든 메뉴<br><b>5% 할인</b>", "short": "전 메뉴 5% 할인", "emoji": "🎟️", "color": "#f0556b", "kind": "discount", "percent": 5},

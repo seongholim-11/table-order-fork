@@ -9,7 +9,6 @@
 """
 import os
 from collections import Counter
-from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from itertools import combinations
 
@@ -221,10 +220,6 @@ def keyword_grades(keywords) -> list[str]:
     sets = [set(KEYWORD_GRADES[k]) for k in keywords]
     common = set.intersection(*sets) if sets else set()
     return [g for g in GRADE_ORDER if g in common]
-
-
-def keyword_label(keywords) -> str:
-    return " + ".join(keywords)
 
 
 def _facts(keywords, ctx: dict, weather: str, event: str) -> dict:

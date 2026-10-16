@@ -8,7 +8,6 @@ from app.routers import admin, auth, user
 from app.services.kakao import KakaoClient
 from app.services.supabase_auth import SupabaseAuthClient
 from app.services.sms import SmsService
-from app.stores.content import ContentStore
 from app.stores.coupons import CouponStore
 from app.stores.db import Database
 from app.stores.login_sessions import LoginSessionStore
@@ -39,7 +38,6 @@ def create_app(settings: Settings | None = None, sms_clock=None, sms_http=None) 
     app.state.tablet_logins = TabletLoginStore(db, settings.jwt_expire_minutes)
     app.state.store_info = StoreInfoStore(db, settings)
     app.state.shop = ShopStore(db)
-    app.state.content = ContentStore(db)
     app.state.sms_logs = SmsLogStore(db)
     app.state.sms = SmsService(settings, app.state.members, app.state.sms_logs, clock=sms_clock, http=sms_http)
     app.state.kakao = KakaoClient(settings)

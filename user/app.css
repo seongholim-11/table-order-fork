@@ -73,7 +73,6 @@ button:focus-visible { outline: 3px solid #ffcf54 !important; outline-offset: 3p
 .ai-hero h2 { margin: 8px 0; font-size: 28px; font-weight: 900; line-height: 1.3; }
 .ai-hero p { margin: 0 0 16px; color: #d4c9e3; font-size: 14px; word-break: keep-all; }
 .ai-offer { display: inline-block; padding: 6px 10px; border-radius: 8px; background: #ffb703; color: #20170b; font-size: 13px; font-weight: 800; }
-.ai-preference-title { font-size: 14px; font-weight: 800; }
 .ai-results-title { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 .ai-results-title small { margin-left: auto; color: #aaa8b4; font-size: 12px; font-weight: 500; }
 [class*="st-key-ai_combo_"] { padding: 18px 20px; background: #1c1c20; border: 1px solid #39323f; border-radius: 16px; gap: 12px; }
@@ -129,10 +128,6 @@ button:focus-visible { outline: 3px solid #ffcf54 !important; outline-offset: 3p
 .splash .big { font-size: clamp(32px, 6vw, 76px); font-weight: 900; letter-spacing: -1px; line-height: 1.3; word-break: keep-all; }
 .splash .big span { color: #ffb703; }
 .splash .slogan { font-size: 18px; color: #bbb; margin: 12px auto 0; max-width: 560px; word-break: keep-all; }
-.st-key-promos { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px !important; }
-.st-key-promos > [data-testid="stElementContainer"] { width: 100% !important; }
-.promo { height: 100%; background: linear-gradient(135deg,#2a2a31,#1c1c20); border: 1px solid #34343b; border-radius: 20px; padding: 24px 16px; text-align: center; }
-.promo .e { font-size: 44px; } .promo .t { color: #aaa; font-size: 14px; margin-top: 6px; } .promo .h { font-size: 20px; font-weight: 900; color: #ffb703; }
 .st-key-start_cta { width: min(100%, 560px) !important; margin: 24px auto; }
 .st-key-start_btn button { min-height: 72px; border-radius: 20px; }
 .st-key-start_btn button p { font-size: 24px; }
@@ -187,18 +182,12 @@ button:focus-visible { outline: 3px solid #ffcf54 !important; outline-offset: 3p
   .mprice { font-size: 16px; margin-top: 2px; }
   .st-key-cart_panel { padding: 16px; }
   .st-key-cart_items, .st-key-dialog_cart_items { max-height: none; overflow: visible; }
-  .st-key-promos { grid-template-columns: minmax(0, 1fr); gap: 10px !important; }
-  .promo { padding: 16px; }
-  .promo .e { font-size: 30px; }
-  .promo .h { font-size: 18px; }
   .splash { padding: 16px 0; }
   .splash .slogan { font-size: 14px; }
   .st-key-start_cta { margin: 12px auto; }
   .st-key-start_btn button { min-height: 60px; }
   .st-key-start_btn button p { font-size: 20px; }
   .thumb.big { height: 160px; font-size: 80px; }
-  .st-key-item_details > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
-  .st-key-item_details [data-testid="stColumn"] { width: 100%; }
 }
 @media (max-width: 360px) {
   .brand .name { font-size: 16px; }
@@ -307,11 +296,6 @@ button:focus-visible { outline: 3px solid #ffcf54 !important; outline-offset: 3p
 
 /* ===== AI 질문 (한 화면에 질문 하나, 큰 선택 카드) ===== */
 .st-key-quiz_page { max-width: 880px; margin: 0 auto; padding-top: 12px; gap: 14px; }
-.qz-progress { display: flex; align-items: center; gap: 12px; }
-.qz-progress .n { font-size: 20px; font-weight: 900; color: #ffb703; min-width: 22px; text-align: center; }
-.qz-progress .t { font-size: 14px; color: #8c8c96; min-width: 22px; }
-.qz-progress .bar { flex: 1; height: 12px; border-radius: 999px; background: #2a2a31; overflow: hidden; }
-.qz-progress .bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #4c8dff, #7db1ff); transition: width .3s; }
 .qz-group { text-align: center; color: #ffb703; font-weight: 800; font-size: 14px; margin-top: 18px; }
 .qz-title { text-align: center; font-size: 30px; font-weight: 900; margin: 4px 0 18px; line-height: 1.4; word-break: keep-all; }
 .st-key-quiz_grid { display: flex !important; flex-wrap: wrap !important; justify-content: center; gap: 14px !important; }
@@ -339,8 +323,6 @@ button:focus-visible { outline: 3px solid #ffcf54 !important; outline-offset: 3p
 .st-key-quiz_answers button p { font-size: 13px; font-weight: 700; }
 .st-key-quiz_answers button:hover { border-color: #ff9a40; color: #ff9a40; }
 .qz-hint { text-align: center; color: #8c8c96; font-size: 13px; margin-top: 8px; }
-.qz-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 4px 0 10px; }
-.qz-chip { background: #26262b; border: 1px solid #3a3a42; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 700; }
 .qz-auto { text-align: center; color: #b5b5bd; font-size: 13px; margin-bottom: 8px; }
 .qz-auto small { color: #8c8c96; }
 .st-key-open_quiz button { min-height: 52px; border-radius: 14px; background: linear-gradient(135deg, #8b5cf6, #5b3fd9); border: 0; box-shadow: 0 4px 14px rgba(91,63,217,.45); }
@@ -379,7 +361,6 @@ button:focus-visible { outline: 3px solid #ffcf54 !important; outline-offset: 3p
 [class*="_mini"][class*="st-key-"] > [data-testid="stElementContainer"] { width: auto !important; flex: 0 0 auto; }
 [class*="_mini"][class*="st-key-"] button { min-height: 34px; width: 34px; padding: 0; border-radius: 10px; }
 [class*="_mini"][class*="st-key-"] button p { font-size: 16px; line-height: 1; }
-.st-key-splash_mini { position: fixed; top: 12px; right: 14px; z-index: 50; }
 
 /* ---------- 모바일 헤더: 한 줄 브랜드 + 아이콘, 아래 줄에 버튼 3개 ---------- */
 @media (max-width: 760px) {

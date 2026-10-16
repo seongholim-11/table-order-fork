@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from streamlit.testing.v1 import AppTest
 
 import admin_repository as ar
-from admin_dummy_data import DummyBackend, Unsupported
+from admin_dummy_data import DummyBackend
 from app.core.settings import Settings
 from app.factory import create_app
 from app.services.grades import KST
