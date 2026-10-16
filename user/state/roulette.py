@@ -8,7 +8,7 @@ import streamlit as st
 import server
 
 from user.state import context as ctx
-from user.state.cart import cart_add
+from user.state.coupons import add_coupon
 
 
 def spins_left():
@@ -36,10 +36,8 @@ def spin_roulette():
     ss.roulette = {"idx": idx, "angle": round(angle, 1), "animate": True}
     prize = ctx.ROULETTE_PRIZES[idx]
     row["prize"] = prize["short"]
-    if ss.access_token:  # 새로고침해도 '이미 돌렸다'가 유지되도록 서버에 남긴다
-        server.save_prize(ss.access_token, ss.table, row["id"], prize["short"])
+    coupon = None
+    if ss.access_token:  # 새로고침해도 '이미 돌렸다'가 유지되도록 서버에 남기고, 서버 쿠폰함에도 넣는다
+        coupon = server.save_prize(ss.access_token, ss.table, row["id"], prize)
+    add_coupon(row["id"], row["nickname"], prize, coupon)  # 당첨 결과는 쿠폰함으로. 쓸 때 장바구니에 적용한다
     ss.just_spun = True
-    if prize["kind"] == "discount":
-        ss.roulette_percent = max(ss.roulette_percent, prize["percent"])
-    elif prize["item_id"] in ctx.MENU_BY_ID:
-        cart_add(ctx.MENU_BY_ID[prize["item_id"]], "룰렛 서비스", 0, 1)

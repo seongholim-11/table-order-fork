@@ -8,7 +8,7 @@ import re
 import sqlite3
 import threading
 
-SERIAL_TABLES = {"members", "orders", "calls", "recommendation_events", "sms_logs"}  # id 가 자동 증가인 테이블
+SERIAL_TABLES = {"members", "orders", "calls", "recommendation_events", "sms_logs", "coupons"}  # id 가 자동 증가인 테이블
 
 
 def is_postgres(url: str) -> bool:

@@ -79,7 +79,7 @@ hr { border-color: var(--line) !important; }
 .sec-title small { color: var(--ink-3); font-size: 13px; font-weight: 500; }
 
 /* ---------- 카드 / KPI ---------- */
-.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--kpi-min, 190px), 1fr)); gap: 16px; }
 .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 20px; box-shadow: var(--shadow); }
 .kpi .k { color: var(--ink-3); font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
 .kpi .v { font-size: 30px; font-weight: 800; letter-spacing: -.03em; margin-top: 8px; line-height: 1.15; font-variant-numeric: tabular-nums; }
@@ -204,3 +204,75 @@ button:focus-visible { outline: 3px solid rgba(232,89,12,.4) !important; outline
 [data-testid="stSidebar"] [data-testid="stButton"],
 [data-testid="stSidebar"] [data-testid="stButton"] button { width: 100% !important; }
 
+
+/* ---------- PC·태블릿 가로(901px 이상): 페이지 전체 세로 스크롤 없이 한 화면에 맞춘다 ----------
+   여백·카드를 조금 줄이고, 목록이 긴 영역(막대 목록·표)은 그 영역 안에서만 스크롤한다. */
+@media (min-width: 901px) {
+  .block-container { padding: 44px 32px 16px !important; max-width: 1280px !important; }
+  [data-testid="stMain"] [data-testid="stVerticalBlock"] { gap: .6rem; }
+  .page-head { margin: 0 0 10px; }
+  .page-head h1 { font-size: 24px; }
+  .page-head p { margin-top: 2px; font-size: 13px; }
+  .sec-title { margin: 12px 0 6px; font-size: 16px; }
+  .kpis { gap: 12px; margin-top: 0; }
+  .kpi { padding: 12px 16px; }
+  .kpi .v { font-size: 24px; margin-top: 4px; }
+  .kpi .v small { font-size: 13px; }
+  .kpi .s { margin-top: 3px; }
+  .panel { padding: 14px 18px; }
+  .panel .hint { margin-bottom: 10px; }
+  .panel .bars { gap: 7px; max-height: calc(100dvh - 440px); min-height: 120px; overflow-y: auto; padding-right: 4px; }
+  .empty { padding: 16px 0; }
+  [data-testid="stTabs"] [role="tablist"] { gap: 20px; }
+  [data-testid="stTabs"] [data-baseweb="tab-list"] { gap: 20px; }
+  [data-testid="stTabs"] [data-baseweb="tab-panel"] { padding-top: 10px; }
+}
+/* 태블릿 가로(약 1024px 이하): 사이드바·여백을 줄여 본문 폭을 확보한다 */
+@media (min-width: 901px) and (max-width: 1200px) {
+  [data-testid="stSidebar"][aria-expanded="true"] { min-width: 210px !important; width: 210px !important; }
+  [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] { padding: 18px 10px 12px !important; }
+  [data-testid="stSidebar"] [data-testid="stRadioOption"] { padding: 8px 10px; }
+  [data-testid="stSidebar"] [data-testid="stExpander"] summary { padding: 8px 10px; }
+  .block-container { padding: 40px 20px 12px !important; }
+  .kpis { --kpi-min: 130px; gap: 10px; }
+  .kpi { padding: 10px 12px; }
+  .kpi .v { font-size: 21px; }
+  .panel { padding: 12px 14px; }
+}
+
+/* 표는 화면 높이에서 위쪽 영역을 뺀 만큼만 쓰고(표는 height="stretch"), 넘치면 표 안에서 스크롤한다 */
+@media (min-width: 901px) {
+  .st-key-orders_table, .st-key-orders_table_cust, .st-key-events_table, .st-key-menu_table, .st-key-weights_table, .st-key-customers_table { flex: 0 0 auto !important; }
+  .st-key-orders_table { height: max(170px, calc(100dvh - 520px)) !important; }
+  .st-key-orders_table_cust { height: max(130px, calc(100dvh - 610px)) !important; }
+  .st-key-events_table { height: max(180px, calc(100dvh - 400px)) !important; }
+  .wheel-preview { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .wheel-preview .bars { width: 100%; max-height: calc(100dvh - 500px); min-height: 100px; overflow-y: auto; }
+  .st-key-menu_table { height: max(150px, calc(100dvh - 360px)) !important; }
+  .st-key-weights_table { height: max(150px, calc(100dvh - 350px)) !important; }
+  .st-key-mcat_panel { max-height: calc(100dvh - 150px); overflow-y: auto; }
+  .st-key-customers_table { height: max(170px, calc(100dvh - 400px)) !important; }
+  .st-key-sms_compose { max-height: calc(100dvh - 330px); overflow-y: auto; padding-right: 6px; }
+  .pscreen { min-height: 220px; }
+  .history { max-height: calc(100dvh - 290px); overflow-y: auto; }
+  .hrow { padding: 10px 16px; }
+  .mmenu-head { margin: 0 0 6px; }
+  .recs { gap: 12px; }
+  .rec { padding: 14px 16px; }
+}
+@media (min-width: 901px) and (max-width: 1200px) {
+  .st-key-mcat_panel { padding: 12px; }
+  [class*="st-key-mcat_"] button { min-height: 40px; padding: 4px 8px; }
+  [class*="st-key-mcat_"] button p { font-size: 13px; }
+}
+
+/* 불필요한 여백 줄이기 */
+@media (min-width: 901px) {
+  [data-testid="stMain"] [data-testid="stVerticalBlock"] { gap: .45rem; }
+  .sec-title { margin: 6px 0 2px; }
+  .mmenu-head + .sec-title, [data-testid="stElementContainer"]:has(.mmenu-head) + [data-testid="stElementContainer"] .sec-title { margin-top: 0; }
+  .panel .hint { margin-bottom: 8px; }
+  .page-head { margin-bottom: 6px; }
+  [data-testid="stCaptionContainer"] { margin: 0; line-height: 1.4; }
+  [data-testid="stForm"] { padding: 14px; }
+}

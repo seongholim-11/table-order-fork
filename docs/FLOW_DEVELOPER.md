@@ -102,7 +102,7 @@ sequenceDiagram
 
 ### 2-3. 로그인 이후 세션 상태 (`finish_login`)
 
-`ss.member`, `ss.access_token`(JWT) 저장 → `ss.members` 에 이 태블릿의 로그인 기록 추가 → 처음 보는 회원 id 면 `eligible=True`(룰렛 기회) 로 기록. **"회원당 1회" 판정은 서버가 아니라 이 태블릿 세션의 `granted_ids`** 입니다. 즉 새로고침하면 초기화되고, 다른 태블릿에서는 다시 받을 수 있습니다(서버에서 막으려면 별도 설계 필요).
+`ss.member`, `ss.access_token`(JWT) 저장 → `ss.members` 에 이 태블릿의 로그인 기록 추가 → 처음 보는 회원 id 면 `eligible=True`(룰렛 기회) 로 기록. 기회 판정은 이 태블릿 세션의 `granted_ids` 와 서버의 `tablet_logins.eligible` 을 함께 봅니다. 서버는 오늘(KST) 이미 쿠폰을 받은 회원이면 어느 테이블이든 `eligible=false` 로 기록하고 룰렛 저장을 409 로 거절하므로, 다른 날에는 다시 돌릴 수 있습니다.
 
 이후 서버 호출에 쓰이는 토큰: 주문/추천 기록은 `optional_member`(없거나 잘못되면 비회원), 내 정보 조회·수신거부는 `current_member`(없으면 401). JWT 는 `services/tokens.py` 로 발급·검증, 유효시간 `jwt_expire_minutes`(기본 720분).
 
@@ -115,11 +115,14 @@ sequenceDiagram
 | 남은 기회 | `state/roulette.py:spins_left` = `eligible and prize is None` 인 회원 수 |
 | 당첨 칸 선택 | `pick_prize_index`: 칸의 `weight`(없으면 1)에 비례해 `random.choices`, 합이 0 이면 균등 |
 | 돌리기 | `spin_roulette`: 각도 계산(포인터 12시 방향), `ss.roulette` 저장, 기록에 `prize` 기입 |
-| 할인 당첨 | `ss.roulette_percent = max(기존, 새 값)` (여러 번 당첨돼도 가장 큰 할인 하나만) |
-| 서비스 당첨 | `cart_add(메뉴, "룰렛 서비스", 0, 1)` → 단가 0원 줄이 장바구니에 추가됨 |
+| 당첨 저장 | `server.save_prize` → `PUT /api/tables/{n}/logins/prize`. 서버가 오늘 이미 쿠폰을 받은 회원이면 409(다른 테이블 포함), 아니면 `coupons`에 쿠폰 발급 |
+| 쿠폰함에 넣기 | `state/coupons.py:add_coupon` → `ss.coupons`. 당첨 즉시 장바구니에 반영하지 않는다 |
+| 쿠폰 사용 | 팝업(`ui/coupons.py`)의 "사용" → `apply_coupon`: 할인은 `ss.roulette_percent`(한 번에 하나), 서비스는 `cart_add(메뉴, "룰렛 서비스", 0, 1)`. "취소" → `cancel_coupon` |
+| 사용 처리 | 주문 확인창에서 `pending_coupon_ids()` 를 `POST /api/orders` 의 `coupon_ids` 로 보내면 서버가 `used_at` 기록(이 태블릿 회원만, 이미 쓴 쿠폰은 무시). 이어서 `consume_applied()` 가 화면 상태를 정리 |
+| 조회 | `GET /api/v1/coupons`(내 쿠폰), `GET /api/tables/{n}/coupons`(이 태블릿 회원들의 쿠폰, 팝업이 사용) |
 
 - 룰렛 칸 설정은 서버의 `content.roulette_prizes` 이고, 관리자가 `PUT /admin/api/content/roulette_prizes` 로 교체합니다. 서버는 `_check_roulette` 로 **칸 2~8개, 종류별 필수값, weight 0 이상이고 합 > 0** 을 검증합니다(`routers/admin/content.py`).
-- 룰렛 결과는 **서버에 저장되지 않습니다.** 서버가 아는 것은 주문 금액(`total`)뿐입니다.
+- 룰렛 결과(`tablet_logins.prize`)와 쿠폰(`coupons`)은 서버에 저장됩니다. 서버가 안 닿을 때 받은 쿠폰은 `id=None` 인 이 세션 안의 쿠폰으로만 남고, 주문 시 서버에 사용 처리를 보내지 못합니다.
 - 애니메이션은 `user/ui/roulette.py`(CSS 회전)가 `ss.roulette` 의 `angle`/`animate` 를 읽어 그립니다.
 
 ---

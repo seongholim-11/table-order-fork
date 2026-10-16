@@ -117,14 +117,12 @@ def marketing_dashboard(repo):
             + usage_card("이번 달 LMS", usage["used"]["LMS"], usage["limit"]["LMS"])
             + kpi("발송 가능 고객", len(pool), "명", sub=f"전체 회원 {len(members)}명 중 수신 동의", accent=True)
             + kpi("수신거부", int(members["수신거부"].sum()), "명", sub="발송 대상에서 자동 제외") + "</div>")
-    if repo.source == "dummy":
-        st.caption("🧪 더미 데이터로 만든 화면이에요. 실제 문자는 전송되지 않고, 이 화면을 닫으면 발송 기록이 사라져요.")
-    st.caption("수신 동의·휴대폰 번호가 있는 회원에게만, 야간(21~08시) 제외, 월 무료 한도 안에서 발송합니다. "
-               "서버 설정 `SMS_DRY_RUN=true` 이면 실제 문자는 전송되지 않고 기록만 남습니다.")
-
-    sec_title("문자 작성")
-    left, right = st.columns([3, 2], gap="large")
-    with left:
+    # 한 화면에 들어오도록 작성 / 발송 내역 / 수신거부·안내를 탭으로 나눈다.
+    t_write, t_history, t_optout = st.tabs(["문자 작성", "발송 내역", "수신거부 · 안내"])
+    with t_write:
+        left, right = st.columns([3, 2], gap="large")
+        compose = left.container(key="sms_compose")
+    with compose:
         st.button("✨ AI 문자 생성", key="ai_sms_generate", type="secondary", width="stretch",
                   on_click=make_ai_candidates, args=(repo,),
                   help="수신 대상과 문구를 AI가 만들어 후보 버튼으로 보여줘요 (AI 키가 없으면 템플릿 문구)")
@@ -148,7 +146,7 @@ def marketing_dashboard(repo):
             with st.expander(f"수신자 목록 ({int(sum(by_grade.get(g, 0) for g in grades))}명) — 체크를 풀면 제외돼요"):
                 member_ids = recipient_editor(pool, grades)
                 st.caption(f"선택 {len(member_ids)}명. 다른 등급을 더하려면 위 ‘대상 등급’에서 추가하세요.")
-        body = st.text_area("본문", key="sms_body", height=130, help="앞에 (광고) 표기와 뒤에 수신거부 안내가 자동으로 붙어요")
+        body = st.text_area("본문", key="sms_body", height=100, help="앞에 (광고) 표기와 뒤에 수신거부 안내가 자동으로 붙어요")
         scheduled_at = None
         if st.checkbox("예약 발송", key="sms_schedule", help="지금부터 10분 이후, 야간(21~08시) 제외"):
             d_col, t_col = st.columns(2)
@@ -180,7 +178,12 @@ def marketing_dashboard(repo):
     with right:
         st.html(phone_preview(plan, not body.strip()))
 
-    with st.expander("수신거부 처리"):
+    with t_optout:
+        if repo.source == "dummy":
+            st.caption("🧪 더미 데이터로 만든 화면이에요. 실제 문자는 전송되지 않고, 이 화면을 닫으면 발송 기록이 사라져요.")
+        st.caption("수신 동의·휴대폰 번호가 있는 회원에게만, 야간(21~08시) 제외, 월 무료 한도 안에서 발송합니다. "
+                   "서버 설정 `SMS_DRY_RUN=true` 이면 실제 문자는 전송되지 않고 기록만 남습니다.")
+        sec_title("수신거부 처리")
         if not pool.empty:
             who = st.selectbox("회원", pool["customer_id"],
                                format_func=lambda i: f"#{i} {pool.set_index('customer_id').at[i, '닉네임']}")
@@ -192,18 +195,19 @@ def marketing_dashboard(repo):
         st.caption(f"수신거부 회원 {int(members['수신거부'].sum())}명 — 발송 대상에서 제외됩니다. (회원 본인은 태블릿에서도 거부할 수 있어요)")
 
     logs = repo.sms_logs()
-    sec_title("발송 내역", f"{len(logs)}건")
-    st.html(sms_history(logs))
-    pending = [x for x in logs if x["status"] == "scheduled" and kst_text(x["scheduled_at"]) >= datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d %H:%M")]
-    for log in pending:
-        if st.button(f"예약 취소 · {kst_text(log['scheduled_at'])} · {log['target_count']}명", key=f"cancel_{log['id']}"):
-            try:
-                repo.sms_cancel(log["id"])
-                st.toast("예약을 취소했습니다.", icon="✅")
-            except (repo_mod.api.ApiError, Unsupported) as e:
-                st.error(f"취소하지 못했습니다: {getattr(e, 'detail', e)}")
-            else:
-                st.rerun()
+    with t_history:
+        sec_title("발송 내역", f"{len(logs)}건")
+        st.html(sms_history(logs))
+        pending = [x for x in logs if x["status"] == "scheduled" and kst_text(x["scheduled_at"]) >= datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d %H:%M")]
+        for log in pending:
+            if st.button(f"예약 취소 · {kst_text(log['scheduled_at'])} · {log['target_count']}명", key=f"cancel_{log['id']}"):
+                try:
+                    repo.sms_cancel(log["id"])
+                    st.toast("예약을 취소했습니다.", icon="✅")
+                except (repo_mod.api.ApiError, Unsupported) as e:
+                    st.error(f"취소하지 못했습니다: {getattr(e, 'detail', e)}")
+                else:
+                    st.rerun()
 
 
 REC_PAGE_SIZE = 4  # 한 번에 보여 주는 추천 수. [재추천]을 누르면 다음 묶음으로 넘어간다.

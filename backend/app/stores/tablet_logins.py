@@ -26,12 +26,14 @@ class TabletLoginStore:
     def _cutoff(self) -> str:
         return _iso(datetime.now(timezone.utc) - self.window)
 
-    def record(self, table_no: int, member_id: int, nickname: str) -> None:
-        """로그인 완료 시 기록한다. 유효 시간이 지난 옛 기록은 지우고, 이미 있으면 그대로 둔다."""
+    def record(self, table_no: int, member_id: int, nickname: str, eligible: bool = True) -> None:
+        """로그인 완료 시 기록한다. 유효 시간이 지난 옛 기록은 지우고, 이미 있으면 그대로 둔다.
+
+        eligible=False 면 룰렛 기회가 없는 로그인이다 (오늘 이미 다른 테이블에서 돌린 회원)."""
         self.db.run("DELETE FROM tablet_logins WHERE table_no=? AND logged_in_at<?", (table_no, self._cutoff()))
-        self.db.run("INSERT INTO tablet_logins (table_no, member_id, nickname, logged_in_at) VALUES (?,?,?,?) "
+        self.db.run("INSERT INTO tablet_logins (table_no, member_id, nickname, logged_in_at, eligible) VALUES (?,?,?,?,?) "
                     "ON CONFLICT DO NOTHING",
-                    (table_no, member_id, nickname, _iso(datetime.now(timezone.utc))))
+                    (table_no, member_id, nickname, _iso(datetime.now(timezone.utc)), int(eligible)))
 
     def list(self, table_no: int) -> list[dict]:
         rows = self.db.all("SELECT member_id AS id, nickname, logged_in_at AS at, eligible, prize FROM tablet_logins "

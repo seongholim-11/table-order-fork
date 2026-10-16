@@ -21,8 +21,10 @@ def kpi(label, value, unit="", sub="", accent=False):
             + (f'<div class="s">{escape(sub)}</div>' if sub else "") + "</div>")
 
 
-def kpi_row(*cards):
-    st.html('<div class="kpis">' + "".join(cards) + "</div>")
+def kpi_row(*cards, min_width=None):
+    """KPI 카드 한 줄. min_width(px)를 주면 카드가 그 너비까지 좁아질 수 있어 한 줄에 더 많이 놓인다."""
+    style = f' style="--kpi-min:{min_width}px"' if min_width else ""
+    st.html(f'<div class="kpis"{style}>' + "".join(cards) + "</div>")
 
 
 def bars(data, unit="", ranked=False, empty="아직 데이터가 없어요."):

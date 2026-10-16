@@ -138,8 +138,6 @@ button:focus-visible { outline: 3px solid #ffcf54 !important; outline-offset: 3p
 .st-key-start_btn button p { font-size: 24px; }
 .order-box { background: #26262b; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; }
 .order-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 800; margin-bottom: 8px; }
-.status { font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 999px; color: #1a1a1a; white-space: nowrap; }
-.status.s0 { background: #74b9ff; } .status.s1 { background: #ffb703; } .status.s2 { background: #55efc4; }
 .order-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; font-size: 14px; color: #ccc; padding: 4px 0; }
 .order-item > span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .order-item > span:last-child { white-space: nowrap; flex-shrink: 0; }
@@ -406,4 +404,46 @@ button:focus-visible { outline: 3px solid #ffcf54 !important; outline-offset: 3p
   [class*="st-key-quiz_opt_"] { padding: 12px 10px 10px; }
   [class*="st-key-quiz_opt_"] button { padding: 4px 6px; }
   [class*="st-key-quiz_opt_"] button p { font-size: 16px; word-break: keep-all; }
+}
+
+/* ===== PC·태블릿 가로(761px 이상): 첫 화면·AI 질문도 화면 높이에 맞춰 줄여 페이지 세로 스크롤을 없앤다 ===== */
+@media (min-width: 761px) {
+  .block-container { padding-top: 16px !important; padding-bottom: 12px !important; }
+  .splash-brand { margin-bottom: 0; }
+  .rw-title { margin-top: 0; }
+  .rw-title h2 { font-size: clamp(26px, 5.6vh, 52px); margin: 0; }
+  .st-key-rw_box { width: min(88vw, 440px, 40vh); margin-top: clamp(20px, 4vh, 40px); }
+  .rw-result { margin-top: 14px; padding: 10px 16px; }
+  .st-key-splash_bottom { margin-top: clamp(12px, 3vh, 44px); }
+  .st-key-start_cta button { min-height: clamp(56px, 9vh, 76px); }
+  .st-key-qr_card { padding: 10px 16px; }
+  .qz-title { font-size: clamp(22px, 4vh, 30px); margin-bottom: clamp(6px, 1.5vh, 18px); }
+  .qz-group { margin-top: clamp(4px, 1.5vh, 18px); }
+  .qz-emoji { height: clamp(48px, 10vh, 110px); font-size: clamp(34px, 6.4vh, 68px); }
+  [class*="st-key-quiz_opt_"] { padding: 10px 12px; border-radius: 20px; }
+  [class*="st-key-quiz_opt_"] button { min-height: clamp(44px, 7vh, 62px); }
+  .st-key-quiz_page { padding-top: 0; gap: 8px; }
+}
+
+/* 태블릿 가로(761~1100px): 머리글을 한 줄로 두고, 메뉴·장바구니 영역만 남은 높이 안에서 스크롤한다 */
+@media (min-width: 761px) and (max-width: 1100px) {
+  .st-key-header { padding-bottom: 10px; }
+  .st-key-header > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.1fr) auto; gap: 10px; }
+  .st-key-header > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child { grid-column: auto; }
+  .brand .name { font-size: 19px; }
+  .brand .logo { flex-basis: 38px; width: 38px; height: 38px; font-size: 22px; }
+  .st-key-order_layout > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2) { max-height: calc(100dvh - 250px); }
+  .st-key-cart_items { max-height: max(120px, calc(100dvh - 500px)); }
+}
+/* 화면 높이가 낮을 때(노트북·태블릿 가로) 첫 화면 제목의 장식 줄을 줄인다 */
+@media (min-width: 761px) and (max-height: 900px) {
+  .rw-title .fork, .rw-title .q, .rw-title .s { display: none; }
+}
+
+/* 불필요한 여백 줄이기 */
+@media (min-width: 761px) {
+  .st-key-header { padding-bottom: 12px; }
+  .section-title, .ai-results-title { margin-top: 4px; margin-bottom: 8px; }
+  [class*="st-key-card_"] { gap: 8px; padding: 10px; }
+  .thumb { height: 150px; }
 }

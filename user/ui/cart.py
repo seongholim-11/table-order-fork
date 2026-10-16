@@ -27,7 +27,7 @@ def render_cart(dialog=False):
         if cart_discount():
             st.html(f'<div class="cart-savings">✨ AI 조합으로 {won(cart_discount())} 할인받았어요</div>')
         if roulette_discount():
-            st.html(f'<div class="cart-savings">🎟️ 룰렛 {st.session_state.roulette_percent}% 할인 −{won(roulette_discount())}</div>')
+            st.html(f'<div class="cart-savings">🎟️ 쿠폰 {st.session_state.roulette_percent}% 할인 −{won(roulette_discount())}</div>')
         st.html(f'<div class="total-row"><span>총 주문금액</span><b>{won(cart_total())}</b></div>')
         if st.button("주문 확인하기", type="primary", width="stretch", key="dialog_order_btn" if dialog else "order_btn", disabled=not cart):
             st.session_state.confirm_order = True

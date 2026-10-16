@@ -80,7 +80,7 @@ class DummyRepository:
             weather=copy.deepcopy(ai_quiz_data.WEATHER), rules=copy.deepcopy(recommendation_data.RULES),
             source="dummy")
 
-    def create_order(self, table_no, lines, total, token):
+    def create_order(self, table_no, lines, total, token, coupon_ids=()):
         return None
 
     def create_call(self, table_no, items):
@@ -121,9 +121,9 @@ class ApiRepository:
                        roulette_prizes=c["roulette_prizes"], staff_calls=c["staff_calls"],
                        quiz_questions=c["quiz_questions"], weather=c["weather"], rules=c["rules"], source="api")
 
-    def create_order(self, table_no, lines, total, token):
+    def create_order(self, table_no, lines, total, token, coupon_ids=()):
         r = server.safe_call(api.post, ENDPOINTS["orders"], token,
-                             json={"table_no": table_no, "lines": lines, "total": total})
+                             json={"table_no": table_no, "lines": lines, "total": total, "coupon_ids": list(coupon_ids)})
         return r["no"] if r else None
 
     def create_call(self, table_no, items):

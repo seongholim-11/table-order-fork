@@ -63,6 +63,15 @@ def tablet_logins(token: str, table_no: int):
     return safe_call(api.get, f"/api/tables/{table_no}/logins", token)
 
 
-def save_prize(token: str, table_no: int, member_id: int, prize: str) -> None:
-    """룰렛 결과를 서버에 남겨 새로고침 뒤에도 '이미 돌렸다'가 유지되게 한다 (실패해도 화면은 진행)."""
-    safe_call(api.put, f"/api/tables/{table_no}/logins/prize", token, json={"member_id": member_id, "prize": prize})
+def save_prize(token: str, table_no: int, member_id: int, prize: dict):
+    """룰렛 결과를 서버에 남겨 새로고침 뒤에도 '이미 돌렸다'가 유지되게 하고, 쿠폰함에 쿠폰으로 넣는다.
+    prize 는 콘텐츠의 룰렛 칸({short, emoji, kind, percent | item_id}). 발급된 쿠폰 dict 를 돌려주고, 서버가 안 닿으면 None."""
+    body = {"member_id": member_id, "prize": prize["short"], "kind": prize["kind"], "emoji": prize.get("emoji", "🎁"),
+            "percent": prize.get("percent"), "item_id": prize.get("item_id")}
+    r = safe_call(api.put, f"/api/tables/{table_no}/logins/prize", token, json=body)
+    return r["coupon"] if r else None
+
+
+def table_coupons(token: str, table_no: int):
+    """이 태블릿에 로그인한 회원들의 쿠폰 [{id, member_id, nickname, kind, label, emoji, percent, item_id, used_at}] 또는 None."""
+    return safe_call(api.get, f"/api/tables/{table_no}/coupons", token)

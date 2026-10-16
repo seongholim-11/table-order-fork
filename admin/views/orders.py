@@ -71,8 +71,7 @@ def page_orders(repo, sub="전체 주문"):
             return
         who = st.selectbox("고객", cust.index, format_func=lambda i: f"{cust.at[i, '닉네임']} ({i}) · {cust.at[i, '등급']}")
         orders = orders[orders["customer_id"] == who]
-        kpi_row(kpi("누적 주문 금액", f"{int(orders['금액'].sum()):,}", "원"))
-        st.html('<div style="height:16px"></div>')
+        st.caption(f"누적 주문 금액 {int(orders['금액'].sum()):,}원")
     if orders.empty:
         st.info("조건에 맞는 주문이 없어요." if mode == "고객별 주문" else "아직 주문이 없어요.")
         return
@@ -82,9 +81,9 @@ def page_orders(repo, sub="전체 주문"):
             kpi("합계 금액", f"{total:,}", "원"),
             kpi("평균 주문금액", f"{total // len(shown):,}" if len(shown) else "-", "원" if len(shown) else ""),
             kpi("AI 추천 사용", int(shown["AI 추천 사용"].sum()), "건"))
-    st.html('<div style="height:16px"></div>')
     if shown.empty:
         st.info("조건에 맞는 주문이 없어요. 필터를 바꿔 보세요.")
         return
-    st.dataframe(shown, hide_index=True, width="stretch",
-                 column_config={"금액": st.column_config.NumberColumn(format="%d원")})
+    with st.container(key="orders_table_cust" if mode == "고객별 주문" else "orders_table"):  # 표 높이는 화면 높이에 맞춰 CSS 가 정한다 (표 안에서만 스크롤)
+        st.dataframe(shown, hide_index=True, width="stretch", height="stretch",
+                     column_config={"금액": st.column_config.NumberColumn(format="%d원")})

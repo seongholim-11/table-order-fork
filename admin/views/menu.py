@@ -73,27 +73,26 @@ def render_category_panel(repo, cats):
 
 
 def render_menu_register_form(repo, category):
-    with st.expander(f"＋ '{category['name']}'에 메뉴 등록", expanded=True):
-        with st.form(f"menu_add_form_{category['id']}", clear_on_submit=True):
-            c1, c2 = st.columns([3, 1.4])
-            name = c1.text_input("메뉴 이름 *", placeholder="예: 매운 닭볶음탕")
-            price = c2.number_input("가격 *", min_value=0, step=500, value=10000)
-            desc = st.text_input("설명", placeholder="손님 화면에 보이는 한 줄 설명")
-            image = st.text_input("이미지 URL", placeholder="https://...")
-            c3, c4, c5, c6 = st.columns(4)
-            spicy = c3.selectbox("매운 정도", list(SPICY_LABELS.values()))
-            weight = c4.slider("추천 가중치", 0, 100, 50, 5, help="높을수록 AI 추천 조합에 우선 반영돼요 (기본 50)")
-            on_sale = c5.checkbox("판매 중", value=True)
-            set_ok = c6.checkbox("세트 가능", value=True)
-            if st.form_submit_button("메뉴 등록", type="primary"):
-                try:
-                    repo.add_menu(category["id"], name, price, desc, image, not on_sale, spicy, weight, set_ok)
-                except CategoryError as e:
-                    st.error(str(e))
-                else:
-                    ss["menu_editor_v"] += 1
-                    st.toast(f"'{name.strip()}' 메뉴를 등록했어요.", icon="✅")
-                    st.rerun()
+    with st.form(f"menu_add_form_{category['id']}", clear_on_submit=True):
+        c1, c2 = st.columns([3, 1.4])
+        name = c1.text_input("메뉴 이름 *", placeholder="예: 매운 닭볶음탕")
+        price = c2.number_input("가격 *", min_value=0, step=500, value=10000)
+        desc = st.text_input("설명", placeholder="손님 화면에 보이는 한 줄 설명")
+        image = st.text_input("이미지 URL", placeholder="https://...")
+        c3, c4, c5, c6 = st.columns(4)
+        spicy = c3.selectbox("매운 정도", list(SPICY_LABELS.values()))
+        weight = c4.slider("추천 가중치", 0, 100, 50, 5, help="높을수록 AI 추천 조합에 우선 반영돼요 (기본 50)")
+        on_sale = c5.checkbox("판매 중", value=True)
+        set_ok = c6.checkbox("세트 가능", value=True)
+        if st.form_submit_button("메뉴 등록", type="primary"):
+            try:
+                repo.add_menu(category["id"], name, price, desc, image, not on_sale, spicy, weight, set_ok)
+            except CategoryError as e:
+                st.error(str(e))
+            else:
+                ss["menu_editor_v"] += 1
+                st.toast(f"'{name.strip()}' 메뉴를 등록했어요.", icon="✅")
+                st.rerun()
 
 
 def render_menu_panel(repo, cats):
@@ -106,16 +105,28 @@ def render_menu_panel(repo, cats):
                           bars({f"{c['icon']} {c['name']}": c["menu_count"] for c in cats}, "개")))
         return
     st.html(f'<div class="mmenu-head"><b>{category["icon"]} {category["name"]}</b><span>메뉴 {category["menu_count"]}개</span></div>')
-    render_menu_register_form(repo, category)
+    # 등록 양식과 메뉴 표를 탭으로 나눠 한 화면에 들어오게 한다.
+    t_list, t_add = st.tabs(["등록된 메뉴", f"＋ '{category['name']}'에 메뉴 등록"])
+    with t_add:
+        render_menu_register_form(repo, category)
+    with t_list:
+        render_menu_editor(repo, category)
 
-    sec_title("등록된 메뉴")
+
+def render_menu_editor(repo, category):
     df = repo.menus()
     old = df[df["카테고리"] == category["name"]].reset_index(drop=True)
     if old.empty:
-        st.caption("아직 등록된 메뉴가 없어요. 위 양식으로 첫 메뉴를 등록해 보세요.")
+        st.caption("아직 등록된 메뉴가 없어요. ‘메뉴 등록’ 탭에서 첫 메뉴를 등록해 보세요.")
         return
-    edited = st.data_editor(
-        old, hide_index=True, width="stretch", num_rows="dynamic", disabled=["id"], height=min(520, 80 + 36 * len(old)),
+    with st.container(key="menu_table"):  # 표 높이는 화면 높이에 맞춰 CSS 가 정한다
+        edited = _menu_editor(old, category)
+    save_menu_changes(repo, category, old, edited)
+
+
+def _menu_editor(old, category):
+    return st.data_editor(
+        old, hide_index=True, width="stretch", num_rows="dynamic", disabled=["id"], height="stretch",
         key=f"menu_editor_{category['id']}_{ss['menu_editor_v']}",
         column_config={
             "id": None, "카테고리": None,
@@ -127,6 +138,9 @@ def render_menu_panel(repo, cats):
             "판매 여부": st.column_config.CheckboxColumn(),
             "세트 가능": st.column_config.CheckboxColumn(),
         })
+
+
+def save_menu_changes(repo, category, old, edited):
     st.caption("표에서 직접 고치거나 행을 추가·삭제한 뒤 저장하세요.")
     new = edited.reset_index(drop=True)
     dirty = not new.equals(old)

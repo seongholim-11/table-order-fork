@@ -38,7 +38,10 @@ def grade_rule_table(rule):
 def page_customers(repo):
     page_head("고객 등급", "방문 이력으로 고객을 신규·재방문·단골·휴면으로 나눠요")
     rule = ss["grade_rule"]
-    with st.expander("등급 분류 기준 (임시 — 추가 정의 필요)", expanded=True):
+    # 기준값 입력은 두 번째 탭에 있지만, 고객 목록 계산에 쓰이므로 코드에서는 먼저 실행한다.
+    t_list, t_rule = st.tabs(["고객 목록", "등급 분류 기준"])
+    with t_rule:
+        st.caption("등급 분류 기준 (임시 — 추가 정의 필요)")
         c1, c2, c3 = st.columns(3)
         rule["repeat"] = c1.number_input("재방문: 방문 횟수 ≥", 2, 50, rule["repeat"], key="rule_repeat")
         rule["regular"] = c2.number_input("단골: 방문 횟수 ≥", rule["repeat"] + 1, 100, max(rule["regular"], rule["repeat"] + 1), key="rule_regular")
@@ -48,7 +51,8 @@ def page_customers(repo):
         st.html(grade_rule_table(rule))
         st.caption("위에서부터 차례로 확인해 먼저 맞는 등급이 됩니다. 이 값은 화면에서 미리 보는 용도이고 서버에는 저장되지 않아요.")
     cust = repo.members(rule)
-    kpi_row(*[kpi(f"{g} 고객", int((cust["등급"] == g).sum()), "명") for g in GRADES])
-    st.html('<div style="height:16px"></div>')
-    pick = st.multiselect("등급 필터", GRADES, default=GRADES)
-    st.dataframe(cust[cust["등급"].isin(pick)], hide_index=True, width="stretch")
+    with t_list:
+        kpi_row(*[kpi(f"{g} 고객", int((cust["등급"] == g).sum()), "명") for g in GRADES])
+        pick = st.multiselect("등급 필터", GRADES, default=GRADES)
+        with st.container(key="customers_table"):
+            st.dataframe(cust[cust["등급"].isin(pick)], hide_index=True, width="stretch", height="stretch")

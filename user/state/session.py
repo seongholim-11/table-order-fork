@@ -17,6 +17,8 @@ def init_state():
     ss.setdefault("orders", [])      # 주문 내역
     ss.setdefault("calls", [])
     ss.setdefault("roulette", None)  # {"idx", "angle", "animate"} - 세션당 1회
+    ss.setdefault("coupons", [])      # 쿠폰함: 룰렛에서 받은 쿠폰 (user/state/coupons.py)
+    ss.setdefault("applied_coupons", [])  # 지금 장바구니에 적용 중인 쿠폰 key
     ss.setdefault("roulette_percent", 0)  # 다음 주문에 적용할 룰렛 할인율
     ss.setdefault("member", None)    # QR 로그인한 회원 {id, nickname}
     ss.setdefault("access_token", None)

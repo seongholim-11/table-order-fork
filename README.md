@@ -57,6 +57,7 @@ streamlit run admin/app.py --server.port 8502   # 관리자 (현재 토큰 입�
 - 자세한 계획과 체크리스트: `docs/PRODUCTION_PLAN.md`
 - 팀원용 개발 가이드(새 API 추가 순서, 경로 규칙, DB 스키마 변경 규칙): `docs/DEVELOPMENT_GUIDE.md`
 - 핵심 기능 플로우(로그인·룰렛·주문·AI 추천·직원 호출·문자): 손님·사장님 관점 `docs/FLOW_USER_ADMIN.md`, 개발자 관점 `docs/FLOW_DEVELOPER.md`
+- DB 설계(테이블·결정 사항·API v6 대응, 실행용 SQL은 `docs/db/fbgrowth_schema.sql`): `docs/DB_SCHEMA.md`
 
 ## Streamlit Community Cloud 배포 (user·admin 각각)
 

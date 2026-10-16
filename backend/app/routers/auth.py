@@ -142,7 +142,8 @@ async def kakao_callback(request: Request, state: str, code: str = "", error: st
     access = tokens.issue(member["id"], settings.jwt_secret, settings.jwt_expire_minutes)
     if not store.complete(s, _public_member(member), access):
         return _page("로그인할 수 없어요", "QR이 만료되었습니다.", 410)
-    app.state.tablet_logins.record(s.table_no, member["id"], member["nickname"])
+    app.state.tablet_logins.record(s.table_no, member["id"], member["nickname"],
+                                   eligible=not app.state.coupons.issued_today(member["id"]))
     return _page(f"{member['nickname']}님, 로그인 완료!", "태블릿 화면을 확인해 주세요. 이 창은 닫으셔도 됩니다.")
 
 
@@ -172,7 +173,8 @@ async def supabase_callback(state: str, request: Request, code: str = "", error:
     access = tokens.issue(member["id"], settings.jwt_secret, settings.jwt_expire_minutes)
     if not store.complete(s, _public_member(member), access):
         return _page("로그인할 수 없어요", "QR이 만료되었습니다.", 410)
-    app.state.tablet_logins.record(s.table_no, member["id"], member["nickname"])
+    app.state.tablet_logins.record(s.table_no, member["id"], member["nickname"],
+                                   eligible=not app.state.coupons.issued_today(member["id"]))
     return _page(f"{member['nickname']}님, 로그인 완료!", "태블릿 화면을 확인해 주세요. 이 창은 닫으셔도 됩니다.")
 
 

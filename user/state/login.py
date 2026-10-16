@@ -7,6 +7,7 @@ from datetime import datetime
 import streamlit as st
 
 import server
+from user.state.coupons import load_coupons
 from user.ui.common import KST
 
 
@@ -35,10 +36,15 @@ def finish_login(event):
     ss.member, ss.access_token, ss.login = m, event["access_token"], None
     st.query_params[TOKEN_PARAM] = ss.access_token
     first = m["id"] not in ss.granted_ids
+    mine = next((r for r in server.tablet_logins(ss.access_token, ss.table) or [] if r["id"] == m["id"]), None)
+    if mine and not mine["eligible"]:  # 오늘 다른 테이블에서 이미 룰렛을 돌린 회원은 기회가 없다
+        first = False
+        ss.granted_ids.append(m["id"])
     if first:
         ss.granted_ids.append(m["id"])
     ss.members.append({"id": m["id"], "nickname": m["nickname"], "at": datetime.now(KST).strftime("%H:%M"),
                        "eligible": first, "prize": None})
+    load_coupons()  # 이전에 받아 둔 안 쓴 쿠폰이 있으면 쿠폰함에 보인다
 
 
 TOKEN_PARAM = "t"  # 로그인 토큰을 담는 URL 쿼리. 쿠키는 Streamlit Cloud 의 iframe 안에서 막혀 URL 로 유지한다.
@@ -71,6 +77,7 @@ def _restore_members(token, m):
     ss.members = [{"id": r["id"], "nickname": r["nickname"], "at": _hhmm(r["at"]),
                    "eligible": r["eligible"], "prize": r["prize"]} for r in rows]
     ss.granted_ids = [r["id"] for r in rows]
+    load_coupons()
 
 
 def _hhmm(iso):

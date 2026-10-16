@@ -38,17 +38,18 @@ def render_weight_panel(repo, cats):
     if old.empty:
         st.caption("이 카테고리에는 아직 메뉴가 없어요. 메뉴 관리에서 먼저 등록해 주세요.")
         return
-    edited = st.data_editor(
-        old, hide_index=True, width="stretch", num_rows="fixed", height=min(520, 80 + 36 * len(old)),
-        key=f"weights_editor_{category['id']}_{ss['weights_editor_v']}",
-        disabled=[c for c in old.columns if c != "추천 가중치"],
-        column_order=["메뉴명", "가격", "판매 여부", "추천 가중치"],
-        column_config={
-            "가격": st.column_config.NumberColumn(format="%d원"),
-            "판매 여부": st.column_config.CheckboxColumn(),
-            "추천 가중치": st.column_config.NumberColumn(min_value=0, max_value=100, step=5, required=True,
-                                                      help="0~100, 높을수록 AI 추천 조합에 우선 반영돼요 (기본 50)"),
-        })
+    with st.container(key="weights_table"):  # 표 높이는 화면 높이에 맞춰 CSS 가 정한다
+        edited = st.data_editor(
+            old, hide_index=True, width="stretch", num_rows="fixed", height="stretch",
+            key=f"weights_editor_{category['id']}_{ss['weights_editor_v']}",
+            disabled=[c for c in old.columns if c != "추천 가중치"],
+            column_order=["메뉴명", "가격", "판매 여부", "추천 가중치"],
+            column_config={
+                "가격": st.column_config.NumberColumn(format="%d원"),
+                "판매 여부": st.column_config.CheckboxColumn(),
+                "추천 가중치": st.column_config.NumberColumn(min_value=0, max_value=100, step=5, required=True,
+                                                          help="0~100, 높을수록 AI 추천 조합에 우선 반영돼요 (기본 50)"),
+            })
     st.caption("표의 '추천 가중치'를 직접 고친 뒤 저장하세요. 0~100, 높을수록 AI 추천 조합에 우선 반영돼요 (기본 50).")
     new = old.copy()
     new["추천 가중치"] = edited["추천 가중치"].reset_index(drop=True).fillna(50).astype(int).clip(0, 100)

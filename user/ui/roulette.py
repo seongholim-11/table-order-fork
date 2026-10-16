@@ -52,7 +52,7 @@ def render_roulette():
         login_dialog("again" if st.session_state.members else "spin")
     if spun:
         prize = prizes[spun["idx"]]
-        note = "다음 주문에 자동 적용돼요" if prize["kind"] == "discount" else "장바구니에 담아 두었어요"
+        note = "쿠폰함에 담았어요 · 주문 화면의 🎟️ 쿠폰함에서 사용하세요"
         reveal = " reveal" if spun["animate"] else ""
         st.html(f'<div class="rw-result{reveal}"><div class="t">축하합니다! 오늘의 행운은</div>'
                 f'<div class="p">{prize["emoji"]} {prize["short"]}</div><div class="n">{note}</div></div>')

@@ -10,6 +10,8 @@ from user.state.cart import cart_add, cart_count
 from user.state.menu_groups import group_spicy_variants
 from user.state.quiz import open_quiz
 from user.ui.common import mini_buttons, thumb_html, won
+from user.state.coupons import usable
+from user.ui.coupons import coupons_dialog
 from user.ui.dialogs import orders_dialog, staff_dialog
 from user.views.ai import render_recommendations
 
@@ -23,6 +25,9 @@ def render_header():
         with c_actions.container(horizontal=True, key="header_actions"):
             if st.button("🔔 직원호출", width="stretch"):
                 staff_dialog()
+            n_coupons = len(usable())
+            if st.button(f"🎟️ 쿠폰함{f' ({n_coupons})' if n_coupons else ''}", key="header_coupons", width="stretch"):
+                coupons_dialog()
             n_orders = len(st.session_state.orders)
             if st.button(f"🧾 주문내역{f' ({n_orders})' if n_orders else ''}", width="stretch"):
                 orders_dialog()

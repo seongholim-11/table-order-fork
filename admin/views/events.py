@@ -35,18 +35,36 @@ def wheel_preview(table, odds):
     rows = "".join(f'<div class="bar-row"><span class="n">{escape(str(r["이모지"]))} {escape(str(r["칸 문구"]))}</span>'
                    f'<span class="t"><i style="width:{max(o, 1.5):.0f}%"></i></span><span class="c">{o:g}%</span></div>'
                    for (_, r), o in zip(table.iterrows(), odds))
-    return (f'<div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">'
-            f'<div style="width:150px;height:150px;border-radius:50%;flex:none;border:4px solid rgba(128,128,128,.25);'
-            f'background:conic-gradient({escape(stops)})"></div><div class="bars" style="flex:1;min-width:260px">{rows}</div></div>')
+    return (f'<div class="wheel-preview">'
+            f'<div style="width:130px;height:130px;border-radius:50%;flex:none;border:4px solid rgba(128,128,128,.25);'
+            f'background:conic-gradient({escape(stops)})"></div><div class="bars">{rows}</div></div>')
 
 
 def render_roulette_panel(repo):
     old = repo.roulette_table()
     menu_names = list(repo.menus()["메뉴명"])
     st.html(f'<div class="mmenu-head"><b>🎰 행운의 룰렛</b><span>칸 {len(old)}개</span></div>')
-    sec_title("칸 구성과 당첨 확률", "손님이 로그인하면 회원당 1회 돌릴 수 있어요")
+    c_edit, c_prev = st.columns([3, 2], gap="medium")
+    with c_edit:
+        sec_title("칸 구성과 당첨 확률", "손님이 로그인하면 회원당 1회 돌릴 수 있어요")
+        with st.container(key="events_table"):  # 표 높이는 화면 높이에 맞춰 CSS 가 정한다
+            edited = _roulette_editor(old, menu_names)
+        st.caption(f"칸은 {ROULETTE_MIN_SLOTS}~{ROULETTE_MAX_SLOTS}개. 표 아래 빈 줄에서 칸을 추가하고, 행을 선택해 지울 수 있어요.")
+    new = edited.reset_index(drop=True)
+    new["확률 가중치"] = pd.to_numeric(new["확률 가중치"], errors="coerce")
+    with c_prev:
+        sec_title("미리보기", "저장 전 표의 값 기준")
+        shown = new.dropna(subset=["확률 가중치"]).fillna({"이모지": "", "칸 문구": ""})
+        if shown.empty:
+            st.caption("칸을 추가해 주세요.")
+        else:
+            st.html(wheel_preview(shown, repo.roulette_odds(shown)))
+    _roulette_buttons(repo, old, new)
+
+
+def _roulette_editor(old, menu_names):
     edited = st.data_editor(
-        old, hide_index=True, width="stretch", num_rows="dynamic", height=min(480, 90 + 36 * (len(old) + 1)),
+        old, hide_index=True, width="stretch", num_rows="dynamic", height="stretch",
         key=f"roulette_editor_{ss['roulette_editor_v']}", column_order=ROULETTE_COLUMNS,
         column_config={
             "칸 문구": st.column_config.TextColumn(required=True, help="룰렛 칸에 보이는 첫 줄 (둘째 줄은 'N% 할인'·'서비스'가 자동으로 붙어요)"),
@@ -60,15 +78,10 @@ def render_roulette_panel(repo):
                                                       help="클수록 잘 나와요. 칸 가중치의 합 대비 비율이 당첨 확률 (0이면 당첨 안 됨)"),
             "당첨 안내문": st.column_config.TextColumn(help="당첨 후 보여줄 문구. 비우면 자동으로 만들어요"),
         })
-    st.caption(f"칸은 {ROULETTE_MIN_SLOTS}~{ROULETTE_MAX_SLOTS}개. 표 아래 빈 줄에서 칸을 추가하고, 행을 선택해 지울 수 있어요.")
-    new = edited.reset_index(drop=True)
-    new["확률 가중치"] = pd.to_numeric(new["확률 가중치"], errors="coerce")
-    sec_title("미리보기", "저장 전 표의 값 기준")
-    shown = new.dropna(subset=["확률 가중치"]).fillna({"이모지": "", "칸 문구": ""})
-    if shown.empty:
-        st.caption("칸을 추가해 주세요.")
-    else:
-        st.html(wheel_preview(shown, repo.roulette_odds(shown)))
+    return edited
+
+
+def _roulette_buttons(repo, old, new):
     dirty = not new.fillna("").astype(str).equals(old.fillna("").astype(str))
     c_save, c_undo, _ = st.columns([1, 1.3, 5])
     if c_undo.button("↩ 되돌리기", key="roulette_undo", width="stretch", disabled=not dirty,
