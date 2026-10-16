@@ -86,7 +86,7 @@ def dev_auto_login():
     # 토큰이 없어 서버 기능(쿠폰 저장 등)은 못 쓰지만 화면 흐름은 확인할 수 있다.
     ss.member = {"id": 0, "nickname": server.DEV_NICKNAME}
     ss.members = [{"id": 0, "nickname": server.DEV_NICKNAME, "at": datetime.now(KST).strftime("%H:%M"),
-                   "eligible": False, "prize": None}]
+                   "eligible": True, "prize": None}]  # eligible=True: 개발 중 룰렛을 바로 돌릴 수 있게 한다
     ss.granted_ids = [0]
 
 

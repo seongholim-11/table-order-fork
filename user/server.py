@@ -97,7 +97,9 @@ def dev_login(table_no: int):
         http = api._http()
         http.get(f"{url.path}?{url.query}")  # QR 을 스캔한 것으로 처리
         http.get("/api/auth/kakao/continue", params={"token": token})  # 광고 문자 수신 동의는 하지 않음
-        http.get("/api/auth/kakao/callback", params={"state": token, "code": f"mock-{DEV_NICKNAME}"})
+        # 룰렛은 회원당 하루 1회라서, 닉네임에 시각을 붙여 로그인할 때마다 새 개발용 회원이 되게 한다(항상 룰렛 기회가 있음).
+        nickname = f"{DEV_NICKNAME}{time.strftime('%H%M%S')}"
+        http.get("/api/auth/kakao/callback", params={"state": token, "code": f"mock-{nickname}"})
     except httpx.HTTPError:
         mark_offline()
         return None

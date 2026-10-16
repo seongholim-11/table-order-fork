@@ -46,8 +46,12 @@ def test_user_app_auto_login_in_dev(server, monkeypatch):
     monkeypatch.setenv("APP_ENV", "dev")
     app = AppTest.from_file(USER_APP, default_timeout=30).run()
     assert not app.exception
-    assert app.session_state["member"]["nickname"] == "개발테스트"
+    assert app.session_state["member"]["nickname"].startswith("개발테스트")
     assert app.session_state["access_token"]
+    # 로그인 팝업 없이 바로 룰렛이 돌아야 한다
+    app.button(key="roulette_btn").click().run()
+    assert not app.exception
+    assert app.session_state["roulette"] is not None
 
 
 def test_user_app_dev_login_even_without_server(monkeypatch):
@@ -58,6 +62,8 @@ def test_user_app_dev_login_even_without_server(monkeypatch):
     app = AppTest.from_file(USER_APP, default_timeout=30).run()
     assert not app.exception
     assert app.session_state["member"]["nickname"] == "개발테스트"
+    app.button(key="roulette_btn").click().run()  # 서버 없이도 룰렛이 돌아야 한다
+    assert app.session_state["roulette"] is not None
     api.set_client(None)
 
 
