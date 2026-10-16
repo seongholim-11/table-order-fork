@@ -17,11 +17,11 @@ button:focus-visible { outline: 3px solid #ffcf54 !important; outline-offset: 3p
 
 /* Only named layout containers are changed; widget columns keep their own layout. */
 .st-key-header { padding-bottom: 20px; border-bottom: 1px solid #2c2c33; }
-.st-key-header > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] { display: grid; grid-template-columns: minmax(250px, 1fr) 110px minmax(240px, 1fr) auto; align-items: center; gap: 20px; }
+.st-key-header > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] { display: grid; grid-template-columns: minmax(250px, 1fr) 110px minmax(330px, 1fr) auto; align-items: center; gap: 20px; }
 .st-key-header > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] { width: 100%; flex: none; }
-.st-key-header_actions { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px !important; }
+.st-key-header_actions { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px !important; }
 .st-key-header_actions > [data-testid="stElementContainer"] { width: 100% !important; }
-.st-key-header_actions button { padding: 8px; }
+.st-key-header_actions button { padding: 8px; white-space: nowrap; }
 .brand { display: flex; align-items: center; gap: 12px; }
 .brand .logo { flex: 0 0 48px; width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg,#ffb703,#e63946); display: flex; align-items: center; justify-content: center; font-size: 28px; }
 .brand .name { font-size: 24px; font-weight: 900; letter-spacing: -.5px; line-height: 1.3; word-break: keep-all; }
@@ -177,7 +177,7 @@ button:focus-visible { outline: 3px solid #ffcf54 !important; outline-offset: 3p
   .brand .name { font-size: 18px; }
   .brand .sub { font-size: 12px; }
   .table-chip { font-size: 12px; padding: 8px; }
-  .st-key-header_actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .st-key-header_actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .st-key-order_layout > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .st-key-menu_grid { gap: 10px !important; }
   [class*="st-key-card_"] { padding: 10px; border-radius: 14px; gap: 10px; }
@@ -389,7 +389,7 @@ button:focus-visible { outline: 3px solid #ffcf54 !important; outline-offset: 3p
   .st-key-header > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(3) { grid-area: 2 / 1 / 3 / 4; }
   .st-key-header > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(4) { grid-area: 1 / 3; }
   .table-chip { padding: 6px 10px; white-space: nowrap; }
-  .st-key-header_actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px !important; }
+  .st-key-header_actions { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px !important; }
   .st-key-header_actions button { min-height: 40px; padding: 4px; }
   .st-key-header_actions button p { font-size: 13px; white-space: nowrap; }
 }
