@@ -3,6 +3,8 @@
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app import dummy
+
 router = APIRouter()
 
 NON_MENU_CATEGORIES = {"ai", "best"}  # 화면용 가상 카테고리(AI 추천 조합·인기메뉴)에는 메뉴를 직접 넣지 않는다
@@ -29,8 +31,9 @@ class MenuIn(BaseModel):
 
 
 @router.get("/menus")
-async def menus(request: Request):
-    return {"categories": menu_categories(request), "menus": request.app.state.shop.menus()}
+async def menus():
+    """[더미] 메뉴 목록과 카테고리."""
+    return dummy.admin_menus()
 
 
 @router.put("/menus/{menu_id}")

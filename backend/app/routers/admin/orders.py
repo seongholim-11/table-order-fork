@@ -2,22 +2,28 @@
 
 from fastapi import APIRouter, HTTPException, Request
 
+from app import dummy
+
 router = APIRouter()
 
 
 @router.get("/orders")
 async def list_orders(request: Request, member_id: int | None = None):
-    members = {m["id"]: m for m in request.app.state.members.all()}
+    """[더미] 주문 목록."""
+    members = {m["id"]: m for m in dummy.members()}
     out = []
-    for o in request.app.state.shop.orders(member_id):
+    for o in dummy.orders():
+        if member_id is not None and o["member_id"] != member_id:
+            continue
         m = members.get(o["member_id"])
         out.append({**o, "nickname": m["nickname"] if m else None})
     return out
 
 
 @router.get("/calls")
-async def list_calls(request: Request):
-    return request.app.state.shop.calls()
+async def list_calls():
+    """[더미] 직원 호출 목록."""
+    return dummy.calls()
 
 
 @router.post("/calls/{call_id}/done")

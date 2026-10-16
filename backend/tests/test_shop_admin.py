@@ -10,7 +10,7 @@ def test_menu_seeded_and_admin_edits_reach_users(client):
     assert len(menus) == 60 and {"id", "name", "price", "soldout", "weight", "spicy", "set_ok", "tags"} <= menus[0].keys()
     r = client.put("/admin/api/menus/c2", headers=ADMIN, json={"weight": 90, "soldout": True, "price": 21000})
     assert r.status_code == 200 and r.json()["weight"] == 90 and r.json()["name"] == "간장마늘 치킨"
-    c2 = next(m for m in client.get("/api/menus").json() if m["id"] == "c2")
+    c2 = client.app.state.shop.menu("c2")  # GET /api/menus 는 더미라 저장소로 확인한다
     assert c2["soldout"] is True and c2["price"] == 21000 and c2["weight"] == 90
 
 
@@ -39,12 +39,11 @@ def test_orders_calls_and_member_link(client):
     assert r.status_code == 201 and r.json()["ai_combo"] is True
     client.post("/api/orders", json={"table_no": 6, "lines": [line], "total": 36000})  # 비회원
     assert client.post("/api/orders", json={"table_no": 6, "lines": [], "total": 0}).status_code == 422
-    orders = client.get("/admin/api/orders", headers=ADMIN).json()
-    assert [o["nickname"] for o in orders] == [None, "주문자"]
-    mine = client.get("/admin/api/orders", headers=ADMIN, params={"member_id": 1}).json()
-    assert len(mine) == 1 and mine[0]["ai_combo"] is True
+    shop = client.app.state.shop  # GET /admin/api/orders·calls 는 더미라 저장소로 확인한다
+    assert [o["member_id"] for o in shop.orders()] == [None, 1]
+    assert len(shop.orders(1)) == 1 and shop.orders(1)[0]["ai_combo"] is True
     cid = client.post("/api/calls", json={"table_no": 3, "items": ["💧 물"]}).json()["id"]
-    assert client.get("/admin/api/calls", headers=ADMIN).json()[0]["done"] is False
+    assert shop.calls()[0]["done"] is False
     assert client.post(f"/admin/api/calls/{cid}/done", headers=ADMIN).json()["done"] is True
     assert client.post("/admin/api/calls/999/done", headers=ADMIN).status_code == 404
 
@@ -73,7 +72,13 @@ def test_stats_and_ai_hit_rate(client):
     client.post("/api/orders", headers=h, json={"table_no": 1, "lines": [combo], "total": 1})
     client.post("/api/orders", json={"table_no": 2, "lines": [{"id": "a4", "name": "계란말이", "unit": 10000, "qty": 1}],
                                      "total": 10000})
-    s = client.get("/admin/api/stats", headers=ADMIN).json()
+    from datetime import datetime
+    from app.routers.admin.common import grade_rule
+    from app.services import stats as stats_service
+    from app.services.grades import KST
+    app = client.app.state  # GET /admin/api/stats 는 더미 입력이라, 통계 계산은 저장소 값으로 직접 검증한다
+    s = stats_service.dashboard(app.shop.orders(), app.members.all(), app.shop.recommendation_count(),
+                                datetime.now(KST).date(), grade_rule(settings()))
     assert s["today_orders"] == 2 and s["avg_order_amount"] == 5000
     assert s["new_customers"] == 1 and s["genders"] == {"남": 1} and s["age_groups"]["20대"] == 1
     assert s["ai"] == {**s["ai"], "recommendations": 4, "ai_orders": 1, "hit_rate": 0.25}
@@ -111,7 +116,7 @@ def test_admin_can_edit_content_and_users_see_it(client):
     prizes = client.get("/api/content/staff_calls").json()
     r = client.put("/admin/api/content/staff_calls", headers=ADMIN, json=prizes + ["🎁 새 항목"])
     assert r.status_code == 200
-    assert client.get("/api/content").json()["staff_calls"][-1] == "🎁 새 항목"
+    assert client.app.state.content.get("staff_calls")[-1] == "🎁 새 항목"  # GET /api/content 는 더미라 저장소로 확인
     assert client.put("/admin/api/content/staff_calls", headers=ADMIN, json={"a": 1}).status_code == 422  # 종류가 다름
     assert client.put("/admin/api/content/staff_calls", headers=ADMIN, json=[]).status_code == 422       # 비어 있음
     assert client.put("/admin/api/content/nope", headers=ADMIN, json=["x"]).status_code == 404
@@ -128,7 +133,7 @@ def test_admin_roulette_prizes_validation_and_weight_saved(client):
     heavy = [dict(p, weight=0) for p in prizes]
     heavy[0]["weight"] = 7
     assert client.put("/admin/api/content/roulette_prizes", headers=ADMIN, json=heavy).status_code == 200
-    assert client.get("/api/content").json()["roulette_prizes"][0]["weight"] == 7
+    assert client.app.state.content.get("roulette_prizes")[0]["weight"] == 7
     bad = {
         "칸 하나": prizes[:1],
         "가중치 합 0": [dict(p, weight=0) for p in prizes],

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from app.core.dependencies import current_member, optional_member
 from app.core.settings import Settings, get_settings
+from app import dummy
 
 router = APIRouter(prefix="/api", tags=["사용자"])
 
@@ -46,19 +47,19 @@ def _me(m: dict) -> dict:
 @router.get("/store")
 @router.get("/v1/store")  # 기획서(API 명세) 경로. 화면은 기존 /api/store 도 그대로 쓴다.
 async def store_info(request: Request):
-    """매장 정보(이름·지점 등) 조회. 스플래시·헤더에 매장명을 보여 줄 때 쓴다. 값은 store_info 테이블(Supabase)에서 읽는다."""
-    return request.app.state.store_info.get()
+    """매장 정보(이름·지점 등) 조회. 스플래시·헤더에 매장명을 보여 줄 때 쓴다. [더미] app/dummy.py 의 값을 돌려준다."""
+    return dummy.store()
 
 
 @router.get("/content")
 async def all_content(request: Request):
-    """화면용 콘텐츠 전체(카테고리·룰렛·직원호출 항목·AI 질문·날씨·추천 규칙)를 한 번에 내려준다."""
-    return request.app.state.content.all()
+    """화면용 콘텐츠 전체(카테고리·룰렛·직원호출 항목·AI 질문·날씨·추천 규칙)를 한 번에 내려준다. [더미]"""
+    return dummy.content()
 
 
 @router.get("/content/{name}")
 async def one_content(name: str, request: Request):
-    data = request.app.state.content.get(name)
+    data = dummy.content_item(name)  # [더미]
     if data is None:
         raise HTTPException(404, "없는 콘텐츠입니다.")
     return data
@@ -66,8 +67,8 @@ async def one_content(name: str, request: Request):
 
 @router.get("/menus")
 async def list_menus(request: Request):
-    """판매 중이든 품절이든 전부 돌려준다 (품절은 `soldout` 로 표시)."""
-    return request.app.state.shop.menus()
+    """판매 중이든 품절이든 전부 돌려준다 (품절은 `soldout` 로 표시). [더미]"""
+    return dummy.menus()
 
 
 @router.post("/orders", status_code=201)
@@ -149,12 +150,12 @@ async def tablet_login_prize(table_no: int, body: PrizeIn, request: Request, mem
 @router.get("/v1/coupons")
 @router.get("/coupons")
 async def my_coupons(request: Request, member: dict = Depends(current_member)):
-    """쿠폰함: 내 쿠폰 목록. 안 쓴 쿠폰이 먼저 나온다 (used_at 이 null 이면 사용 가능)."""
-    return request.app.state.coupons.for_member(member["id"])
+    """쿠폰함: 내 쿠폰 목록. 안 쓴 쿠폰이 먼저 나온다 (used_at 이 null 이면 사용 가능). [더미]"""
+    return dummy.member_coupons(member["id"])
 
 
 @router.get("/tables/{table_no}/coupons")
 async def table_coupons(table_no: int, request: Request, member: dict = Depends(current_member)):
     """이 태블릿에 로그인한 회원들의 쿠폰함. 한 테이블에 여러 명이 앉으므로 화면의 쿠폰함 팝업이 이걸 쓴다."""
-    rows = _tablet_rows(request, table_no, member)
-    return request.app.state.coupons.for_members([r["id"] for r in rows])
+    _tablet_rows(request, table_no, member)
+    return dummy.table_coupons(table_no)  # [더미]
