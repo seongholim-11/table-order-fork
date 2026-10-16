@@ -45,7 +45,7 @@ def test_next_day_member_can_spin_again(client):
     assert _spin(client, h).status_code == 200
     mid = _my_id(client, h)
     client.app.state.coupons.db.run("UPDATE coupons SET issued_at='2000-01-01T00:00:00+00:00' WHERE member_id=?", (mid,))
-    client.app.state.tablet_logins.db.run("DELETE FROM tablet_logins")  # 하루가 지나 로그인 기록도 만료됐다고 가정
+    client.app.state.tablet_logins.db.run("DELETE FROM table_logins")  # 하루가 지나 로그인 기록도 만료됐다고 가정
     h2 = login(client, "가")
     assert client.get("/api/tables/1/logins", headers=h2).json()[0]["eligible"] is True
     assert _spin(client, h2).status_code == 200

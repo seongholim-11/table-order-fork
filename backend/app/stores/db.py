@@ -4,11 +4,14 @@ DATABASE_URL 이 sqlite:/// 로 시작하면 SQLite, postgresql:// 로 시작하
 저장소의 SQL 은 SQLite 문법(? 자리표시자, AUTOINCREMENT)으로 쓰고, Postgres 에서는 아래 translate() 가 바꿔 준다.
 """
 
+import json
 import re
 import sqlite3
 import threading
+from datetime import date, datetime, timezone
 
-SERIAL_TABLES = {"members", "orders", "calls", "recommendation_events", "sms_logs", "coupons"}  # id 가 자동 증가인 테이블
+SERIAL_TABLES = {"members", "orders", "order_items", "order_item_components", "staff_calls", "recommendation_events", "sms_logs", "coupons",
+                 "table_logins"}  # id 가 자동 증가인 테이블
 
 
 def is_postgres(url: str) -> bool:
@@ -19,6 +22,13 @@ def translate(sql: str) -> str:
     """SQLite 문법의 SQL 을 Postgres 문법으로 바꾼다."""
     sql = sql.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "BIGSERIAL PRIMARY KEY")
     return sql.replace("%", "%%").replace("?", "%s")
+
+
+def _plain(v):
+    """Postgres 가 돌려준 시각은 SQLite 와 같은 ISO 문자열로 맞춘다 (화면·통계 코드가 문자열을 기대한다)."""
+    if isinstance(v, datetime):
+        return v.astimezone(timezone.utc).isoformat(timespec="seconds")
+    return v.isoformat() if isinstance(v, date) else v
 
 
 class Database:
@@ -68,7 +78,7 @@ class Database:
 
     def all(self, sql: str, params: tuple = ()) -> list[dict]:
         with self._lock:
-            return [dict(r) for r in self._execute(sql, params).fetchall()]
+            return [{k: _plain(v) for k, v in dict(r).items()} for r in self._execute(sql, params).fetchall()]
 
     def one(self, sql: str, params: tuple = ()) -> dict | None:
         rows = self.all(sql, params)
@@ -82,6 +92,14 @@ class Database:
                 return
             self._conn.executescript(sql)
             self._conn.commit()
+
+    def to_list(self, value) -> str | list:
+        """목록 컬럼에 넣을 값: Postgres 는 배열(text[]), SQLite 는 JSON 문자열."""
+        return list(value) if self.pg else json.dumps(list(value), ensure_ascii=False)
+
+    @staticmethod
+    def from_list(value) -> list:
+        return json.loads(value) if isinstance(value, str) else list(value or [])
 
     def columns(self, table: str) -> set[str]:
         """테이블의 컬럼 이름 (스키마 마이그레이션 확인용)."""

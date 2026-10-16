@@ -8,7 +8,7 @@ SCHEMA = """CREATE TABLE IF NOT EXISTS members (
     id INTEGER PRIMARY KEY AUTOINCREMENT, kakao_id TEXT UNIQUE NOT NULL, nickname TEXT NOT NULL,
     phone TEXT, gender TEXT, birthday TEXT, birth_year INTEGER,
     marketing_consent INTEGER NOT NULL DEFAULT 0, marketing_consent_at TEXT,
-    opted_out INTEGER NOT NULL DEFAULT 0,
+    opted_out INTEGER NOT NULL DEFAULT 0, opted_out_at TEXT,
     visit_count INTEGER NOT NULL DEFAULT 0, last_visit_at TEXT, created_at TEXT NOT NULL)"""
 
 
@@ -46,10 +46,10 @@ class MemberStore:
 
     def set_marketing_consent(self, member_id: int, consent: bool) -> dict | None:
         """로그인할 때 받은 광고성 문자 수신 동의 여부를 저장한다. 동의하면 수신거부 상태도 해제한다."""
-        self.db.run("UPDATE members SET marketing_consent=?, marketing_consent_at=?, opted_out=CASE WHEN ?=1 THEN 0 ELSE opted_out END WHERE id=?",
-                    (int(consent), now_iso() if consent else None, int(consent), member_id))
+        self.db.run("UPDATE members SET marketing_consent=?, marketing_consent_at=?, opted_out=CASE WHEN ? THEN FALSE ELSE opted_out END WHERE id=?",
+                    (consent, now_iso() if consent else None, consent, member_id))
         return self.get(member_id)
 
     def opt_out(self, member_id: int) -> dict | None:
-        self.db.run("UPDATE members SET opted_out=1 WHERE id=?", (member_id,))
+        self.db.run("UPDATE members SET opted_out=TRUE, opted_out_at=? WHERE id=?", (now_iso(), member_id))
         return self.get(member_id)

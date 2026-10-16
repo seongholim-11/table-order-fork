@@ -13,10 +13,10 @@ KST = timezone(timedelta(hours=9))
 
 SCHEMA = """CREATE TABLE IF NOT EXISTS coupons (
     id INTEGER PRIMARY KEY AUTOINCREMENT, member_id INTEGER NOT NULL, table_no INTEGER NOT NULL,
-    kind TEXT NOT NULL, label TEXT NOT NULL, emoji TEXT NOT NULL DEFAULT '🎁', percent INTEGER, item_id TEXT,
-    issued_at TEXT NOT NULL, used_at TEXT, used_order_id INTEGER)"""
+    table_login_id INTEGER, prize_id INTEGER, kind TEXT NOT NULL, label TEXT NOT NULL, emoji TEXT NOT NULL DEFAULT '🎁',
+    percent INTEGER, menu_id TEXT, issued_at TEXT NOT NULL, expires_at TEXT, used_at TEXT, used_order_id INTEGER)"""
 
-COLUMNS = "id, member_id, table_no, kind, label, emoji, percent, item_id, issued_at, used_at, used_order_id"
+COLUMNS = "id, member_id, table_no, kind, label, emoji, percent, menu_id AS item_id, issued_at, used_at, used_order_id"
 
 
 def _today_start_utc() -> str:
@@ -37,7 +37,7 @@ class CouponStore:
 
     def issue(self, member_id: int, table_no: int, kind: str, label: str, emoji: str,
               percent: int | None, item_id: str | None) -> dict:
-        cid = self.db.run("INSERT INTO coupons (member_id, table_no, kind, label, emoji, percent, item_id, issued_at) "
+        cid = self.db.run("INSERT INTO coupons (member_id, table_no, kind, label, emoji, percent, menu_id, issued_at) "
                           "VALUES (?,?,?,?,?,?,?,?)",
                           (member_id, table_no, kind, label, emoji, percent, item_id, now_iso()))
         return self.get(cid)
@@ -56,7 +56,7 @@ class CouponStore:
             return []
         marks = ",".join("?" * len(member_ids))
         return self.db.all(
-            f"SELECT c.id, c.member_id, m.nickname, c.table_no, c.kind, c.label, c.emoji, c.percent, c.item_id, "
+            f"SELECT c.id, c.member_id, m.nickname, c.table_no, c.kind, c.label, c.emoji, c.percent, c.menu_id AS item_id, "
             f"c.issued_at, c.used_at, c.used_order_id FROM coupons c JOIN members m ON m.id=c.member_id "
             f"WHERE c.member_id IN ({marks}) ORDER BY c.used_at IS NOT NULL, c.id DESC", tuple(member_ids))
 
