@@ -8,6 +8,8 @@ import streamlit as st
 
 import admin_repository as repo_mod
 import marketing_ai
+from admin.marketing.config import RECOMMENDATION_PAGE_SIZE
+from admin.marketing.recommendations import pick_recommendations as pick_recommendation_page
 from admin.ui.widgets import kpi, page_head, sec_title
 from admin_dummy_data import Unsupported
 from admin_repository import GRADES
@@ -210,7 +212,7 @@ def marketing_dashboard(repo):
                     st.rerun()
 
 
-REC_PAGE_SIZE = 4  # 한 번에 보여 주는 추천 수. [재추천]을 누르면 다음 묶음으로 넘어간다.
+REC_PAGE_SIZE = RECOMMENDATION_PAGE_SIZE  # 기존 테스트·호출부에서 쓰는 이름은 유지한다.
 
 
 def next_rec_round():
@@ -219,18 +221,19 @@ def next_rec_round():
 
 def pick_recommendations(recs, round_no):
     """추천 목록에서 round_no 번째 묶음을 고른다. 끝까지 보면 처음으로 돌아간다. → (고른 목록, 묶음 번호, 전체 묶음 수)"""
-    pages = -(-len(recs) // REC_PAGE_SIZE)
-    page = round_no % pages
-    start = page * REC_PAGE_SIZE
-    chosen = recs[start:start + REC_PAGE_SIZE]
-    if len(chosen) < REC_PAGE_SIZE and pages > 1:
-        chosen += recs[:REC_PAGE_SIZE - len(chosen)]  # 마지막 묶음은 앞의 추천으로 채운다
-    return chosen, page + 1, pages
+    return pick_recommendation_page(recs, round_no)
 
 
 def marketing_recommend_tab(repo):
     ctx = marketing_ai.build_context(repo, ss["grade_rule"])
     sec_title("사장님을 위한 마케팅 추천", "매장의 모든 데이터를 바탕으로 정리했어요")
+    # 추천의 근거가 되는 핵심 숫자를 먼저 보여 줘서 사장님이 카드 내용을 빠르게 판단할 수 있게 한다.
+    consumers, orders = ctx["members"], ctx["orders"]
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("전체 고객", f"{consumers['total']:,}명")
+    c2.metric("문자 발송 가능", f"{consumers['sendable']:,}명")
+    c3.metric("누적 매출", f"{orders['revenue']:,}원")
+    c4.metric("평균 주문금액", f"{orders['avg']:,}원")
     recs, page, pages = pick_recommendations(marketing_ai.recommend(ctx), ss.get("mk_rec_round", 0))
     cards = "".join(f'<div class="rec"><div class="rt">{i}. {escape(r["title"])}</div>'
                     f'<div class="rw">{escape(r["why"])}</div><div class="ra">👉 {escape(r["action"])}</div></div>'

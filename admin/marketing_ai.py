@@ -8,110 +8,25 @@
 화면 코드는 그대로다.
 """
 import os
-from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from itertools import combinations
 
 import httpx
 
-import admin_repository as repo_mod
-from admin_dummy_data import Unsupported
+from admin.marketing.context import build_marketing_context
+from admin.marketing.recommendations import recommend as build_recommendations
 
 GRADE_ORDER = ["신규", "재방문", "단골", "휴면"]
 
 
 def build_context(repo, rule: dict) -> dict:
-    """다른 admin 페이지(대시보드·메뉴·고객 등급·주문 이력·마케팅)의 데이터를 한 덩어리로 모은다."""
-    stats = repo.stats(rule)
-    menus, members, orders = repo.menus(), repo.members(rule), repo.orders()
-    try:
-        sms_logs, sms_usage = repo.sms_logs(), repo.sms_usage()
-    except (Unsupported, repo_mod.api.ApiError, repo_mod.api.ApiUnavailable):
-        sms_logs, sms_usage = [], None  # 문자 기능을 못 쓰는 환경에서도 AI 탭은 동작해야 한다
-
-    pool = members[members["마케팅 수신 동의"] & ~members["수신거부"]] if len(members) else members
-    on_sale = menus[menus["판매 여부"]] if len(menus) else menus
-    line_qty: Counter = Counter()
-    for text in orders["주문 내역"] if len(orders) else []:
-        for part in text.split(", "):
-            name, _, qty = part.rpartition(" x")
-            if name:
-                line_qty[name] += int(qty or 1)
-    hours = Counter(t.hour for t in orders["주문 시각"]) if len(orders) else Counter()
-    weekdays = Counter(t.weekday() for t in orders["주문 시각"]) if len(orders) else Counter()
-    return {
-        "stats": stats,
-        "menus": {"total": len(menus), "on_sale": len(on_sale),
-                  "soldout": [] if not len(menus) else menus[~menus["판매 여부"]]["메뉴명"].tolist(),
-                  "high_weight": [] if not len(menus) else menus.nlargest(3, "추천 가중치")["메뉴명"].tolist(),
-                  "unsold": [n for n in (on_sale["메뉴명"].tolist() if len(on_sale) else []) if line_qty[n] == 0]},
-        "members": {"total": len(members), "grades": dict(members["등급"].value_counts()) if len(members) else {},
-                    "sendable": len(pool), "opted_out": int(members["수신거부"].sum()) if len(members) else 0,
-                    "pool_by_grade": dict(pool["등급"].value_counts()) if len(pool) else {}},
-        "orders": {"count": len(orders), "revenue": int(orders["금액"].sum()) if len(orders) else 0,
-                   "avg": int(orders["금액"].mean()) if len(orders) else 0,
-                   "peak_hours": [h for h, _ in hours.most_common(3)],
-                   "busy_weekday": weekdays.most_common(1)[0][0] if weekdays else None,
-                   "top_items": line_qty.most_common(5)},
-        "sms": {"logs": len(sms_logs), "usage": sms_usage},
-    }
-
-
-def _pct(part, whole) -> str:
-    return f"{part / whole:.0%}" if whole else "0%"
+    """기존 호출부를 유지하면서 성격별 데이터 모듈로 컨텍스트 생성을 위임한다."""
+    return build_marketing_context(repo, rule)
 
 
 def recommend(ctx: dict) -> list[dict]:
-    """사장님께 드리는 마케팅 방법. 각 항목: {title, why, action}. 데이터에서 근거를 찾은 것만 낸다."""
-    m, o, mn, st = ctx["members"], ctx["orders"], ctx["menus"], ctx["stats"]
-    grades, pool = m["grades"], m["pool_by_grade"]
-    recs = []
-    dormant = int(grades.get("휴면", 0))
-    if dormant:
-        n = int(pool.get("휴면", 0))
-        recs.append({"title": f"휴면 고객 {dormant}명 되찾기",
-                     "why": f"전체 회원 {m['total']}명 중 {_pct(dormant, m['total'])}가 한동안 오지 않았어요. 문자를 받을 수 있는 분은 {n}명이에요.",
-                     "action": "‘휴면’ 등급에게 재방문 쿠폰 문자(예: 안주 10% 할인)를 보내 보세요. 마케팅 > AI 문자 탭의 ‘빠른 문구’를 쓰면 돼요."})
-    regular = int(grades.get("단골", 0))
-    if regular:
-        recs.append({"title": f"단골 {regular}명에게 감사 혜택",
-                     "why": "단골은 매출의 중심이고, 작은 혜택만으로도 발길이 이어져요.",
-                     "action": "단골 전용 서비스 안주나 감사 문자를 보내 보세요."})
-    repeat, new = int(grades.get("재방문", 0)), int(grades.get("신규", 0))
-    if new:
-        recs.append({"title": f"신규 {new}명을 재방문 고객으로",
-                     "why": f"재방문 고객은 {repeat}명이에요. 첫 방문 뒤 한 번 더 오게 하는 것이 가장 효율적이에요.",
-                     "action": "신규 등급에게 ‘다음 방문 시 음료 1병 서비스’ 문자를 보내 보세요."})
-    if o["peak_hours"]:
-        hrs = ", ".join(f"{h}시" for h in sorted(o["peak_hours"]))
-        recs.append({"title": f"한가한 시간대 이벤트 (피크: {hrs})",
-                     "why": f"주문이 {hrs}에 몰려 있어요. 그 외 시간은 비어 있을 가능성이 커요.",
-                     "action": "피크가 아닌 시간대 한정 할인(해피아워)을 만들고 수신 동의 고객에게 알려 보세요."})
-    if o["top_items"]:
-        name, qty = o["top_items"][0]
-        recs.append({"title": f"인기 메뉴 ‘{name}’ 앞세우기",
-                     "why": f"주문 수량 {qty}개로 1위예요. 사진과 문구로 먼저 보이게 하면 객단가가 올라가요.",
-                     "action": f"‘{name}’을 세트 구성에 넣거나 추천 가중치를 올려 보세요."})
-    if mn["unsold"]:
-        names = ", ".join(mn["unsold"][:3])
-        recs.append({"title": "안 팔리는 메뉴 살리기",
-                     "why": f"{names} 등 {len(mn['unsold'])}개 메뉴는 아직 주문이 없어요.",
-                     "action": "인기 메뉴와 묶은 세트로 만들거나, 추천 가중치를 올려 노출을 늘려 보세요."})
-    if mn["soldout"]:
-        recs.append({"title": "품절 메뉴 정리",
-                     "why": f"{', '.join(mn['soldout'][:3])} 품절 상태라 손님이 아쉬워할 수 있어요.",
-                     "action": "재입고 일정을 정하거나 대체 메뉴를 추천 목록에 올려 두세요."})
-    ai = st["ai"]
-    if ai.get("hit_rate") is not None and ai["hit_rate"] < 0.5:
-        recs.append({"title": "AI 추천 조합 활용도 높이기",
-                     "why": f"AI 추천 적중률이 {ai['hit_rate']:.0%}예요. 아직 추천이 주문으로 잘 이어지지 않아요.",
-                     "action": "추천 가중치 화면에서 인기 메뉴 가중치를 올리고, 조합 문구를 매력적으로 다듬어 보세요."})
-    if m["opted_out"] or m["sendable"] < m["total"] * 0.5:
-        recs.append({"title": "수신 동의 늘리기",
-                     "why": f"전체 {m['total']}명 중 문자를 보낼 수 있는 분은 {m['sendable']}명뿐이에요.",
-                     "action": "테이블 QR 로그인 시 마케팅 수신 동의를 안내하고, 동의 시 혜택을 약속해 보세요."})
-    return recs or [{"title": "데이터를 더 모아 볼까요?", "why": "아직 주문·회원 데이터가 적어 추천할 근거가 부족해요.",
-                     "action": "주문이 쌓이면 이곳에 맞춤 마케팅 방법이 나타나요."}]
+    """기존 챗봇·문자 코드도 같은 추천 규칙을 쓰도록 새 모듈에 위임한다."""
+    return build_recommendations(ctx)
 
 
 def context_to_text(ctx: dict) -> str:

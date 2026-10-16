@@ -16,6 +16,8 @@ from user import menu_data  # noqa: E402
 TODAY = date(2026, 10, 12)
 GRADES = ["신규", "재방문", "단골", "휴면"]  # admin_repository 도 여기 것을 가져다 쓴다
 AGE_GROUPS = ["20대 미만", "20대", "30대", "40대", "50대 이상"]
+DUMMY_ORDER_COUNT = 1000  # 매출 추이와 회원·비회원 비교가 충분히 보이도록 한 달 주문량을 넉넉히 만든다.
+DUMMY_TODAY_ORDER_COUNT = 80
 
 # 손님 화면(user/menu_data.py)과 같은 카테고리. 서버에는 AI 추천 조합·인기메뉴 같은 가상 카테고리도 섞여 있으나 관리자 더미는 실제 카테고리만 쓴다.
 CATEGORIES = [c for c in menu_data.CATEGORIES if c["id"] not in ("ai", "best")]
@@ -83,12 +85,15 @@ class DummyBackend:
                 "last_visit": TODAY - timedelta(days=r.choice([0, 1, 2, 3, 5, 8, 14, 21, 35, 50, 70, 95, 130])),
                 "marketing_consent": r.random() < 0.7, "opted_out": False})
         self.orders_ = []
-        for i in range(1, 301):
+        for i in range(1, DUMMY_ORDER_COUNT + 1):
             picks = r.sample([m for m in MENUS if not m["soldout"]], r.randint(2, 4))
             lines = [{"id": m["id"], "name": m["name"], "opt": "", "unit": m["price"], "qty": r.randint(1, 2)} for m in picks]
-            day = TODAY - timedelta(days=0 if i <= 28 else r.randint(1, 29))
+            day = TODAY - timedelta(days=0 if i <= DUMMY_TODAY_ORDER_COUNT else r.randint(1, 29))
             ts = datetime(day.year, day.month, day.day, tzinfo=timezone(timedelta(hours=9))) + timedelta(minutes=r.randint(1020, 1430))
-            self.orders_.append({"id": i, "ts": _iso(ts), "table_no": r.randint(1, 30), "member_id": r.choice(self.members_)["id"],
+            # 실제 매장처럼 로그인한 회원 주문과 로그인하지 않은 비회원 주문을 함께 만든다.
+            # 고정 시드를 쓰므로 화면과 테스트에서는 매번 같은 약 75%의 회원 주문 비율이 나온다.
+            member_id = r.choice(self.members_)["id"] if r.random() < 0.75 else None
+            self.orders_.append({"id": i, "ts": _iso(ts), "table_no": r.randint(1, 30), "member_id": member_id,
                                  "lines": lines, "total": sum(l["unit"] * l["qty"] for l in lines),
                                  "ai_combo": r.random() < 0.45,
                                  "roulette_discount_percent": 0, "recommendation_event_id": None})
@@ -147,7 +152,8 @@ class DummyBackend:
     def stats(self, rule: dict) -> dict:
         today = [o for o in self.orders_ if o["ts"][:10] >= TODAY.isoformat()]  # UTC 기준 근사
         members = {m["id"]: m for m in self.members(rule)["members"]}
-        grades = {o["member_id"]: members[o["member_id"]]["grade"] for o in today}
+        # 비회원 주문에는 member_id가 없으므로 신규·재방문 고객 집계에서 제외한다.
+        grades = {o["member_id"]: members[o["member_id"]]["grade"] for o in today if o["member_id"] in members}
         counts: dict[str, int] = {}
         for o in self.orders_:
             for l in o["lines"]:

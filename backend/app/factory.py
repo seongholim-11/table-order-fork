@@ -4,12 +4,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.settings import Settings, get_settings
-from app.routers import admin, ai, auth, content, coupons, menus, orders, roulette, roulette_prizes, staff_calls, store, user
+from app.routers import admin, ai, auth, content, coupons, dev, menus, orders, roulette, roulette_prizes, staff_calls, store, user
 from app.services.kakao import KakaoClient
 from app.services.supabase_auth import SupabaseAuthClient
 from app.services.sms import SmsService
 from app.stores.coupons import CouponStore
 from app.stores.db import Database
+from app.stores.dev_test import DevTestStore
 from app.stores.login_sessions import LoginSessionStore
 from app.stores.members import MemberStore
 from app.stores.shop import ShopStore
@@ -33,6 +34,7 @@ def create_app(settings: Settings | None = None, sms_clock=None, sms_http=None) 
     )
     db = Database(settings.database_url)
     app.state.db = db  # DB 연결 점검(/admin/api/system/db)에서 쓴다
+    app.state.dev_test = DevTestStore(db)
     app.state.login_store = LoginSessionStore(settings.login_ttl_seconds)
     app.state.members = MemberStore(db)
     app.state.coupons = CouponStore(db)
@@ -46,7 +48,7 @@ def create_app(settings: Settings | None = None, sms_clock=None, sms_http=None) 
     app.dependency_overrides[get_settings] = lambda: settings
     app.include_router(auth.router)
     # 손님 API 는 기능별 파일로 나뉘어 있다. 새 기능 라우터는 해당 파일에 추가하므로 여기는 고치지 않는다.
-    for module in (user, store, content, menus, orders, coupons, roulette, roulette_prizes, staff_calls, ai):
+    for module in (user, store, content, menus, orders, coupons, roulette, roulette_prizes, staff_calls, ai, dev):
         app.include_router(module.router)
     app.include_router(admin.router)
 

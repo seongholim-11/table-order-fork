@@ -153,6 +153,10 @@ class AdminRepository:
     def source(self) -> str:
         return self.backend.source
 
+    def store(self) -> dict:
+        """대시보드 계산에 필요한 매장명·테이블 수를 데이터 출처와 관계없이 돌려준다."""
+        return self.backend.store()
+
     # ---- 메뉴 ----
     def categories(self) -> list[dict]:
         return self.backend.menus()["categories"]
