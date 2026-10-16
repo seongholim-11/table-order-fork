@@ -1,7 +1,7 @@
 # F&BGrowth DB 설계 (Supabase / Postgres)
 
 > 다른 에이전트·개발자가 DB를 참고할 때 가장 먼저 읽는 문서입니다. 실행용 SQL은 [`docs/db/fbgrowth_schema.sql`](db/fbgrowth_schema.sql)입니다.
-> 이 문서는 API v6 목록표(73개 API)를 기준으로 설계했습니다. 원본 API 문서는 프로젝트 공유 폴더의 `api/FBGrowth_API_경로_통합_정리_최종_v6_목록표만.md`입니다.
+> 이 문서는 API v6 목록표(73개 API)를 기준으로 설계했고, 이후 쿠폰함 API가 추가됐습니다. 구현 현황까지 반영한 최신 API 문서는 프로젝트 공유 폴더의 `api/FBGrowth_API_경로_통합_정리_최종_v7_목록표만.md`(v6 원본도 같은 폴더)입니다. 아래 표의 "v6 구분" 번호는 v7에서도 같습니다.
 
 ## 한 단락 요약
 
@@ -161,6 +161,8 @@ API 화면 구분은 v6 목록표의 번호(1-1 … 2-10)입니다. "집계"는 
 v6에서 "뺄" 처리된 API(`orders/{orderId}`, 메뉴군·날씨별 매출 등 5개 통계)는 테이블을 따로 만들지 않았습니다.
 
 ## 현재 DB와 달라진 점
+
+"현재"는 서버가 아직 쓰는 기존 SQLite 구조(`backend/app/stores/*.py` 의 `SCHEMA`)입니다.
 
 | 항목 | 현재 | 변경 |
 |---|---|---|

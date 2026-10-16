@@ -1,15 +1,18 @@
 # 정식 구현 계획: QR 로그인 · 솔라피 문자 발송
 
-더미(Streamlit 안에서만 동작)로 화면 흐름과 규칙을 확인했다. 이 문서는 더미를 정식 기능으로 바꾸는 기준이다.
+이 문서는 서버에 **실제로 구현된 두 기능(QR 로그인, 솔라피 문자 발송)** 의 기준 명세와, 카카오·솔라피 설정 가이드·실기기 검증 체크리스트를 모은 것이다. (갱신: 2026-10-16)
 
-## 0. 더미에서 확인된 것 / 확인되지 않은 것
+- 그 밖의 기능(주문·룰렛·쿠폰·통계·AI 등)은 서버에서 더미 응답만 돌려주며, 구현 현황은 `AGENTS.md` 의 "더미 상태"와 프로젝트 파일 `api/FBGrowth_API_경로_통합_정리_최종_v7_목록표만.md`, 담당별 할 일은 `todo/TODO_*.md` 를 본다.
+- DB 는 지금 SQLite(`backend/app.db`)이고, 새 Supabase 스키마는 `docs/DB_SCHEMA.md` 를 따른다.
+
+## 0. 확인된 것 / 확인되지 않은 것
 
 | 구분 | 내용 |
 |---|---|
-| 확인됨 | 스캔 → 승인 → 로그인 상태에 따른 화면 전환, 3분 만료, 일회용 토큰, 로그인 후 룰렛 1회 추가 |
-| 확인됨 | SMS/LMS 구분, 광고 문구 자동 추가, 월 한도 차단, 야간 차단, 수신 동의·수신거부 필터, 발송 내역 |
-| 확인 안 됨 | 실제 휴대폰 스캔, 카카오 로그인, 서버↔태블릿 실시간 연결(WebSocket), 실제 문자 수신 |
-| 알려진 한계 | user/admin 앱은 별도 프로세스라 데이터를 공유하지 않음 → 백엔드/DB로 해결 |
+| 확인됨(자동 테스트) | 스캔 → 승인 → 로그인 상태에 따른 화면 전환, 3분 만료, 일회용 토큰, 로그인할 때마다 방문 횟수 +1 |
+| 확인됨(자동 테스트) | SMS/LMS 구분, 광고 문구 자동 추가, 월 한도 차단, 야간 차단, 수신 동의·수신거부 필터, 발송 내역 |
+| 확인됨 | 솔라피 실제 발송(프로젝트 메모 기준, 2026-10-15 사용자 확인) |
+| 확인 안 됨 | 실제 휴대폰 스캔 + 실제 카카오 로그인 end-to-end, 서버↔태블릿 WebSocket(화면은 폴링 사용) |
 
 ## 1. QR 로그인
 
@@ -40,21 +43,13 @@
 
 ### 규칙 (더미에서 검증한 것을 그대로 이식)
 - 상태 전이: `waiting → scanned → logged_in`, 또는 `expired`. 되돌리기 없음.
-- 토큰은 일회용. 승인된 토큰·만료된 토큰은 재사용 불가 (`user/login_demo.py` 와 `user/test_login.py` 가 기준 명세).
+- 토큰은 일회용. 승인된 토큰·만료된 토큰은 재사용 불가 (`backend/tests/test_auth.py` 가 기준 명세).
+- 로그인할 때마다 `visit_count` +1. 같은 태블릿에서 이미 로그인한 회원이 다시 로그인하려 하면 거절하고 방문 횟수를 올리지 않는다.
 - `state` 파라미터로 CSRF 방지: 콜백의 state 가 발급한 토큰과 일치해야 함.
 - 로그인 완료 시 JWT 발급, 태블릿 세션에 저장. 만료·로그아웃 정책은 별도 정의.
 
-### 더미에서 교체할 지점
-| 더미 | 정식 |
-|---|---|
-| `user/login_demo.py` (메모리 상태) | `backend/app/stores/login_sessions.py` (+ 이후 Redis 교체 가능한 인터페이스) |
-| `login_action("scan"/"approve")` 버튼 | 휴대폰이 부르는 `/kakao/start`, `/kakao/callback` |
-| `login_demo_panel` 2초 폴링 fragment | WebSocket 수신 (Streamlit은 폴링 유지 + 서버 WS 병행 권장) |
-| `qr_png()` 가짜 QR | `qrcode` 라이브러리로 `qr_url` 인코딩 |
-| 고정 닉네임 `카카오` | 카카오 프로필(닉네임) |
-
 ### 회원 테이블 `members`
-`id, kakao_id(unique), nickname, phone, gender, birthday, mbti, marketing_consent(bool), marketing_consent_at, opted_out(bool), visit_count, last_visit_at, created_at`
+`id, kakao_id(unique), nickname, phone, gender, birthday, mbti, marketing_consent(bool), marketing_consent_at, opted_out(bool), visit_count, last_visit_at, created_at` (SQLite 서버 기준. Supabase 스키마의 `members` 는 `docs/DB_SCHEMA.md`)
 
 ## 2. 문자 발송 (솔라피)
 
@@ -65,7 +60,10 @@
 | POST | `/admin/api/marketing/sms/send` | preview 와 동일한 검사 후 발송. 응답 `{request_id, count}` |
 | GET | `/admin/api/marketing/sms/usage` | 이번 달 SMS/LMS 사용량·한도 |
 | GET | `/admin/api/marketing/sms/logs` | 발송 내역 |
+| POST | `/admin/api/members/{id}/opt-out` | 관리자 화면에서 수신거부 처리 |
 | POST | `/api/members/me/opt-out` | 수신거부 (손님/링크 용) |
+| POST | `/admin/api/sms/test` | 번호 1건 즉시 테스트 발송 (README 참고) |
+| POST | `/admin/api/marketing/sms/logs/{id}/cancel` | 예약 취소 |
 
 ### 규칙
 - 90바이트 이하 SMS, 초과 LMS (한글 2바이트).
@@ -80,72 +78,37 @@
 ### 테이블
 `sms_logs(id, request_id, type, content, target_count, status, error, created_at)`, 월 사용량은 `sms_logs` 집계.
 
-## 3. 진행 현황 (갱신: 2026-10-12)
+## 3. 진행 현황 (갱신: 2026-10-16)
 
-범례: ✅ 완료 · ⏳ 남음(Claude가 구현) · 🙋 당신이 해야 함
+범례: ✅ 완료 · ⏳ 남음 · 🙋 사람이 해야 함
 
 ### 3-1. QR 로그인
-- ✅ 로그인 세션 저장소 (일회용, 3분 만료, token/secret 분리), `/api/auth/*` REST + `WS /api/auth/ws/{secret}` + 폴링
-- ✅ 카카오 클라이언트 (키 없으면 모의 모드, 키 있으면 실제 호출 코드), 회원 저장소(SQLite), JWT, `/api/members/me`
-- ✅ **[user] 서버 연동**: 실제 QR 이미지(`qrcode`), 2초 폴링으로 로그인 감지, 만료 시 QR 새로고침, `?table=번호`로 테이블 지정
-- ✅ **[user] 로그인 후 화면**: 닉네임 표시, 룰렛 한 번 더, 회원 정보 입력 폼은 제거 (성별·생일·번호는 카카오 로그인 때 자동 수집, 마케팅 수신 동의는 휴대폰 로그인 화면에서 선택)
-- ✅ **룰렛 화면 흐름**: 비로그인 START → 로그인 팝업(QR), 로그인 후 START → 룰렛, 이미 돌린 뒤 START → 다른 회원 로그인 팝업(회원당 1회), 비회원 주문/회원 주문 버튼, 로그인한 회원이 하단에 누적 표시 (화면만, 서버 저장 없음)
-- ✅ 더미 시뮬레이션(`login_demo.py`) 제거. 서버가 없으면 QR 로그인만 꺼지고 주문 화면은 그대로 동작
-- ✅ 테스트: 백엔드 `backend/tests/test_auth.py`, 통합 `tests/test_qr_login_e2e.py`, 실제 서버 두 개 + 브라우저에서 화면의 QR을 디코딩해 스캔을 흉내 내는 확인까지 완료
+- ✅ 로그인 세션 저장소(일회용, 3분 만료, token/secret 분리), `/api/auth/*` REST + `WS /api/auth/ws/{secret}` + 폴링
+- ✅ 카카오 직접 호출(키 없으면 모의 모드)과 Supabase Auth 방식(8단계), 회원 저장소, JWT, `/api/members/me`, 태블릿 로그인 기록 `/api/tables/{n}/logins`
+- ✅ [user] 서버 연동: 실제 QR 이미지, 2초 폴링, 만료 시 QR 새로고침, `?table=번호`로 테이블 지정. 성별·생일·번호는 카카오에서 자동 수집, 마케팅 수신 동의는 휴대폰 화면에서 선택
 - ✅ 운영 모드(`APP_ENV=prod`)에서 기본 비밀값(`change-me`)이면 서버 기동 차단
-- ⏳ [백엔드] 로그인 세션 Redis 교체 (여러 프로세스로 운영할 때만 필요)
-- ⏳ [백엔드] 로그아웃/JWT 만료 정책 정의
-- ⏳ 휴대폰 번호를 직접 입력 대신 카카오 수집으로 바꾸려면 비즈 앱 심사 후 `kakao.py` 수정
+- ✅ 테스트: `backend/tests/test_auth.py`, 통합 `tests/test_qr_login_e2e.py`
+- ⏳ 로그인 세션 Redis 교체(여러 프로세스로 운영할 때만 필요), 로그아웃/JWT 만료 정책
+- ⏳ 휴대폰 번호는 카카오 비즈 앱 심사 후 `KAKAO_SCOPES` 로 수집(심사 전에는 번호 없는 회원이 생길 수 있음)
 
 ### 3-2. 문자 발송 (솔라피)
 - ✅ 발송 규칙: SMS/LMS 분기, `(광고)` 표기·수신거부 문구 자동 추가, 월 한도, 야간 차단, 수신 동의·번호·수신거부 필터 (`backend/app/services/sms.py`)
 - ✅ 솔라피 호출: send-many/detail, 예약 발송·취소, 실패 시 `failed` 로그. `SMS_DRY_RUN=true`(기본)이면 호출 없이 기록만
-- ✅ 발송 로그 `sms_logs`와 월 사용량 집계 (실패는 한도에서 제외)
-- ✅ API: `/admin/api/marketing/sms/{preview,send,usage,logs}`, `/admin/api/members/{id}/opt-out`, `/api/members/me/opt-out`
-- ✅ **[admin] 마케팅 화면 API 연동** (관리자 토큰 로그인, 사용량·미리보기·발송·수신거부·내역).
+- ✅ 발송 로그 `sms_logs`와 월 사용량 집계(실패는 한도에서 제외), `/admin/api/marketing/sms/*`, `/admin/api/sms/test`
+- ✅ [admin] 마케팅 화면(AI 챗봇·AI 추천·AI 문자 세 메뉴 중 AI 문자) API 연동
 - ✅ 테스트: `backend/tests/test_sms.py`(솔라피 호출은 MockTransport), 통합 `tests/test_sms_admin_e2e.py`
 
-### 3-2b. AI 질문 (회의록 2.4) — 더미 데이터 화면
-- ✅ 메뉴 화면 왼쪽 위 **[💬 AI 질문]** 버튼 → 한 화면에 질문 하나, 큰 선택 카드, 선택하면 바로 다음 질문 (진행 바·이전·닫기)
-- ✅ 질문 8개: 배고픔 → 스트레스 → 인원수 → 성비 → 원하는 종류 → 맵기 → 방문 의도 → 예산 (`user/ai_quiz_data.py`, 더미)
-- ✅ 결과: 답변 요약, 자동 반영(시간대·날씨), 추천 조합 최대 3개 + 이유 + 담기. 날씨는 더미(`?weather=rain` 등으로 바꿔 보기)
-- ✅ 추천 로직 확장: 맵기 필터 오류 수정, 종류·방문 의도·성비·배고픔·스트레스·시간대·날씨 반영, 사장님 가중치 입력 자리(`weight`), 세트 불가·삭제·품절 메뉴 제외
-- ⏳ 질문 목록·선택지를 서버/관리자 설정으로 옮기기 (노출 조건 정의 필요), 날씨 API 연동, 회원 정보(MBTI·선호 등)로 일부 질문 건너뛰기
-- ⏳ 추천 노출·선택 기록(적중률 계산)과 백엔드 연결, 주종 질문 추가 여부 결정 (지금은 맥주 고정)
-
-### 3-2c. 프론트 데이터 소스 전환 구조 (더미 ↔ API)
-- ✅ `DATA_SOURCE=dummy|api|auto` 한 값으로 전환. 화면은 저장소(`user_repository.py`, `admin_repository.py`)만 사용
-- ✅ 더미 데이터를 서버 응답과 같은 JSON 모양으로 정리 → 변환 코드 없음. admin 은 더미가 "가짜 서버"(`DummyBackend`)
-- ✅ 백엔드: `GET /api/content`(카테고리·룰렛·직원호출·AI 질문·날씨·추천 규칙), `PUT /admin/api/content/{이름}`, 시드는 더미에서 생성(`tools/export_dummy_seed.py`)
-- ✅ 연결됨(서버 모드): 메뉴·가격·품절·가중치, 주문 저장, 직원 호출 저장, 추천 노출 기록, 대시보드 통계, 고객 등급, 주문 이력, 메뉴 편집 저장
-- ✅ 계약 테스트: 더미와 서버의 JSON 모양이 어긋나면 실패 (`tests/test_admin_data_source.py`, `backend/tests/test_shop_admin.py`)
-- ⏳ 서버가 아직 안 주는 것: 날씨 실시간 값(지금은 시드의 고정값), 메뉴 옵션, 관리자 화면에서 콘텐츠(질문·룰렛 등) 편집 UI
-- ⏳ 관리자 더미 모드의 마케팅(문자 발송)은 서버가 필요해서 안내만 표시
-
-### 3-2d. 관리자 메뉴 관리 화면 (카테고리 CRUD + 메뉴 등록)
-- ✅ 왼쪽 패널: 카테고리 목록(아이콘·이름·메뉴 수, 클릭해서 선택) + 추가 / 수정(이름·아이콘·색상) / 삭제
-- ✅ 카테고리를 클릭하면 오른쪽에 그 카테고리의 **메뉴 등록 폼**과 등록된 메뉴 표(수정·행 추가·삭제·저장)가 나온다. 클릭 전에는 안내 문구와 카테고리별 메뉴 수 차트
-- ✅ 규칙: 이름 비어 있음·중복 불가, 메뉴가 남은 카테고리는 삭제 불가, 손님 화면용 가상 카테고리(AI 추천 조합·인기메뉴)는 건드리지 않음
-- ✅ 더미/서버 모드 모두 동작 (서버 모드는 기존 `PUT /admin/api/content/categories` 로 목록을 통째로 저장, 손님 화면이 10초 안에 반영)
-- ⏳ 카테고리 순서 바꾸기, 삭제 전에 메뉴를 다른 카테고리로 한 번에 옮기기, 이미지 파일 업로드(지금은 URL 입력)
-
-### 3-3. 앞서 분석에서 나온 user 페이지 수정 사항 (아직 미수정)
-- ✅ 맵기 필터 오류 수정 ("맵지 않게"인데 "매콤한 골뱅이 한 상"이 추천되던 문제)
-- ⏳ `requirements.txt`의 streamlit 최소 버전을 1.65로 상향
-- ⏳ `.streamlit/config.toml`을 저장소 루트에서 실행해도 적용되게 이동 (user·admin 공통)
-- ⏳ 주문 시각 시간대를 한국(Asia/Seoul)으로
-- ✅ 지점명 홍대점 반영 (`user/menu_data.py`, 백엔드 `STORE_BRANCH`)
-- ⏳ 메뉴·주문·직원 호출을 백엔드 API와 연결 (`shared/api.py` 사용), 관리자와 데이터 공유
-- ⏳ 추천에 사장님 가중치·날씨·시간대 반영, 추천 노출/적중 기록
-- ⏳ HTML 이스케이프 일관화
+### 3-3. 나머지 기능
+- 주문·룰렛·쿠폰함·메뉴 관리·통계·AI 추천/챗봇 등은 서버 더미 상태입니다. 결정 사항: 주문 상태 기능 없음, 룰렛 회원당 하루 1회 + 쿠폰함, 챗봇은 제미나이 무료 API(RAG 없음), 관리자 인증(Supabase Auth `owners`)은 모든 개발 후 마지막. 상세는 `AGENTS.md`, `docs/DB_SCHEMA.md` 의 "결정 사항".
+- ⏳ 화면 쪽 정리 후보(미착수): `requirements.txt` 의 streamlit 최소 버전 상향, `.streamlit/config.toml` 위치, 주문 시각 시간대(Asia/Seoul), HTML 이스케이프 일관화
 
 ## 4. 당신이 해야 할 일 🙋
 
 ### 지금 정하면 되는 것
 - [x] 지점명: **홍대점**으로 확정, 반영 완료
-- [ ] 휴대폰 번호: 카카오 비즈 앱 심사로 받을지, 직접 입력으로 갈지 (현재 코드는 직접 입력 기준)
+- [ ] 휴대폰 번호: 카카오 비즈 앱 심사로 받을지 결정 (현재 코드는 카카오 로그인 때 자동 수집을 시도하고, 못 받은 회원에게는 광고 문자를 보내지 않음)
 
-### 카카오 (로그인 실기기 검증 전까지)
+### 카카오 직접 호출 방식 (Supabase 방식을 쓰지 않을 때만. Supabase 방식은 아래 단계별 가이드)
 - [ ] developers.kakao.com 앱 생성, REST API 키 발급
 - [ ] 카카오 로그인 활성화, Redirect URI 등록 (`{PUBLIC_BASE_URL}/api/auth/kakao/callback`, 개발·운영 각각)
 - [ ] 동의항목 설정 (이름·성별·생일·출생연도). 휴대폰 번호는 비즈 앱 심사가 필요함
@@ -259,4 +222,4 @@ JWT_SECRET=<긴 랜덤 문자열>          # change-me 그대로 두지 말 것
 ## 6. 다음 순서
 1. 🙋 같은 와이파이 휴대폰으로 **모의 모드** 실기기 확인 (`PUBLIC_BASE_URL=http://서버PC주소:8000`, README 참고)
 2. 🙋 카카오·솔라피 키 준비 → `.env`에 입력 → 실제 모드 전환 후 5장 체크리스트 수행 (솔라피는 `SMS_DRY_RUN=false` 로 바꾸기 전에 본인 번호 1건부터)
-3. ⏳ 3-3의 user 페이지 수정 사항 (요청 시)
+3. ⏳ 나머지 기능은 팀원별 TODO(`todo/TODO_*.md`)에 따라 더미를 DB 구현으로 교체

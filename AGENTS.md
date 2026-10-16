@@ -28,7 +28,10 @@ streamlit run admin/app.py --server.port 8502   # 관리자 (현재 토큰 입�
 - `backend/app/`: `routers/`(user.py, auth.py, admin/) → `services/` → `stores/`(SQL은 여기만) , `dummy.py`(더미 응답), `seed/`.
 - `user/`, `admin/`: `app.py`는 진입점만. 화면은 `views/`, 공용 UI는 `ui/`, 세션 상태·계산은 `state/`. 폴더명을 `pages`로 쓰지 않는다(Streamlit 자동 멀티페이지 때문).
 - 화면 코드는 `api`를 직접 부르지 않고 `user/user_repository.py`, `admin/admin_repository.py`만 부른다.
-- API 경로: 손님 `/api/...`, 관리자 `/admin/api/...`. 기준 문서는 `/mnt/project-files/api/FBGrowth_API_경로_통합_정리_최종_v7_목록표만.md`(프로젝트 파일).
+- API 경로: 손님 `/api/...`, 관리자 `/admin/api/...`. 기준 문서는 `docs/api/FBGrowth_API_경로_통합_정리_최종_v7_목록표만.md`, 담당 분배는 `docs/api/FBGrowth_API_담당_분배_3-2-2-2-1.md`.
+- 담당자별 TODO: `docs/todo/TODO_{성호,재현,수용,서준,석원}.md`
+- 문서 목록: `docs/NOTICE_TEAM.md`(팀원 공지, 어떤 문서를 언제 보는지), `docs/todo/`(담당자별 TODO), `docs/api/`(API 경로·담당 분배), `docs/TODO_CONFLICTS_AND_ERRORS.md`(충돌·오류), `docs/DEVELOPMENT_GUIDE.md`·`docs/DB_SCHEMA.md`·`docs/FLOW_*.md`·`docs/CODE_TOUR.md`.
+- TODO 진행 중 충돌·오류와 해결: `docs/TODO_CONFLICTS_AND_ERRORS.md`
 - 상세: `docs/DEVELOPMENT_GUIDE.md`(API 추가 순서), `docs/DB_SCHEMA.md`(DB 설계), `docs/FLOW_*.md`(기능 흐름), `docs/CODE_TOUR.md`.
 
 ## 더미 상태 (팀원이 구현할 뼈대)
@@ -51,6 +54,7 @@ streamlit run admin/app.py --server.port 8502   # 관리자 (현재 토큰 입�
 - 수정하는 파일 수를 최대한 줄인다. 요청과 무관한 파일은 건드리지 않는다.
 - 기존 코드를 최대한 유지한다. 꼭 필요한 부분만 고치고, 관련 없는 정리·이름 변경·재배치는 하지 않는다.
 - 새로 추가한 코드와 로직에는 초급 개발자도 이해할 수 있게 한국어 주석을 단다(무엇을, 왜 하는지).
+- **TODO 체크**: 작업을 끝낸 항목은 본인 `docs/todo/TODO_*.md`에서 `- [ ]`를 `- [x]`로 바꾸고, 맨 위 "진행 순서" 표의 상태도 맞춘 뒤 같은 PR에 포함한다. 테스트까지 통과한 항목만 체크한다.
 
 ## 금지 구역
 - `.env`, 비밀 키(`SOLAPI_*`, `SUPABASE_SERVICE_ROLE_KEY`, `JWT_SECRET`, `ADMIN_TOKEN`)를 커밋하거나 화면·로그에 노출하지 않는다.

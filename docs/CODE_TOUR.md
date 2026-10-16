@@ -4,6 +4,8 @@
 작업 순서·규칙(새 API 추가법, 경로 규칙 등)은 `docs/DEVELOPMENT_GUIDE.md`, 실행 방법은 `README.md` 를 보세요.
 기능별 동작 흐름(로그인·주문·AI 추천 등)은 `docs/FLOW_USER_ADMIN.md`(손님·사장님 관점)와 `docs/FLOW_DEVELOPER.md`(개발자 관점)를 보세요.
 
+> **현재 상태 (2026-10-16)**: 서버에 실제로 구현된 것은 QR 로그인·문자 발송·고객 목록뿐이고, 나머지 엔드포인트는 `backend/app/dummy.py` 의 더미 응답이며 `services/stats.py`·`stores/shop_*.py` 는 시그니처와 TODO 만 있는 뼈대입니다(`AGENTS.md` 의 "더미 상태" 참고). 3-3·3-4·3-5절의 코드 예시는 이전 구현(커밋 `a8b3d14`)을 기준으로 한 "완성되면 이런 모양" 설명입니다. DB는 지금 SQLite(`app.db`)이고 Supabase 스키마(`docs/DB_SCHEMA.md`)로 옮기는 작업이 남아 있습니다.
+
 ## 1. 한 장 요약: 이 프로젝트는 "식당"이다
 
 테이블 오더는 식당 운영과 똑같이 생각하면 쉽습니다.
@@ -23,7 +25,7 @@
                      │
               backend/ (FastAPI 서버)
                      │
-              app.db (SQLite 파일)         ← 장부
+              app.db (SQLite 파일, 이후 Supabase) ← 장부
 ```
 
 ## 2. 폴더 지도
@@ -62,7 +64,7 @@ backend/
 | `stores/` | 창고지기. 장부(DB)를 읽고 쓰는 유일한 사람 | `shop_orders.py`, `members.py` … | SQL 은 여기에만 있다 |
 | `core/` | 정문 경비실과 설정표 | `settings.py`, `dependencies.py` | 누가 들어올 수 있는지 검사 |
 
-관리자 접수 창구는 기능별로 방이 나뉩니다: `menus / orders / members / stats / sms / content`.
+관리자 접수 창구는 기능별로 방이 나뉩니다: `menus / orders / members / stats / sms / content / system`.
 창구 한 곳에 몰아 두면 여러 명이 동시에 고칠 때 충돌하기 때문입니다.
 
 ### 2-2. user/ — 손님 화면
@@ -87,7 +89,7 @@ user/
 
 ### 2-3. admin/ — 관리자 화면
 
-`user/` 와 같은 구조입니다. `app.py`(로그인·사이드바 메뉴), `views/`(대시보드·메뉴·가중치·이벤트·고객·주문·직원호출·마케팅), `ui/widgets.py`, `admin_repository.py`(데이터 출입구), `admin_dummy_data.py`(가짜 서버), 그리고 `dashboard_stats.py`·`order_filters.py`·`marketing_ai.py` 같은 계산 모듈이 있습니다.
+`user/` 와 같은 구조입니다. `app.py`(로그인·사이드바 메뉴), `views/`(대시보드·메뉴·가중치·이벤트·고객·주문·마케팅·로그인), `ui/widgets.py`, `admin_repository.py`(데이터 출입구), `admin_dummy_data.py`(가짜 서버), 그리고 `dashboard_stats.py`·`order_filters.py`·`marketing_ai.py` 같은 계산 모듈이 있습니다.
 
 ### 2-4. 두 쪽의 대응표 (같은 역할은 같은 이름)
 
@@ -204,9 +206,9 @@ async def create_order(body: OrderIn, request: Request, member = Depends(optiona
 - AI 추천 세트는 `components`(세트 안의 메뉴들)를 가진 한 줄로 담기고, 품절 메뉴가 하나라도 있으면 담지 않고 안내(토스트)를 띄웁니다.
 
 **`state/roulette.py`** — 룰렛 = 가게의 뽑기 이벤트.
-- 기회는 **로그인한 회원당 1회**(`spins_left`).
+- 기회는 **로그인한 회원당 하루 1회**(`spins_left`, 한국 시간 기준이며 같은 날 다른 테이블에서도 불가. 서버가 최종 판정).
 - `pick_prize_index` : 칸마다 `weight`(관리자 '이벤트'에서 조정)에 **비례해** 당첨 칸을 뽑습니다. 모든 가중치가 0 이면 균등 확률. 사장님이 "꽝을 줄이고 서비스 메뉴를 늘리자"를 화면에서 바로 조정할 수 있는 구조입니다.
-- 당첨이 `할인`이면 `roulette_percent` 에 저장(더 큰 할인율만 유지) → 장바구니 계산이 자동 반영. `서비스 메뉴`면 0원짜리 항목으로 장바구니에 바로 담김.
+- 당첨은 바로 적용되지 않고 **쿠폰함**(`state/coupons.py`, 서버 `coupons`)에 담깁니다. 주문 화면의 "🎟️ 쿠폰함"에서 "사용"을 누르면 `할인`은 `roulette_percent` 에 저장되어(한 번에 하나) 장바구니 계산에 반영되고, `서비스 메뉴`는 0원짜리 항목으로 담깁니다. "취소"로 되돌릴 수 있고, 주문하면 서버가 `used_at` 을 기록합니다.
 - 화면이 보여 주는 회전 각도는 당첨 칸이 포인터 아래에 오도록 계산합니다(5바퀴 + 칸 중앙 근처).
 
 **`views/order.py`** — 주문 화면. 메뉴 카드를 만들 때 매운맛 단계가 있는 메뉴는 `group_spicy_variants` 로 한 카드에 묶고, 선택한 단계의 메뉴를 담습니다. 품절이면 버튼이 "품절"로 바뀌며 비활성화됩니다.
@@ -252,7 +254,7 @@ user/ui/dialogs.py confirm_dialog ("주문 확인" 팝업의 [주문하기] 버�
 
 | 위치 | 확인하는 것 | 비유 |
 |---|---|---|
-| `backend/tests/` | 서버 API 단독 (로그인, 문자, 관리자 API) | 주방 단독 점검 |
+| `backend/tests/` | 서버 API 단독 (로그인, 문자, 더미 응답, 쿠폰 등. 더미 상태인 기능의 테스트는 skip) | 주방 단독 점검 |
 | `user/test_*.py` | 장바구니·메뉴 묶기·추천·AI 질문 같은 계산 | 계산기 점검 |
 | `tests/` | 화면 ↔ 서버 연결 (QR 로그인 E2E, 관리자 데이터 소스) | 홀과 주방 연결 리허설 |
 

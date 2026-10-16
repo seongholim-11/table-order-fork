@@ -32,6 +32,7 @@ def create_app(settings: Settings | None = None, sms_clock=None, sms_http=None) 
         allow_headers=["Authorization", "Content-Type"],
     )
     db = Database(settings.database_url)
+    app.state.db = db  # DB 연결 점검(/admin/api/system/db)에서 쓴다
     app.state.login_store = LoginSessionStore(settings.login_ttl_seconds)
     app.state.members = MemberStore(db)
     app.state.coupons = CouponStore(db)

@@ -45,9 +45,12 @@ class TabletLoginStore:
                            (table_no, self._cutoff()))
         return [{**r, "eligible": bool(r["eligible"])} for r in rows]
 
-    def set_prize(self, table_no: int, member_id: int, prize: str) -> bool:
+    def set_prize(self, table_no: int, member_id: int, prize: str, prize_id: int | None = None) -> int | None:
         """룰렛 결과를 기록한다. 이미 돌린 회원이면 덮어쓰지 않는다 (회원당 1회). [뼈대]
 
+        prize_id: 당첨된 룰렛 칸(roulette_prizes.id). 모르면 None (prize_text 만 저장).
+
         TODO: 이 태블릿(table_no)의 가장 최근 로그인 기록(_cutoff 이후)을 찾아 prize_text 가 비어 있을 때만
-              prize_text·played_at 을 채우고, 기록돼 있으면 True / 없거나 이미 다른 값이면 False."""
+              prize_text·prize_id·played_at 을 채우고, 기록했으면 그 table_logins 행의 id 를 돌려준다
+              (coupons.issue 의 table_login_id 로 쓴다). 없거나 이미 다른 값이면 None."""
         raise NotImplementedError

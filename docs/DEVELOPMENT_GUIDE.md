@@ -2,6 +2,11 @@
 
 각자 맡은 API 를 만들 때 따라 할 순서와 약속을 모았습니다. 실행 방법은 `README.md` 를 먼저 보세요.
 
+- 담당 분배와 할 일은 프로젝트 파일의 `todo/TODO_*.md`, 경로·구현 현황은 `api/FBGrowth_API_경로_통합_정리_최종_v7_목록표만.md` 를 기준으로 합니다.
+- Git 흐름: 조직 리포를 **포크**해서 작업 브랜치(`feat/한글설명` 등)를 만들고, PR 은 본 리포의 **`dev`** 로만 보냅니다(`main` 직접 PR·push 금지). 자세한 규칙은 `AGENTS.md` 의 "Git 규칙".
+- 구현 중 부딪히는 충돌·오류와 해결: `docs/TODO_CONFLICTS_AND_ERRORS.md`.
+- **더미 엔드포인트를 실제 구현으로 바꾸는 순서**는 `AGENTS.md` 의 "더미 상태"(① 라우터의 `dummy.xxx()` 를 store/service 호출로 → ② `dummy.py` 함수와 `DUMMY_ENDPOINTS` 줄 삭제 → ③ 테스트 skip 제거)를 따릅니다.
+
 ## 0. 시작하기 (DB·서버 없이)
 
 ```bash
@@ -22,12 +27,12 @@ DATA_SOURCE=dummy streamlit run user/app.py                   # 서버 없이 �
 | 손님 | `/api/...` | `/api/v1/...` |
 | 관리자 | `/admin/api/...` | `/api/admin/...`, `/api/v1/owner/...` |
 
-분배서의 `/api/v1`, `/api/admin`, `/api/v1/owner` 는 기획용 이름이고, 구현은 위 코드 경로로 합니다. 경로를 바꾸기로 하면 팀이 같이 정하고 이 표를 먼저 고치세요.
+분배서·API 문서의 `/api/v1`, `/api/admin`, `/api/v1/owner` 는 기획용 이름이고, 구현은 위 코드 경로로 합니다(v7 문서 마지막 열에 실제 경로가 적혀 있음). 경로를 바꾸기로 하면 팀이 같이 정하고 이 표를 먼저 고치세요.
 
 ## 2. 서버에 API 하나 추가하기
 
 1. **요청 모델** 은 라우터 파일 위쪽에 pydantic 으로 (`routers/user.py` 의 `OrderIn` 참고).
-2. **라우터**: 손님용은 `routers/user.py`, 관리자용은 `routers/admin/` 안의 기능별 파일(`menus / orders / members / stats / sms / content`)에 `@router.get(...)` 로 추가합니다. 새 기능 파일을 만들면 `routers/admin/__init__.py` 의 목록에 등록합니다. 인증은 관리자 라우터에 이미 걸려 있고, 손님 로그인은 `Depends(current_member)` / `Depends(optional_member)`.
+2. **라우터**: 손님용은 `routers/user.py`, 관리자용은 `routers/admin/` 안의 기능별 파일(`menus / orders / members / stats / sms / content / system`)에 `@router.get(...)` 로 추가합니다. 새 기능 파일을 만들면 `routers/admin/__init__.py` 의 목록에 등록합니다. 인증은 관리자 라우터에 이미 걸려 있고, 손님 로그인은 `Depends(current_member)` / `Depends(optional_member)`.
 3. **저장소**: 새 테이블이면 `stores/` 에 파일을 만들어 `SCHEMA` 와 메서드를 두고 `factory.py` 에 등록합니다(상점 데이터는 `shop_*.py` 의 해당 파일에 추가). DB 접근은 `stores/` 의 메서드로만 하고 라우터에서 SQL 을 쓰지 않습니다. 라우터에서는 `request.app.state.shop.xxx()` 로 부릅니다.
 4. **테스트**: `backend/tests/` 에 `client` 픽스처(`conftest.py`)로 추가.
 5. **오류 응답**: 일반 오류는 `HTTPException(상태코드, "한국어 메시지")`. 여러 문제를 한 번에 알려야 할 때만 `{"problems": [...]}` 를 쓰고, 화면에서 둘 다 처리합니다 (문자 발송이 예).
@@ -52,12 +57,13 @@ DATA_SOURCE=dummy streamlit run user/app.py                   # 서버 없이 �
 
 ## 5. 여러 명이 같이 고치는 파일
 
-충돌이 잦은 곳이니 작은 PR 로 자주 합치고, 같은 파일을 고치는 사람끼리 미리 알려 주세요.
+충돌이 잦은 곳이니 작은 PR 로 자주 합치고, 같은 파일을 고치는 사람끼리 미리 알려 주세요. (충돌별 해결 방법은 `docs/TODO_CONFLICTS_AND_ERRORS.md`)
 
-| 파일 | 같이 쓰는 담당 |
+| 파일 | 왜 겹치나 |
 |---|---|
-| `backend/app/stores/shop_menus.py` / `shop_orders.py` / `shop_calls.py` / `shop_recommendations.py` (테이블별로 나뉨, `shop.py` 가 `ShopStore` 로 합침) | 메뉴·주문 D, 직원 호출 E, 추천 기록 C (+ B 통계) |
-| `backend/app/seed/content.json` (`tools/export_dummy_seed.py` 로 생성) | C, D, E |
+| `backend/app/dummy.py` (더미 함수 + `DUMMY_ENDPOINTS`) | 더미를 지울 때마다 이웃한 줄을 고침 |
+| `backend/app/routers/user.py` | 손님용 라우트(메뉴·주문·룰렛·쿠폰·직원 호출·AI)가 한 파일 |
+| `backend/app/stores/shop_menus.py` / `shop_orders.py` / `shop_calls.py` / `shop_recommendations.py` (테이블별로 나뉨, `shop.py` 가 `ShopStore` 로 합침) | 메뉴·주문·직원 호출·추천 기록 담당이 각각 다름. 주문 테이블 스키마는 통계 담당과 서로 알리기 |
+| `backend/app/seed/content.json` (`tools/export_dummy_seed.py` 로 생성) | 카테고리·룰렛·질문·규칙을 여러 명이 고침 |
+| `backend/app/services/stats.py` | 통계·AI 추천 담당 |
 | `admin/admin_repository.py`, `admin/admin_dummy_data.py` | 전원 |
-| `backend/app/services/stats.py` | B, C |
-| 주문 테이블 스키마 | B, D (바꾸면 서로 알리기) |

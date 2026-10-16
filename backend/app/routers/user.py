@@ -113,6 +113,7 @@ class PrizeIn(BaseModel):
     emoji: str = Field(default="🎁", max_length=8)
     percent: int | None = Field(default=None, ge=1, le=100)
     item_id: str | None = Field(default=None, max_length=40)
+    prize_id: int | None = None  # 당첨된 룰렛 칸 id(roulette_prizes.id). 화면이 아직 모르면 생략해도 된다
 
 
 def _tablet_rows(request: Request, table_no: int, member: dict) -> list[dict]:
@@ -136,8 +137,8 @@ async def tablet_login_prize(table_no: int, body: PrizeIn, request: Request, mem
     TODO: 이 태블릿에 로그인한 회원인지 확인(_tablet_rows, 아니면 404).
     TODO: 회원당 하루 1회(KST) 검사 coupons.issued_today(member_id) → 이미 돌렸으면 409.
     TODO: kind 가 있으면 할인은 percent, 서비스는 item_id 필수(아니면 422).
-    TODO: tablet_logins.set_prize(table_no, member_id, prize) 로 당첨 기록 → 이미 기록돼 있으면 409.
-    TODO: kind 가 있으면 coupons.issue(...) 로 쿠폰 발급.
+    TODO: login_id = tablet_logins.set_prize(table_no, member_id, prize, prize_id) 로 당첨 기록 → None 이면(이미 기록) 409.
+    TODO: kind 가 있으면 coupons.issue(..., prize_id=prize_id, table_login_id=login_id) 로 쿠폰 발급.
     """
     return dummy.prize_saved(body.prize, body.kind, body.emoji, body.percent, body.item_id)
 

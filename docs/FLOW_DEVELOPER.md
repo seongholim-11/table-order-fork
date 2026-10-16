@@ -3,7 +3,12 @@
 `docs/FLOW_USER_ADMIN.md` 에서 본 손님·사장님 이야기를 **"어느 파일의 어느 함수가 일을 하는가"** 로 다시 따라가는 문서입니다.
 폴더 지도와 핵심 코드 설명은 `docs/CODE_TOUR.md`, 새 API 추가 순서와 규칙은 `docs/DEVELOPMENT_GUIDE.md` 에 있고, 여기서는 중복하지 않고 **흐름(누가 → 누구를 호출 → 어디에 저장)** 만 다룹니다.
 
-비유는 이어집니다: **홀(`user/`) → 서빙 직원(`shared/api.py`) → 카운터(`routers/`) → 두뇌(`services/`) → 창고지기(`stores/`) → 장부(SQLite)**.
+비유는 이어집니다: **홀(`user/`) → 서빙 직원(`shared/api.py`) → 카운터(`routers/`) → 두뇌(`services/`) → 창고지기(`stores/`) → 장부(SQLite, 이후 Supabase)**.
+
+> **읽기 전에 (2026-10-16 갱신)**: 지금 서버에 실제로 구현된 것은 QR 로그인·고객 목록·수신거부·문자 발송(2·7-5절)뿐이고, 나머지 엔드포인트는 `backend/app/dummy.py` 의 더미 응답입니다(`AGENTS.md` 의 "더미 상태" 참고). 3~6절과 7절 일부는 **이전 구현(커밋 `a8b3d14`)의 흐름을 구현 기준으로 남긴 것**이라, 팀원이 더미를 실제 DB로 바꿀 때 "이렇게 동작해야 한다"는 명세로 읽으세요. 코드에 남은 이름이 문서와 다르면 아래 결정이 우선합니다.
+> - 주문 상태(접수/조리중/서빙완료) 기능·UI 없음. 관리자 직원 호출 화면과 `content` 테이블 저장소는 삭제됨(손님의 직원 호출 버튼과 `POST /api/calls` 는 남아 있음).
+> - 룰렛은 회원당 하루 1회(KST), 당첨은 쿠폰함(`coupons`)에 넣고 주문 시 `used_at` 기록. 로그인 기록 테이블은 새 스키마에서 `table_logins` 입니다(`stores/tablet_logins.py` 의 옛 이름 `tablet_logins` 와 같은 역할).
+> - 방문 횟수는 로그인할 때마다 +1. 새 DB 설계는 `docs/DB_SCHEMA.md`.
 
 ## 0. 먼저 알아둘 두 가지
 
@@ -102,7 +107,7 @@ sequenceDiagram
 
 ### 2-3. 로그인 이후 세션 상태 (`finish_login`)
 
-`ss.member`, `ss.access_token`(JWT) 저장 → `ss.members` 에 이 태블릿의 로그인 기록 추가 → 처음 보는 회원 id 면 `eligible=True`(룰렛 기회) 로 기록. 기회 판정은 이 태블릿 세션의 `granted_ids` 와 서버의 `tablet_logins.eligible` 을 함께 봅니다. 서버는 오늘(KST) 이미 쿠폰을 받은 회원이면 어느 테이블이든 `eligible=false` 로 기록하고 룰렛 저장을 409 로 거절하므로, 다른 날에는 다시 돌릴 수 있습니다.
+`ss.member`, `ss.access_token`(JWT) 저장 → `ss.members` 에 이 태블릿의 로그인 기록 추가 → 처음 보는 회원 id 면 `eligible=True`(룰렛 기회) 로 기록. 기회 판정은 이 태블릿 세션의 `granted_ids` 와 서버의 `tablet_logins.eligible` 을 함께 봅니다. 서버는 오늘(KST) 이미 룰렛을 돌린 회원이면 어느 테이블이든 `eligible=false` 로 기록하고 룰렛 저장을 409 로 거절하므로, 다른 날에는 다시 돌릴 수 있습니다(회원당 하루 1회).
 
 이후 서버 호출에 쓰이는 토큰: 주문/추천 기록은 `optional_member`(없거나 잘못되면 비회원), 내 정보 조회·수신거부는 `current_member`(없으면 401). JWT 는 `services/tokens.py` 로 발급·검증, 유효시간 `jwt_expire_minutes`(기본 720분).
 
@@ -121,8 +126,8 @@ sequenceDiagram
 | 사용 처리 | 주문 확인창에서 `pending_coupon_ids()` 를 `POST /api/orders` 의 `coupon_ids` 로 보내면 서버가 `used_at` 기록(이 태블릿 회원만, 이미 쓴 쿠폰은 무시). 이어서 `consume_applied()` 가 화면 상태를 정리 |
 | 조회 | `GET /api/v1/coupons`(내 쿠폰), `GET /api/tables/{n}/coupons`(이 태블릿 회원들의 쿠폰, 팝업이 사용) |
 
-- 룰렛 칸 설정은 서버의 `content.roulette_prizes` 이고, 관리자가 `PUT /admin/api/content/roulette_prizes` 로 교체합니다. 서버는 `_check_roulette` 로 **칸 2~8개, 종류별 필수값, weight 0 이상이고 합 > 0** 을 검증합니다(`routers/admin/content.py`).
-- 룰렛 결과(`tablet_logins.prize`)와 쿠폰(`coupons`)은 서버에 저장됩니다. 서버가 안 닿을 때 받은 쿠폰은 `id=None` 인 이 세션 안의 쿠폰으로만 남고, 주문 시 서버에 사용 처리를 보내지 못합니다.
+- 룰렛 칸 설정은 서버의 `roulette_prizes`(지금 더미에서는 `seed/content.json` 의 `roulette_prizes`)이고, 관리자가 `PUT /admin/api/content/roulette_prizes` 로 교체합니다. 구현할 때 **칸 2~8개, 종류별 필수값, weight 0 이상이고 합 > 0** 을 검증해야 합니다(규칙은 `routers/admin/content.py` 의 TODO 주석).
+- 룰렛 결과(`table_logins` 의 당첨 문구·`prize_id`)와 쿠폰(`coupons`)은 서버에 저장됩니다. 서버가 안 닿을 때 받은 쿠폰은 `id=None` 인 이 세션 안의 쿠폰으로만 남고, 주문 시 서버에 사용 처리를 보내지 못합니다.
 - 애니메이션은 `user/ui/roulette.py`(CSS 회전)가 `ss.roulette` 의 `angle`/`animate` 를 읽어 그립니다.
 
 ---
@@ -159,10 +164,10 @@ sequenceDiagram
 
 핵심만 정리하면:
 
-- **서버 검증은 형식 검증뿐**입니다. 가격(`unit`, `total`)은 **화면이 보낸 값을 그대로 저장**합니다. 서버가 메뉴 가격표와 대조하지 않으므로, 운영 전에는 서버에서 금액을 다시 계산하는 보강이 필요합니다(`docs/PRODUCTION_PLAN.md` 참고).
+- **서버 검증은 형식 검증뿐**입니다. 가격(`unit`, `total`)은 **화면이 보낸 값을 그대로 저장**합니다. 서버가 메뉴 가격표와 대조하지 않으므로, 운영 전에는 서버에서 금액을 다시 계산하는 보강이 필요합니다.
 - 회원이면 `Authorization: Bearer <JWT>` 가 같이 가고 `optional_member` 가 `member_id` 를 채웁니다. 토큰이 틀려도 오류 없이 **비회원 주문**으로 저장됩니다.
 - `lines` 는 JSON 문자열로 `orders.lines` 컬럼에 저장되고 읽을 때 `_order` 가 풀어 줍니다. AI 조합이 있으면 `ai_combo=1` 이 따로 저장되어 적중률 통계의 분자가 됩니다.
-- 화면의 `orders`(주문내역 팝업)는 **세션에만** 있는 목록이고, 상태 변화(접수/조리중/서빙완료)는 `time.time()` 경과로 만든 연출입니다. 서버에 주문 상태 필드는 아직 없습니다.
+- 화면의 `orders`(주문내역 팝업)는 **세션에만** 있는 목록이며 상태 표시는 없습니다(주문 상태 기능은 두지 않기로 함). 테이블 누적 주문(`GET /v1/tables/{id}/orders`)은 `table_logins` 의 로그인 시각 이후 주문만 합산합니다.
 - 서버가 안 닿으면 `server.safe_call` 이 `None` 을 돌려 주문번호는 세션 내 순번(`len(orders)+1`)이 됩니다 — 이때 서버에는 아무것도 저장되지 않습니다.
 
 ---
@@ -199,14 +204,11 @@ sequenceDiagram
 
 ```
 손님  staff_dialog (ui/dialogs.py)  ─ REPO.create_call(table, items) ─▶ POST /api/calls
-                                                                   └▶ shop.add_call → calls 테이블 (done=0)
-사장님 admin/views/calls.py: render_waiting (fragment, 15초마다) ─▶ GET /admin/api/calls
-        [처리 완료] → finish() → POST /admin/api/calls/{id}/done → shop.finish_call (done=1)
+                                                                   └▶ shop.add_call → staff_calls 테이블
 ```
 
-- 손님 쪽 `POST /api/calls` 는 인증이 없습니다(테이블 번호만 필요). 호출 항목 목록 자체는 `content.staff_calls` 이고, 관리자 "호출 항목 설정" 탭이 `PUT /admin/api/content/staff_calls` 로 교체합니다.
-- 관리자 화면은 서버가 준 JSON 을 `AdminRepository.staff_calls()` 에서 pandas 표(`호출 시각`, `처리 완료` 등)로 바꿔 씁니다. 화면 코드는 서버 JSON 을 직접 보지 않습니다.
-- 푸시/웹소켓이 아니라 **폴링**입니다. 그래서 호출이 사장님 화면에 뜨기까지 최대 15초 걸립니다.
+- 손님 쪽 `POST /api/calls` 는 인증이 없습니다(테이블 번호만 필요). 호출 항목 목록 자체는 `staff_calls`(콘텐츠, 새 스키마의 `staff_call_items`)입니다.
+- **관리자 직원 호출 화면(`admin/views/calls.py`)과 처리 완료 API(`/admin/api/calls`)는 삭제됐습니다.** `staff_calls.done_at` 컬럼만 남겨 두어, 되살릴 때 마이그레이션이 필요 없게 했습니다. (API v7 의 2-11 직원 호출 관리 행은 이 기능의 기록입니다.)
 
 ---
 
@@ -225,7 +227,7 @@ admin/views/xxx.py        표·폼을 그린다 (repo.xxx() 만 호출)
 admin/admin_repository.py AdminRepository  서버 JSON → pandas 표 변환, 입력 검증(CategoryError 등)
                           └ backend = ApiBackend (HTTP) 또는 admin_dummy_data.DummyBackend (가짜 서버)
 shared/api.py             HTTP
-routers/admin/*.py        menus / orders / members / stats / sms / content
+routers/admin/*.py        menus / orders / members / stats / sms / content / system
 ```
 
 `ApiBackend` 와 `DummyBackend` 는 **같은 이름·같은 JSON 모양의 메서드**를 가져야 하며, `tests/test_admin_data_source.py` 가 이를 확인합니다.
@@ -234,7 +236,7 @@ routers/admin/*.py        menus / orders / members / stats / sms / content
 
 1. 관리자 표 편집 → `AdminRepository.save_menu` → `PUT /admin/api/menus/{id}` → `shop.save_menu`(없는 id 면 신규: name·cat·price 필수).
 2. 손님 쪽은 `GET /api/menus` 를 `_fetch_content` 가 **최대 10초 캐시**하다가 다음 실행 때 읽어 반영합니다.
-3. 카테고리·룰렛·호출 항목은 "콘텐츠" 단위로 **통째 교체**(`PUT /admin/api/content/{이름}`): 이름이 없으면 404, 기존과 타입이 다르거나 비어 있으면 422. 부분 수정이 아니므로 동시에 두 사람이 고치면 나중 저장이 덮어씁니다.
+3. 카테고리·룰렛 등은 "콘텐츠" 단위로 **통째 교체**(`PUT /admin/api/content/{이름}`)합니다(구현할 때 이름이 없으면 404, 기존과 타입이 다르거나 비어 있으면 422). 부분 수정이 아니므로 동시에 두 사람이 고치면 나중 저장이 덮어씁니다.
 
 ### 7-4. 통계와 고객 등급
 
@@ -264,17 +266,17 @@ routers/admin/*.py        menus / orders / members / stats / sms / content
 
 | 기능 | 호출하는 화면 코드 | 엔드포인트 | 서버 처리 | 저장 위치 |
 |---|---|---|---|---|
-| 콘텐츠 읽기 | `user_repository._fetch_content` | `GET /api/store`, `/api/menus`, `/api/content` | `shop.menus`, `content.all` | `menus` 테이블, content |
+| 콘텐츠 읽기 | `user_repository._fetch_content` | `GET /api/store`, `/api/menus`, `/api/content` | `shop.menus`, 더미 `content()` | `menus` 테이블, `seed/content.json`(content 저장소는 삭제됨) |
 | QR 발급 | `user/server.py:create_qr` | `POST /api/auth/qr` | `login_store.create` | 메모리 |
 | 로그인 확인 | `server.poll_login` | `GET /api/auth/qr/{secret}` | `status`/`claim` | 메모리 |
 | 로그인 완료 | (휴대폰 브라우저) | `GET /api/auth/kakao/callback` | `members.upsert_login`, JWT 발급 | `members` |
 | 내 정보 조회·수신거부 | (화면 호출 없음) | `GET /api/members/me`, `POST /api/members/me/opt-out` | `current_member` | `members` |
 | 주문 | `REPO.create_order` | `POST /api/orders` | `shop.add_order` | `orders` |
-| 직원 호출 | `REPO.create_call` | `POST /api/calls` | `shop.add_call` | `calls` |
+| 직원 호출 | `REPO.create_call` | `POST /api/calls` | `shop.add_call` | `staff_calls` |
 | 추천 노출 | `REPO.log_recommendation` | `POST /api/recommendations` | `shop.add_recommendation` | `recommendation_events` |
 | 관리자 메뉴 | `ApiBackend.save_menu` 등 | `GET/PUT/DELETE /admin/api/menus` | `shop.save_menu` | `menus` |
-| 관리자 콘텐츠 | `save_roulette_prizes` 등 | `PUT /admin/api/content/{이름}` | `content.set` + 검증 | content |
-| 주문·호출 조회/처리 | `orders()`, `finish_call()` | `GET /admin/api/orders`, `/calls`, `POST /calls/{id}/done` | `shop.orders`, `finish_call` | `orders`, `calls` |
+| 관리자 콘텐츠 | `save_roulette_prizes` 등 | `PUT /admin/api/content/{이름}` | (더미: 받은 값을 그대로 반환, 구현 시 해당 테이블에 통째 교체 + 검증) | `categories`, `roulette_prizes` 등 |
+| 주문 조회 | `orders()` | `GET /admin/api/orders` | `shop.orders` | `orders` |
 | 고객·등급 | `members(rule)` | `GET /admin/api/members` | `grade_of` | `members` |
 | 통계 | `stats(rule)` | `GET /admin/api/stats` | `stats.dashboard` | (계산) |
 | 문자 | `sms_preview`/`sms_send` 등 | `/admin/api/marketing/sms/*` | `SmsService` | `sms_logs` |
@@ -286,8 +288,7 @@ routers/admin/*.py        menus / orders / members / stats / sms / content
 | 한계 | 어디서 확인 | 영향 |
 |---|---|---|
 | 주문 금액을 서버가 재계산하지 않음 | `routers/user.py:OrderIn`, `create_order` | 조작된 요청이면 임의 금액 저장 가능 |
-| 주문 상태(조리중 등)가 서버에 없음 | `ui/dialogs.py:orders_dialog`, `orders` 스키마 | 손님 화면 상태는 시간 연출 |
-| 룰렛 "회원당 1회"가 태블릿 세션 기준 | `state/login.py:finish_login` | 새로고침·다른 태블릿에서 재참여 가능 |
+| 룰렛 "회원당 하루 1회"는 서버가 판정해야 함 | `state/login.py:finish_login`, `stores/tablet_logins.py` | 화면 세션만 보면 새로고침·다른 태블릿에서 재참여 가능. 서버(`table_logins` 부분 유니크)가 막아야 함 |
 | QR 로그인 세션이 메모리 | `stores/login_sessions.py` | 서버 재시작·다중 프로세스에서 유실 |
 | 서버 오프라인 시 주문이 조용히 저장 안 됨 (`auto`) | `AutoRepository.create_order` | 운영은 `DATA_SOURCE=api` 권장 |
 | 날씨는 더미 | `ai_quiz_data.WEATHER` | 추천의 날씨 가산이 실제와 무관 |
@@ -299,7 +300,7 @@ routers/admin/*.py        menus / orders / members / stats / sms / content
 1. **주문**: `ui/cart.py` → `state/cart.py` → `ui/dialogs.py:confirm_dialog` → `user_repository.py:create_order` → `routers/user.py:create_order` → `stores/shop_orders.py`
 2. **로그인**: `ui/login.py` → `state/login.py` → `user/server.py` → `routers/auth.py` → `stores/login_sessions.py` → `stores/members.py`
 3. **AI 추천**: `views/ai.py` → `recommendations.py:recommend_combos` → `recommendation_data.py`(규칙) → `state/cart.py:add_combo`
-4. **관리자 한 화면**: `admin/views/calls.py` → `admin_repository.py`(AdminRepository → ApiBackend) → `routers/admin/orders.py` → `stores/shop_calls.py`
+4. **관리자 한 화면**: `admin/views/orders.py` → `admin_repository.py`(AdminRepository → ApiBackend) → `routers/admin/orders.py` → `stores/shop_orders.py`
 5. **통계·문자**: `services/stats.py`, `services/grades.py`, `services/sms.py` (서비스 계층이라 DB 없이 읽어도 이해됨)
 
 테스트로 흐름을 확인하려면: `tests/test_qr_login_e2e.py`(로그인 전 과정), `tests/test_sms_admin_e2e.py`(문자), `user/test_cart.py`·`user/test_recommendations.py`(장바구니·추천 계산).

@@ -37,10 +37,15 @@ class CouponStore:
 
     # ---- 아래는 [뼈대]: 시그니처만 남겼다. 지금은 라우터가 dummy.py 응답을 돌려준다.
     def issue(self, member_id: int, table_no: int, kind: str, label: str, emoji: str,
-              percent: int | None, item_id: str | None) -> dict:
+              percent: int | None, item_id: str | None,
+              prize_id: int | None = None, table_login_id: int | None = None) -> dict:
         """룰렛 당첨 쿠폰을 발급하고 get() 모양으로 돌려준다.
 
-        TODO: coupons INSERT (menu_id 칸에 item_id, issued_at 은 now_iso()) 후 get() 으로 반환."""
+        prize_id: 당첨된 룰렛 칸(roulette_prizes.id). 모르면 None (시연에는 없어도 동작).
+        table_login_id: 이 룰렛을 돌린 로그인 기록(table_logins.id). tablet_logins.set_prize 가 돌려준 값을 넣는다.
+                        coupons.table_login_id 가 UNIQUE 라서 '룰렛 1번 = 쿠폰 1장'을 DB 가 보장해 준다.
+
+        TODO: coupons INSERT (menu_id 칸에 item_id, prize_id·table_login_id 칸에 위 값, issued_at 은 now_iso()) 후 get() 으로 반환."""
         raise NotImplementedError
 
     def get(self, coupon_id: int) -> dict | None:

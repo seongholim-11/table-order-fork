@@ -1,0 +1,24 @@
+# 팀원 공지
+
+## 먼저 읽을 것
+1. `AGENTS.md` — 프로젝트 규칙, 실행·테스트 명령, 더미 상태, 제품 규칙, Git 규칙
+2. `docs/todo/TODO_본인이름.md` — 내가 맡은 일 (성호·재현·수용·서준·석원)
+3. `docs/TODO_CONFLICTS_AND_ERRORS.md` — 작업 중 겹치기 쉬운 파일과 오류 해결법
+
+## 문서 위치
+| 문서 | 위치 |
+|---|---|
+| 담당자별 TODO | `docs/todo/` |
+| API 경로 기준(v7), 담당 분배표 | `docs/api/` |
+| 충돌·오류 가이드 | `docs/TODO_CONFLICTS_AND_ERRORS.md` |
+| 새 API 추가 순서·규칙 | `docs/DEVELOPMENT_GUIDE.md` |
+| DB 설계, 실행용 SQL | `docs/DB_SCHEMA.md`, `docs/db/fbgrowth_schema.sql` |
+| 기능 흐름, 코드 지도 | `docs/FLOW_USER_ADMIN.md`, `docs/FLOW_DEVELOPER.md`, `docs/CODE_TOUR.md` |
+
+## 작업 방법
+- 본 리포를 포크 → 작업마다 `feat/한글설명` 브랜치 → PR은 본 리포 **`dev`** 로만. `main`은 SEONGHO가 확인 후 머지한다.
+- 시작 전 본 리포 `dev`를 내 포크에 최신으로 맞춘다.
+- PR 전에 `cd backend && uv run pytest -q`, 루트에서 `python -m pytest tests -q`가 통과해야 한다.
+- 끝낸 TODO 항목은 `- [x]`로 체크하고 진행 순서 표 상태도 고쳐서 같은 PR에 넣는다.
+- PR 본문에는 변경 내용·테스트 방법·테스트 결과·미해결 문제(없으면 "없음")를 적는다.
+- 수정 파일은 최소로, 새 코드에는 한국어 주석을 단다. `.env`와 비밀 키는 커밋하지 않는다.

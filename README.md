@@ -1,6 +1,8 @@
 # Table Order
 
-FastAPI 서버 + 사용자 페이지 + 관리자 페이지를 한 저장소에서 관리하는 모노레포입니다.
+FastAPI 서버 + 사용자 페이지 + 관리자 페이지를 한 저장소에서 관리하는 모노레포입니다. (역전할머니맥주 홍대점 시연용)
+
+> **현재 상태**: 서버에 실제로 구현된 기능은 **QR 로그인**, **문자 발송(솔라피)**, **고객 목록·수신거부**입니다. 나머지 엔드포인트는 `backend/app/dummy.py` 의 더미 응답을 돌려주고 저장하지 않습니다(팀원이 하나씩 DB로 구현 중). 자세한 내용은 `AGENTS.md` 의 "더미 상태"를 보세요.
 
 ```
 backend/   FastAPI 서버 (app factory 구조: core / routers / services / stores)
@@ -21,10 +23,10 @@ shared/    두 페이지가 같이 쓰는 API 호출 코드
 | `state/` | `st.session_state` 조작과 계산 (장바구니·로그인·퀴즈 등), `context.py` 는 매장 데이터 | `services/` |
 | `shared/api.py`, `*_repository.py` | 서버/더미 데이터 호출 | `stores/` |
 
-- `admin/`: `views/`(대시보드·메뉴·가중치·이벤트·고객·주문·직원호출·마케팅·로그인), `ui/widgets.py`
+- `admin/`: `views/`(대시보드·메뉴·가중치·이벤트·고객·주문·마케팅·로그인), `ui/widgets.py`
 - `user/`: `views/`(splash·order·ai), `ui/`(common·cart·dialogs·login·roulette), `state/`(session·cart·login·roulette·quiz·context)
 - 새 모듈은 저장소 루트 기준으로 `from user.state.cart import ...`, `from admin.ui.widgets import ...` 처럼 import 합니다. (예전부터 있는 `admin_repository`, `user_repository`, `server` 등 최상위 모듈은 폴더 이름 없이 import 합니다. 자세한 규칙은 `docs/DEVELOPMENT_GUIDE.md`)
-- 서버 관리자 API 는 `backend/app/routers/admin/` 안에 기능별 파일(menus·orders·members·stats·sms·content)로 나뉘어 있습니다.
+- 서버 관리자 API 는 `backend/app/routers/admin/` 안에 기능별 파일(menus·orders·members·stats·sms·content·system)로 나뉘어 있습니다.
 
 ## 실행
 
@@ -54,10 +56,16 @@ streamlit run admin/app.py --server.port 8502   # 관리자 (현재 토큰 입�
   # → {"ok": true, "dry_run": true, "type": "SMS", "request_id": "dryrun-...", "to": "01012345678"}
   ```
   `SMS_DRY_RUN=true` 면 실제 전송 없이 기록만, 실패 시 409 + `{"detail": {"ok": false, "problems": [...]}}`.
-- 자세한 계획과 체크리스트: `docs/PRODUCTION_PLAN.md`
+- QR 로그인·솔라피 문자 구현 기준과 카카오/Supabase 로그인 설정 가이드: `docs/PRODUCTION_PLAN.md`
 - 팀원용 개발 가이드(새 API 추가 순서, 경로 규칙, DB 스키마 변경 규칙): `docs/DEVELOPMENT_GUIDE.md`
-- 핵심 기능 플로우(로그인·룰렛·주문·AI 추천·직원 호출·문자): 손님·사장님 관점 `docs/FLOW_USER_ADMIN.md`, 개발자 관점 `docs/FLOW_DEVELOPER.md`
-- DB 설계(테이블·결정 사항·API v6 대응, 실행용 SQL은 `docs/db/fbgrowth_schema.sql`): `docs/DB_SCHEMA.md`
+- 핵심 기능 플로우(로그인·룰렛·쿠폰함·주문·AI 추천·직원 호출·문자): 손님·사장님 관점 `docs/FLOW_USER_ADMIN.md`, 개발자 관점 `docs/FLOW_DEVELOPER.md`
+- DB 설계(테이블·결정 사항·API 대응, 실행용 SQL은 `docs/db/fbgrowth_schema.sql`): `docs/DB_SCHEMA.md`
+- 코드 둘러보기(폴더 지도·핵심 코드 설명): `docs/CODE_TOUR.md`
+- TODO 구현 중 예상 충돌·오류와 해결 방법: `docs/TODO_CONFLICTS_AND_ERRORS.md`
+- 담당자별 TODO(성호·재현·수용·서준·석원): `docs/todo/TODO_*.md` (끝낸 항목은 `- [x]`로 체크해 PR에 포함)
+- API 경로 기준(v7)과 담당 분배표: `docs/api/`
+- 팀원 공지(문서 위치·작업 순서 요약): `docs/NOTICE_TEAM.md`
+- 협업 규칙: 조직 리포를 **포크**해서 `feat/한글설명` 같은 브랜치로 작업하고, PR 은 본 리포의 **`dev`** 로만 보냅니다(`main` 은 SEONGHO 가 확인 후 머지). 자세한 내용은 `AGENTS.md` 의 "Git 규칙".
 
 ## Streamlit Community Cloud 배포 (user·admin 각각)
 
@@ -65,8 +73,8 @@ streamlit run admin/app.py --server.port 8502   # 관리자 (현재 토큰 입�
 
 | 앱 | Repository | Branch | Main file path | 권장 URL |
 |---|---|---|---|---|
-| 사용자 | `seongholim-11/table-order` | `main` | `user/app.py` | `…-user.streamlit.app` |
-| 관리자 | `seongholim-11/table-order` | `main` | `admin/app.py` | `…-admin.streamlit.app` |
+| 사용자 | `aio-03-p1-team1/table-order` (또는 배포용 포크) | `main` | `user/app.py` | `…-user.streamlit.app` |
+| 관리자 | `aio-03-p1-team1/table-order` (또는 배포용 포크) | `main` | `admin/app.py` | `…-admin.streamlit.app` |
 
 - 의존성은 루트 `requirements.txt`, 테마는 루트 `.streamlit/config.toml` 을 두 앱이 함께 씁니다. Python 버전은 Advanced settings 에서 3.11 이상을 고르세요.
 - Advanced settings → **Secrets** (TOML, 최상위 키는 환경 변수로도 읽힙니다):
@@ -98,16 +106,18 @@ DATA_SOURCE=dummy streamlit run admin/app.py     # 로그인 토큰은 ADMIN_TOK
 
 - 더미 파일은 서버 응답과 **같은 JSON 모양**이라 변환 코드가 필요 없습니다. 서버 초기 데이터는 `python tools/export_dummy_seed.py` 로 더미에서 만듭니다.
 - 새 데이터를 API로 바꾸려면: 저장소의 `ENDPOINTS` 에 경로 추가 → 가져오는 줄 추가 → 서버 응답을 더미와 같은 모양으로 맞추기. 맞는지는 `tests/test_admin_data_source.py`, `backend/tests/test_shop_admin.py` 의 계약 테스트가 확인합니다.
-- 콘텐츠(카테고리·룰렛·직원호출 항목·AI 질문·추천 규칙)는 `GET /api/content`, 관리자는 `PUT /admin/api/content/{이름}` 으로 고칩니다.
+- 콘텐츠(카테고리·룰렛·직원호출 항목·AI 질문·추천 규칙)는 `GET /api/content`, 관리자는 `PUT /admin/api/content/{이름}` 으로 고치도록 되어 있으나, 지금은 둘 다 더미(`seed/content.json` 을 읽고, 저장은 하지 않음)입니다. 새 스키마에서는 `content` 테이블 없이 카테고리·룰렛 칸 등을 각각의 테이블로 나눕니다(`docs/DB_SCHEMA.md`).
 - 서버 데이터는 10초 캐시되어 관리자가 바꾼 가격·품절이 곧 반영됩니다.
 
 ## 테스트
 
 ```bash
-(cd backend && python -m pytest)          # 백엔드
-python -m pytest tests                    # user·admin ↔ 백엔드 통합
+(cd backend && uv run pytest -q)          # 백엔드
+python -m pytest tests -q                 # 화면+통합 (streamlit·pytest·backend 의존성이 모두 설치된 환경)
 (cd user && python -m unittest test_ai_quiz test_cart test_recommendations)
 ```
+
+- 완료 기준은 위 두 pytest 가 실패 없이 통과하는 것입니다(더미 상태인 기능의 테스트는 skip). 린터·포매터·빌드 설정은 없습니다.
 
 ## 규칙
 
