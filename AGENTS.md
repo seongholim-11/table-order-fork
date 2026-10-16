@@ -13,12 +13,13 @@ cp .env.example .env
 uv sync
 uv run fastapi dev main.py
 
+# 페이지 (backend/.env 의 APP_ENV=dev 면 손님은 모의 회원으로 자동 로그인, 관리자는 토큰 생략. dev 가 아니면 우회 없음)
 # 페이지 (저장소 루트에서, 서버가 켜져 있어야 QR 로그인·문자 발송이 동작)
 uv venv .venv
 source .venv/Scripts/activate   # macOS/Linux 는 source .venv/bin/activate
 uv pip install -r requirements.txt
 streamlit run user/app.py --server.port 8501    # 사용자 (?table=12 로 테이블 지정)
-streamlit run admin/app.py --server.port 8502   # 관리자 (현재 토큰 입력 생략. 끄려면 ADMIN_SKIP_TOKEN=0, 토큰은 ADMIN_TOKEN)
+streamlit run admin/app.py --server.port 8502   # 관리자 (APP_ENV=dev 면 토큰 입력 생략. 끄려면 ADMIN_SKIP_TOKEN=0, 토큰은 ADMIN_TOKEN)
 ```
 - 서버 테스트: `cd backend && uv run pytest -q`
 - 화면+통합 테스트: 저장소 루트에서 `python -m pytest tests -q` (streamlit·pytest·backend 의존성이 모두 설치된 환경 필요)
@@ -65,7 +66,41 @@ streamlit run admin/app.py --server.port 8502   # 관리자 (현재 토큰 입�
 ## Git 규칙
 - 조직 소유 본 리포를 팀원이 각자 **포크**해서 개발하고, **PR은 본 리포의 `dev` 브랜치로만** 보낸다. `main`으로 직접 PR·push 하지 않는다.
 - 본 리포의 `main`에는 SEONGHO가 `dev`의 코드를 확인한 뒤 머지한다.
-- 포크한 본인 리포에서는 작업마다 새 브랜치를 만든다. 이름은 `feat/`·`fix/`·`docs/`·`refactor/`·`chore/`·`test/` + 한글 설명으로 짓는다(예: `feat/룰렛-하루-1회-제한`). `dev`·`main`에서 바로 작업하지 않는다.
+- 팀원은 포크한 본인 리포의 **`main`에서 계속 개발**한다(작업용 브랜치를 따로 만들지 않는다). 본 리포에는 팀원 포크의 `main`에서 `dev`로 PR을 보낸다. 본 리포 `main`에는 직접 PR·push 하지 않는다.
+- 작업을 시작하기 전에 본 리포 `dev`를 내 포크 `main`에 맞춘다(충돌을 줄이기 위해 작업 시작 전과 PR 직전에 한다):
+  ```bash
+  git remote add upstream https://github.com/aio-03-p1-team1/table-order.git   # 최초 1회
+  git fetch upstream && git pull --rebase upstream dev                        # 내 main에 최신 dev 반영
+  ```
 - PR을 보내기 전에 위 테스트를 돌려 통과를 확인한다. 문제가 있으면 PR을 보내지 말고 먼저 고치거나 보고한다.
-- PR 본문에는 **변경 내용, 테스트 방법, 테스트 결과, 미해결 문제**를 반드시 적는다(없으면 "없음").
+- **한 PR에는 TODO 항목 하나만** 담는다. 포크 `main`에서 바로 보내므로 여러 작업이 섞이면 일부만 되돌리기 어렵다. 한 항목을 끝내면 PR을 보내고, 머지된 뒤에 다음 항목을 시작한다.
+
+### 커밋 메시지
+- 첫 줄: `종류: 한글 요약` (종류는 `feat`·`fix`·`docs`·`refactor`·`chore`·`test`). 50자 안팎, 마침표 없이 "~추가", "~수정"처럼 끝낸다.
+- 빈 줄 다음 본문에 **무엇을·왜** 바꿨는지 적는다. TODO 항목이 있으면 번호를 쓴다(예: `TODO_수용 2-3`).
+- 좋은 예
+  ```
+  feat: 룰렛 하루 1회 제한 추가
+
+  같은 회원이 같은 날(KST) 다시 돌리면 409를 돌려준다. 다른 테이블에서도 막는다.
+  TODO_수용 3-2
+  ```
+  ```
+  fix: 쿠폰 사용 취소 시 used_at 초기화
+  ```
+- 나쁜 예: `수정`, `작업중`, `ㅇㅇ`, `fix: 이것저것 고침` (무엇을 왜 바꿨는지 알 수 없다).
+
+### PR 메시지
+- 제목: `종류: 한글 요약 (TODO_담당 항목번호)` 예) `feat: 룰렛 하루 1회 제한 (TODO_수용 3-2)`
+- 본문에는 **변경 내용, 테스트 방법, 테스트 결과, 미해결 문제**를 반드시 적는다(없으면 "없음").
+  ```
+  ## 변경 내용
+  - 룰렛 스핀 전에 오늘(KST) 기록이 있는지 확인하고, 있으면 409 반환
+  ## 테스트 방법
+  - cd backend && uv run pytest -q / 루트에서 python -m pytest tests -q
+  ## 테스트 결과
+  - 서버 123 passed, 화면 45 passed
+  ## 미해결 문제
+  - 없음
+  ```
 - 빌드 명령·폴더 구조·규칙이 바뀌는 변경에는 이 파일도 함께 갱신한다.

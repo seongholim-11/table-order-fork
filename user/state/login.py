@@ -7,6 +7,7 @@ from datetime import datetime
 import streamlit as st
 
 import server
+from shared import api
 from user.state.coupons import load_coupons
 from user.ui.common import KST
 
@@ -66,6 +67,20 @@ def restore_login():
         m = {"id": me["id"], "nickname": me["nickname"]}
         ss.member, ss.access_token = m, token
         _restore_members(token, m)
+
+
+def dev_auto_login():
+    """APP_ENV=dev 일 때만, 로그인 안 된 손님 앱을 모의 회원으로 자동 로그인시킨다 (개발 중 매번 QR 로그인을 거치지 않으려는 용도).
+
+    APP_ENV 가 dev 가 아니면(운영·미설정) 아무것도 하지 않는다. 세션당 한 번만 시도한다.
+    """
+    ss = st.session_state
+    if not api.is_dev() or ss.member or ss.get("_dev_login_tried"):
+        return
+    ss._dev_login_tried = True
+    event = server.dev_login(ss.table)
+    if event:
+        finish_login(event)
 
 
 def _restore_members(token, m):

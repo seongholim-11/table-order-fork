@@ -86,14 +86,13 @@ def render_operations(repo, s):
     kpi_row(*cards, min_width=120)
 
 
-def page_dashboard(repo):
-    """화면 높이 안에 들어오도록 영역별 탭으로 나눈다 (페이지 전체 스크롤을 만들지 않기 위해)."""
+def page_dashboard(repo, sub="오늘 · 매출"):
+    """영역(오늘·매출 / 매출 추이 / 고객 분석 / 메뉴·운영)은 사이드바 하위 메뉴에서 고른다 (admin/app.py 의 SUBPAGES)."""
     s = repo.stats(ss["grade_rule"])
     ai = s["ai"]
     x = summarize(repo.orders(), repo.members(ss["grade_rule"]))
     page_head("대시보드", "오늘 매장 현황을 한눈에 확인하세요")
-    t_sales, t_trend, t_cust, t_menu = st.tabs(["오늘 · 매출", "매출 추이", "고객 분석", "메뉴 · 운영"])
-    with t_sales:
+    if sub == "오늘 · 매출":
         kpi_row(
             kpi("오늘 주문", s["today_orders"], "건", accent=True),
             kpi("평균 주문금액", f"{s['avg_order_amount']:,}" if s["today_orders"] else "-", "원" if s["today_orders"] else ""),
@@ -101,11 +100,11 @@ def page_dashboard(repo):
             kpi("오늘 재방문 고객", s["returning_customers"], "명"),
         )
         render_sales_insights(x)
-    with t_trend:
+    elif sub == "매출 추이":
         render_trend_insights(x)
-    with t_cust:
+    elif sub == "고객 분석":
         render_order_customers(x, s)
-    with t_menu:
+    else:  # 메뉴 · 운영
         l, r = st.columns([3, 2], gap="medium")
         l.html(panel("인기 메뉴 TOP 10", "주문 수량 기준",
                      bars({m["name"]: m["qty"] for m in s["popular_menus"]}, "개", ranked=True, empty="아직 주문이 없어요.")))

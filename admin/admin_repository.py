@@ -354,10 +354,13 @@ def data_source_mode() -> str:
 
 
 def skip_token_login() -> bool:
-    """ADMIN_SKIP_TOKEN (기본 켜짐) 이면 토큰 입력 화면 없이 ADMIN_TOKEN 으로 자동 로그인한다.
+    """APP_ENV=dev 이고 ADMIN_SKIP_TOKEN (기본 켜짐) 이면 토큰 입력 화면 없이 ADMIN_TOKEN 으로 자동 로그인한다.
 
-    임시 조치다. 0/false/no/off 로 바꾸면 토큰 입력 화면이 다시 나온다.
+    APP_ENV 가 dev 가 아니면(운영·미설정) 항상 토큰 입력 화면을 거친다.
+    dev 에서도 ADMIN_SKIP_TOKEN=0/false/no/off 로 바꾸면 토큰 입력 화면이 다시 나온다.
     """
+    if not api.is_dev():  # 개발 환경이 아니면 우회하지 않는다
+        return False
     return os.getenv("ADMIN_SKIP_TOKEN", "1").strip().lower() not in {"0", "false", "no", "off"}
 
 

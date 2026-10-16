@@ -236,7 +236,7 @@ def test_weights_save_persists_changes(monkeypatch):
 
 def test_grade_rule_reset_returns_to_defaults(monkeypatch):
     app = open_menu_page(monkeypatch, "dummy")
-    app.sidebar.radio(key="nav_top").set_value("고객 등급").run()
+    app.sidebar.radio(key="nav_sub_고객 등급").set_value("등급 분류 기준").run()
     assert app.button(key="rule_reset").disabled
     app.number_input(key="rule_dormant").set_value(120).run()
     assert not app.button(key="rule_reset").disabled
@@ -263,6 +263,7 @@ def test_page_and_category_are_kept_in_url_and_restored_on_reload(monkeypatch):
 def test_skip_token_enters_without_login(monkeypatch):
     monkeypatch.setenv("DATA_SOURCE", "dummy")
     monkeypatch.setenv("ADMIN_TOKEN", "change-me")
+    monkeypatch.setenv("APP_ENV", "dev")  # 자동 입장은 APP_ENV=dev 일 때만
     monkeypatch.setenv("ADMIN_SKIP_TOKEN", "1")
     app = AppTest.from_file(APP, default_timeout=30).run()
     assert not app.exception

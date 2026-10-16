@@ -26,9 +26,9 @@ RULE = ar.DEFAULT_RULE
 
 
 def go_page(app, page):
-    """사이드바에서 메뉴를 연다 (주문 이력·마케팅은 하위 메뉴의 첫 항목)."""
-    if page in {"주문 이력": 0, "마케팅": 0}:
-        sub = {"주문 이력": "전체 주문", "마케팅": "AI 문자"}[page]
+    """사이드바에서 메뉴를 연다 (대시보드·고객 등급·주문 이력·마케팅은 하위 메뉴의 항목)."""
+    if page in {"대시보드": 0, "고객 등급": 0, "주문 이력": 0, "마케팅": 0}:
+        sub = {"대시보드": "오늘 · 매출", "고객 등급": "고객 목록", "주문 이력": "전체 주문", "마케팅": "AI 문자"}[page]
         return app.sidebar.radio(key=f"nav_sub_{page}").set_value(sub).run()
     return app.sidebar.radio(key="nav_top").set_value(page).run()
 

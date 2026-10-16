@@ -50,11 +50,17 @@ from admin_repository import DEFAULT_RULE  # noqa: E402
 st.set_page_config(page_title="식당도우미 관리자", page_icon="🍺", layout="wide", initial_sidebar_state="auto")
 st.html(Path(__file__).with_name("admin.css"))
 
-# 사이드바 메뉴. 화면 안에 탭이 있는 페이지(주문 이력·마케팅)는 탭을 접고 펼 수 있는 하위 메뉴로 보여 준다.
-SUBPAGES = {"주문 이력": ["전체 주문", "고객별 주문"], "마케팅": ["AI 챗봇", "AI 추천", "AI 문자"]}
-SUBPAGE_ICON = {"주문 이력": "🧾", "마케팅": "💬"}
-TOP_PAGES = ["대시보드", "메뉴 관리", "추천 가중치", "이벤트", "고객 등급"]
+# 사이드바 메뉴. 화면 안에 탭이 있는 페이지(대시보드·고객 등급·주문 이력·마케팅)는 탭을 접고 펼 수 있는 하위 메뉴로 보여 준다.
+SUBPAGES = {
+    "대시보드": ["오늘 · 매출", "매출 추이", "고객 분석", "메뉴 · 운영"],
+    "고객 등급": ["고객 목록", "등급 분류 기준"],
+    "주문 이력": ["전체 주문", "고객별 주문"],
+    "마케팅": ["AI 챗봇", "AI 추천", "AI 문자"],
+}
+SUBPAGE_ICON = {"대시보드": "📊", "고객 등급": "👥", "주문 이력": "🧾", "마케팅": "💬"}
+TOP_PAGES = ["메뉴 관리", "추천 가중치", "이벤트"]
 PAGES = [*TOP_PAGES, *SUBPAGES]
+DEFAULT_PAGE = "대시보드"  # 처음 들어오면 보여 줄 화면 (하위 메뉴의 첫 항목이 열린다)
 NAV_KEYS = ["nav_top", *(f"nav_sub_{p}" for p in SUBPAGES)]  # 메뉴 묶음마다 라디오 하나 (한 번에 하나만 선택된다)
 
 ss = st.session_state
@@ -97,7 +103,7 @@ with st.sidebar:
             f'<div class="sb-sub">관리자 콘솔</div></div></div><div class="sb-label">MENU</div>')
     # 새로고침해도 보던 메뉴가 유지되도록 URL(?page=...&tab=...)에 저장하고 거기서 복원한다.
     if "nav_top" not in ss:
-        url_page = st.query_params["page"] if st.query_params.get("page") in PAGES else PAGES[0]
+        url_page = st.query_params["page"] if st.query_params.get("page") in PAGES else DEFAULT_PAGE
         url_tab = st.query_params.get("tab")
         for key in NAV_KEYS:
             ss[key] = None
@@ -112,7 +118,7 @@ with st.sidebar:
         with st.expander(f"{SUBPAGE_ICON[group]} {group}", expanded=group == active_group):
             st.radio(group, subs, key=f"nav_sub_{group}", index=None, label_visibility="collapsed",
                      on_change=_select_nav, args=(f"nav_sub_{group}",))
-    page = active_group or ss.get("nav_top") or TOP_PAGES[0]
+    page = active_group or ss.get("nav_top") or DEFAULT_PAGE
     sub = ss.get(f"nav_sub_{active_group}") if active_group else None
     if st.query_params.get("page") != page:
         st.query_params["page"] = page
@@ -129,10 +135,10 @@ if ss["notice"]:
     st.warning(ss["notice"])
 
 if page in SUBPAGES:
-    {"주문 이력": page_orders, "마케팅": page_marketing}[page](repo, sub)
+    {"대시보드": page_dashboard, "고객 등급": page_customers, "주문 이력": page_orders,
+     "마케팅": page_marketing}[page](repo, sub)
 else:
-    {"대시보드": page_dashboard, "메뉴 관리": page_menu, "추천 가중치": page_weights, "이벤트": page_events,
-     "고객 등급": page_customers}[page](repo)
+    {"메뉴 관리": page_menu, "추천 가중치": page_weights, "이벤트": page_events}[page](repo)
 
 # 메뉴 관리에서 고른 카테고리도 URL에 남겨 새로고침 후 복원한다 (페이지 실행 후의 최종 선택값 기준).
 if page == "메뉴 관리" and ss["menu_cat"]:

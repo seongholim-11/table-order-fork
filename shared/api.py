@@ -5,11 +5,31 @@
 """
 
 import os
+from pathlib import Path
 
 import httpx
 
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 _client: httpx.Client | None = None
+
+
+def is_dev() -> bool:
+    """APP_ENV=dev 인지 확인한다. 개발 편의(자동 로그인)는 이 값이 정확히 'dev' 일 때만 켜진다.
+
+    화면(Streamlit)은 backend/.env 를 자동으로 읽지 않으므로, 셸 환경변수가 없으면 backend/.env 의 APP_ENV 줄을 직접 읽는다.
+    둘 다 없거나 dev 가 아니면(운영·미설정) False 라서 로그인 우회가 절대 켜지지 않는다.
+    """
+    value = os.getenv("APP_ENV")
+    if value is None:
+        env_file = Path(__file__).resolve().parent.parent / "backend" / ".env"
+        try:
+            for line in env_file.read_text(encoding="utf-8").splitlines():
+                key, _, val = line.partition("=")
+                if key.strip() == "APP_ENV":
+                    value = val.split("#")[0].strip().strip("\"'")
+        except OSError:
+            pass  # .env 가 없으면 미설정으로 본다
+    return (value or "").strip().lower() == "dev"
 
 
 class ApiError(Exception):

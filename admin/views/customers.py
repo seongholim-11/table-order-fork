@@ -35,12 +35,11 @@ def grade_rule_table(rule):
             f'</tr></thead><tbody>{body}</tbody></table>')
 
 
-def page_customers(repo):
+def page_customers(repo, sub="고객 목록"):
+    """고객 목록 / 등급 분류 기준은 사이드바 하위 메뉴에서 고른다 (admin/app.py 의 SUBPAGES)."""
     page_head("고객 등급", "방문 이력으로 고객을 신규·재방문·단골·휴면으로 나눠요")
-    rule = ss["grade_rule"]
-    # 기준값 입력은 두 번째 탭에 있지만, 고객 목록 계산에 쓰이므로 코드에서는 먼저 실행한다.
-    t_list, t_rule = st.tabs(["고객 목록", "등급 분류 기준"])
-    with t_rule:
+    rule = ss["grade_rule"]  # 기준값은 세션에 저장돼 있어서 다른 하위 메뉴로 옮겨도 유지된다
+    if sub == "등급 분류 기준":
         st.caption("등급 분류 기준 (임시 — 추가 정의 필요)")
         c1, c2, c3 = st.columns(3)
         rule["repeat"] = c1.number_input("재방문: 방문 횟수 ≥", 2, 50, rule["repeat"], key="rule_repeat")
@@ -50,8 +49,8 @@ def page_customers(repo):
                   help="등급 분류 기준을 처음 값으로 돌립니다")
         st.html(grade_rule_table(rule))
         st.caption("위에서부터 차례로 확인해 먼저 맞는 등급이 됩니다. 이 값은 화면에서 미리 보는 용도이고 서버에는 저장되지 않아요.")
-    cust = repo.members(rule)
-    with t_list:
+    else:  # 고객 목록
+        cust = repo.members(rule)
         kpi_row(*[kpi(f"{g} 고객", int((cust["등급"] == g).sum()), "명") for g in GRADES])
         pick = st.multiselect("등급 필터", GRADES, default=GRADES)
         with st.container(key="customers_table"):

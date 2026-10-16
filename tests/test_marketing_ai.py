@@ -75,14 +75,14 @@ def test_sidebar_sub_menus_are_collapsible_and_select_tabs():
     app = open_marketing("AI 추천")
     assert app.sidebar.radio(key="nav_sub_마케팅").options == ["AI 챗봇", "AI 추천", "AI 문자"]
     assert app.sidebar.radio(key="nav_sub_주문 이력").options == ["전체 주문", "고객별 주문"]
-    assert [e.label for e in app.sidebar.expander] == ["🧾 주문 이력", "💬 마케팅"]
-    assert [e.proto.expanded for e in app.sidebar.expander] == [False, True]  # 선택된 묶음만 펼쳐서 시작
+    assert [e.label for e in app.sidebar.expander] == ["📊 대시보드", "👥 고객 등급", "🧾 주문 이력", "💬 마케팅"]
+    assert [e.proto.expanded for e in app.sidebar.expander] == [False, False, False, True]  # 선택된 묶음만 펼쳐서 시작
     assert "직원 호출" not in app.sidebar.radio(key="nav_top").options
     app.sidebar.radio(key="nav_sub_주문 이력").set_value("고객별 주문").run()
     assert not app.exception and any("고객" in s.label for s in app.selectbox)
     assert app.query_params["page"] == "주문 이력" and app.query_params["tab"] == "고객별 주문"
     assert app.sidebar.radio(key="nav_sub_마케팅").value is None  # 다른 묶음의 선택은 풀린다
-    app.sidebar.radio(key="nav_top").set_value("대시보드").run()
+    app.sidebar.radio(key="nav_top").set_value("메뉴 관리").run()
     assert "tab" not in app.query_params and app.sidebar.radio(key="nav_sub_주문 이력").value is None
 
 
