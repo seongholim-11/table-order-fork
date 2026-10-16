@@ -6,7 +6,7 @@
 |---|---|
 | 경로 표기 | `B/`=`backend/app/` · `A/`=`admin/` · `U/`=`user/` · `T/`=루트 `tests/` · `BT/`=`backend/tests/` |
 | 브랜치 | 본 리포를 포크 → 작업마다 `feat/한글설명` 새 브랜치 → PR은 본 리포 `dev`로만. `dev`·`main`에서 바로 작업하지 않는다 |
-| 더미 주석처리 (더미 기능만, 구현보다 먼저) | ① 라우터의 `return dummy.xxx(...)` 줄을 `#`으로 주석처리하고 그 아래에 `raise NotImplementedError`를 둔다 ② `B/dummy.py`의 해당 함수와 `DUMMY_ENDPOINTS` 줄을 **같이** 주석처리한다(한쪽만 하면 `test_every_listed_dummy_function_exists`가 실패) ③ 구현·테스트가 끝나면 주석처리해 둔 줄을 지운다 |
+| 더미 주석처리 (더미 기능만, 구현보다 먼저) | ① 라우터의 `return dummy.xxx(...)` 줄을 `#`으로 주석처리하고 그 아래에 `raise NotImplementedError`를 둔다 ② `B/dummy/` 안의 본인 담당 `*_data.py`(예: `menu_data.py`)에서 해당 함수와 그 파일의 `ENDPOINTS` 줄을 **같이** 주석처리한다(한쪽만 하면 `test_every_listed_dummy_function_exists`가 실패. `dummy/__init__.py`는 고치지 않는다) ③ 구현·테스트가 끝나면 주석처리해 둔 줄을 지운다 |
 | 건드리지 않는 것 | 화면쪽 더미(`U/menu_data.py`, `A/admin_dummy_data.py`)는 서버 없이도 화면이 뜨게 하는 대체 데이터라 지우지 않는다 |
 | SQL 위치 | SQL은 `B/stores/`에서만 쓴다. 라우터에는 쓰지 않는다. 테이블 정의 기준은 `docs/db/fbgrowth_schema.sql` |
 | 테스트 | 서버 `cd backend && uv run pytest -q` · 화면+통합 `python -m pytest tests -q`. 둘 다 실패 없이 통과해야 PR을 보낸다. 테스트를 skip·삭제해서 통과시키지 않는다(더미 교체 시 `skip` 제거만 허용) |
@@ -18,6 +18,7 @@
 
 | 순서 | 할 일 | API | 상태 |
 |---|---|---|---|
+| 0 | 0. 개발 흐름 확인 (테스트 버튼) | `POST /api/dev/db-test` (개발 전용) | 확인 전 |
 | 1 | 1. 직원 호출 (손님 호출 → 관리자 확인) | `POST /api/v1/staff-calls`, `GET /api/v1/staff-call-items`, `GET /api/admin/calls`, `POST /api/admin/calls/{callId}/done` | 더미 |
 | 2 | 2. 룰렛 설정 | `GET /api/v1/roulette/prizes`, `PUT /api/v1/owner/roulette/prizes` | 더미 |
 | 3 | 3. 관리자 AI 추천 | `GET /api/admin/marketing/opportunities?round=` | 미구현 |
@@ -26,14 +27,34 @@
 
 | 파일 | 누구와 | 규칙 |
 |---|---|---|
-| `B/routers/user.py` | 재현·서준 | `create_call`(`/calls`) 함수만 수정. 새 엔드포인트는 `B/routers/staff_calls.py`(신규) |
+| `B/routers/staff_calls.py` | (석원 전담) | `create_call`(`/calls`)이 이 파일에 있다. 새 직원 호출 엔드포인트도 여기에 추가 |
 | `B/stores/roulette_prizes.py`(신규) | 재현이 룰렛 추첨에서 `list()`를 호출 | 석원이 만들고 `list()`의 반환 모양을 재현과 먼저 합의 |
 | `B/routers/admin/content.py`, `B/seed/content.json` | 서준·재현 | 본인 키(`roulette_prizes`, `staff_calls`)만 옮기고 지운다 |
-| `B/dummy.py` | 재현·서준·수용 | `call_created`, `content_saved`, 룰렛·직원 호출 관련 줄만 |
+| `B/dummy/` | 재현·서준·수용 | `call_data.py`의 `call_created`, `content_data.py`의 `content_saved`, 룰렛·직원 호출 관련 줄만 |
 | `A/views/marketing.py`, `A/marketing_ai.py` | 성호(AI 문자·챗봇 탭) | 석원은 `marketing_recommend_tab`, `next_rec_round`, `pick_recommendations`, `recommend`만. 성호의 함수는 건드리지 않는다 |
 | `A/admin_repository.py` | 모두 | `# ---- 이벤트: 룰렛 ----` 구역과 `ApiBackend`의 룰렛·직원 호출 메서드만 |
 | `U/user_repository.py` | 재현·서준 | `_fetch_content`의 `roulette_prizes`·`staff_calls` 줄만 |
 | `A/app.py` | 성호 | 관리자에 "직원 호출" 화면을 새로 추가하려면 `PAGES`/`TOP_PAGES`에 한 줄이 필요하다. 그 줄은 PR을 작게 나눠 먼저 올리고 성호에게 알린다 |
+
+---
+
+## 0. 개발 흐름 확인 (테스트 버튼) — 가장 먼저
+
+본격적으로 구현하기 전에, 내 PC에서 **포크 → 브랜치 → DB 쓰기·읽기 → 커밋·푸시 → PR** 흐름이 막힘없이 되는지 한 번 확인한다. AI에게 아래 내용을 그대로 시키면 된다.
+
+- [ ] **0-1. 포크·브랜치**: 본 리포를 포크해 내려받고, `dev` 기준으로 `feat/개발흐름-확인-내이름` 같은 새 브랜치를 만든다.
+- [ ] **0-2. test 테이블 확인**: Supabase `table-order`에는 `test` 테이블(`id`, `value`, `created_at`, RLS 켜짐)을 **이미 만들어 두었다**. 없다면(다른 프로젝트·새 DB) `docs/db/fbgrowth_test_table.sql`을 SQL Editor에서 실행한다.
+- [ ] **0-3. 테스트 버튼 만들기** (내 브랜치에서만. `DEV_TEST_BUTTON=1`일 때만 보이는 **개발 전용** 버튼):
+  - 위치: **손님 시작 화면(룰렛이 있는 화면)**(`U/views/splash.py`)의 "📱 로그인" 버튼(`key="login_open"`) 옆. 화면 코드는 `api`를 직접 부르지 말고 `U/user_repository.py`를 통해서만 서버를 부른다.
+  - 서버: `POST /api/dev/db-test`(`B/routers/dev.py` 신규, SQL은 `B/stores/`의 신규 저장소에). `test` 테이블에 임의 값을 INSERT → 같은 행을 다시 SELECT → 값이 같으면 `{"result": 1}`, 아니면 `{"result": 0}`. 확인용 행은 지운다.
+  - 서버 `.env`에 `DEV_TEST_BUTTON=true`일 때만 이 경로를 열고, 꺼져 있으면 404. 화면 쪽은 환경변수 `DEV_TEST_BUTTON=1`일 때만 버튼을 보인다. `.env.example`에도 적는다.
+  - 화면에는 결과 `1`(정상) 또는 실패 이유를 표시한다.
+- [ ] **0-4. 테스트**: `cd backend && uv run pytest -q`와 `python -m pytest tests -q`가 통과하는지 확인한다.
+- [ ] **0-5. 버튼 확인**: 서버와 손님 화면(`streamlit run user/app.py`)을 `DEV_TEST_BUTTON`을 켠 채 실행하고, 버튼을 눌러 `1`이 나오는지 본다.
+- [ ] **0-6. 커밋·푸시·PR**: 한국어 커밋 메시지로 커밋하고 내 포크에 푸시한 뒤, **본 리포 `dev`로 PR**을 보낸다(본문: 변경 내용·테스트 방법·테스트 결과·미해결 문제).
+- [ ] **0-7. 마무리**: 이 PR은 흐름 확인용이므로 **머지하지 않고 PR만 닫는다**(버튼 코드는 `dev`에 들어가지 않는다). 확인이 끝나면 위 항목을 모두 `[x]`로 바꾸고 맨 위 진행 순서 표의 0번 상태를 "완료"로 고친다. 이 체크 변경은 첫 실제 기능 PR에 함께 넣는다.
+
+> 이 단계에서 막히면(포크·푸시·DB 연결·PR 권한 등) 구현을 시작하지 말고 먼저 팀에 알린다. 실제 문제 기록은 `docs/TODO_충돌_오류.md`에 남긴다.
 
 ---
 
@@ -58,7 +79,7 @@ UI(직원 호출 다이얼로그 열기) → U/ui/dialogs.py staff_dialog ← ct
 
 **상세 설명 / TODO**
 
-- [ ] 더미 주석처리: `B/seed/content.json`의 `staff_calls` 키는 `/api/content`로 나오므로 새 API로 옮긴 뒤 **그 키만** 지운다. `B/dummy.py`의 `content_saved`·`"PUT /admin/api/content/{name}"` 줄은 2번(룰렛 저장)과 같이 쓰이므로 둘 다 옮긴 뒤 정리(서준이 마지막 확인).
+- [ ] 더미 주석처리: `B/seed/content.json`의 `staff_calls` 키는 `/api/content`로 나오므로 새 API로 옮긴 뒤 **그 키만** 지운다. `B/dummy/content_data.py`의 `content_saved`·`"PUT /admin/api/content/{name}"` 줄은 2번(룰렛 저장)과 같이 쓰이므로 둘 다 옮긴 뒤 정리(서준이 마지막 확인).
 - [ ] `shop_calls.py`에 `items()`(목록)와 비어 있을 때 시드 채우기 추가.
 - [ ] `U/user_repository.py _fetch_content`에서 `staff_calls`를 새 경로로 받도록 **그 줄만** 수정.
 
@@ -73,14 +94,14 @@ UI(직원 호출 다이얼로그 열기) → U/ui/dialogs.py staff_dialog ← ct
 **흐름**
 ```
 UI(직원 호출 · 항목 선택 · 호출 버튼) → U/ui/dialogs.py staff_dialog → ctx.REPO.create_call(table, picks)
- → POST /api/calls {table_no, items} → B/routers/user.py create_call(→ 새 라우터로 이동 가능)
+ → POST /api/calls {table_no, items} → B/routers/staff_calls.py create_call
  → B/stores/shop_calls.py add_call → DB(staff_calls INSERT) → {id}
  → UI "호출했어요" 토스트 + 세션 호출 기록
 ```
 
 **상세 설명 / TODO**
 
-- [ ] 더미 주석처리: `create_call`의 `dummy.call_created()` 줄, `dummy.py`의 `call_created`와 `"POST /api/calls"` 줄.
+- [ ] 더미 주석처리: `create_call`의 `dummy.call_created()` 줄, `B/dummy/call_data.py`의 `call_created`와 `"POST /api/calls"` 줄.
 - [ ] `shop_calls.py`의 `add_call`, `call` 구현(파일 안 TODO 그대로).
 - [ ] 문서 경로 `POST /api/v1/staff-calls`는 같은 함수를 부르는 별칭으로 추가. 기존 `/api/calls`는 유지(화면이 사용 중).
 
@@ -152,7 +173,7 @@ UI(관리자 > 이벤트 > 룰렛 · 칸 편집 · 저장) → A/views/events.py
 - [ ] 더미 주석처리: `B/seed/content.json`의 `roulette_prizes` 키는 옮긴 뒤 지운다. `B/routers/admin/content.py`의 룰렛용 `PUT /content/{name}` 사용부는 직원 호출(1-1)과 함께 정리(서준이 마지막 확인).
 - [ ] `A/admin_repository.py`: `ENDPOINTS["roulette"]`와 `ApiBackend.roulette_prizes`/`save_roulette_prizes`의 경로를 새 경로로 바꾼다(이 두 메서드만).
 - [ ] `U/user_repository.py _fetch_content`의 `roulette_prizes`를 새 경로로 받도록 **그 줄만** 수정.
-- [ ] `B/dummy.py`의 `content_saved`와 `"PUT /admin/api/content/{name}"` 줄은 직원 호출·카테고리가 모두 옮겨진 뒤 삭제.
+- [ ] `B/dummy/content_data.py`의 `content_saved`와 `"PUT /admin/api/content/{name}"` 줄은 직원 호출·카테고리가 모두 옮겨진 뒤 삭제.
 
 ---
 

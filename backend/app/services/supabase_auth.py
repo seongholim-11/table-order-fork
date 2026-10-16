@@ -1,4 +1,4 @@
-"""Supabase Auth 로 카카오 로그인을 처리한다 (PKCE). docs/PRODUCTION_PLAN.md 4장 가이드 참고.
+"""Supabase Auth 로 카카오 로그인을 처리한다 (PKCE). docs/정식_구현_계획.md 4장 가이드 참고.
 
 흐름: 휴대폰을 Supabase /auth/v1/authorize?provider=kakao 로 보냄 → 카카오 로그인 →
 Supabase 가 redirect_to(우리 서버)로 ?code= 와 함께 돌려보냄 → code + code_verifier 로 사용자 정보를 받는다.

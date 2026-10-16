@@ -6,7 +6,7 @@
 |---|---|
 | 경로 표기 | `B/`=`backend/app/` · `A/`=`admin/` · `U/`=`user/` · `T/`=루트 `tests/` · `BT/`=`backend/tests/` |
 | 브랜치 | 본 리포를 포크 → 작업마다 `feat/한글설명` 새 브랜치 → PR은 본 리포 `dev`로만. `dev`·`main`에서 바로 작업하지 않는다 |
-| 더미 주석처리 (더미 기능만, 구현보다 먼저) | ① 라우터의 `return dummy.xxx(...)` 줄을 `#`으로 주석처리하고 그 아래에 `raise NotImplementedError`를 둔다 ② `B/dummy.py`의 해당 함수와 `DUMMY_ENDPOINTS` 줄을 **같이** 주석처리한다(한쪽만 하면 `test_every_listed_dummy_function_exists`가 실패) ③ 구현·테스트가 끝나면 주석처리해 둔 줄을 지운다 |
+| 더미 주석처리 (더미 기능만, 구현보다 먼저) | ① 라우터의 `return dummy.xxx(...)` 줄을 `#`으로 주석처리하고 그 아래에 `raise NotImplementedError`를 둔다 ② `B/dummy/` 안의 본인 담당 `*_data.py`(예: `menu_data.py`)에서 해당 함수와 그 파일의 `ENDPOINTS` 줄을 **같이** 주석처리한다(한쪽만 하면 `test_every_listed_dummy_function_exists`가 실패. `dummy/__init__.py`는 고치지 않는다) ③ 구현·테스트가 끝나면 주석처리해 둔 줄을 지운다 |
 | 건드리지 않는 것 | 화면쪽 더미(`U/menu_data.py`, `A/admin_dummy_data.py`)는 서버 없이도 화면이 뜨게 하는 대체 데이터라 지우지 않는다 |
 | SQL 위치 | SQL은 `B/stores/`에서만 쓴다. 라우터에는 쓰지 않는다. 테이블 정의 기준은 `docs/db/fbgrowth_schema.sql` |
 | 테스트 | 서버 `cd backend && uv run pytest -q` · 화면+통합 `python -m pytest tests -q`. 둘 다 실패 없이 통과해야 PR을 보낸다. 테스트를 skip·삭제해서 통과시키지 않는다(더미 교체 시 `skip` 제거만 허용) |
@@ -18,6 +18,7 @@
 
 | 순서 | 할 일 | API | 상태 |
 |---|---|---|---|
+| 0 | 0. 개발 흐름 확인 (테스트 버튼) | `POST /api/dev/db-test` (개발 전용) | 확인 전 |
 | 1 | 1. 고객 등급 · 수신거부 점검 | `GET /api/admin/customers`, `…/customers/grades`, `…/grades/rules`, `POST …/customers/{id}/opt-out` | 구현 / 부분 구현 |
 | 2 | 2. 대시보드 기본 통계 | `GET /api/admin/stats/sales`, `stats/menus/ranking`, `stats/customers`, `stats/ai-recommendations` | 더미 |
 | 3 | 3. 대시보드 추가 통계 | `stats/sales/hourly·trends·weekday·tickets`, `stats/tables` | 미구현 |
@@ -29,10 +30,30 @@
 |---|---|---|
 | `B/stores/shop_orders.py` | 재현(주문 저장) | 수정하지 않는다. 통계용 읽기 SQL은 `B/stores/stats.py`(신규)에 만든다 |
 | `B/services/stats.py` | 성호(챗봇이 "오늘 매출"을 물을 때 호출) | 수용만 수정. 함수 이름이 바뀌면 성호에게 알린다 |
-| `B/dummy.py` | 재현·서준·석원 | `dashboard_stats` 함수와 `"GET /admin/api/stats"` 줄만 다룬다. `members()`·`orders()` 더미는 재현의 주문 이력이 쓰므로 재현과 순서를 맞춘다 |
+| `B/dummy/` | 재현·서준·석원 | `stats_data.py`(`dashboard_stats`와 `"GET /admin/api/stats"` 줄)만 다룬다. `members()`·`orders()` 더미는 재현의 주문 이력이 쓰므로 재현과 순서를 맞춘다 |
 | `A/admin_repository.py` | 모두 | `# ---- 고객 / 주문 / 통계 ----` 구역 안에서만 수정 |
 
 **먼저 알아둘 점**: 통계는 주문 데이터가 있어야 확인할 수 있다. 재현이 주문 저장(`POST /orders`)을 끝내기 전에는 테스트에서 `orders`/`order_items`에 직접 INSERT 해 둔 값(픽스처)으로 확인한다.
+
+---
+
+## 0. 개발 흐름 확인 (테스트 버튼) — 가장 먼저
+
+본격적으로 구현하기 전에, 내 PC에서 **포크 → 브랜치 → DB 쓰기·읽기 → 커밋·푸시 → PR** 흐름이 막힘없이 되는지 한 번 확인한다. AI에게 아래 내용을 그대로 시키면 된다.
+
+- [ ] **0-1. 포크·브랜치**: 본 리포를 포크해 내려받고, `dev` 기준으로 `feat/개발흐름-확인-내이름` 같은 새 브랜치를 만든다.
+- [ ] **0-2. test 테이블 확인**: Supabase `table-order`에는 `test` 테이블(`id`, `value`, `created_at`, RLS 켜짐)을 **이미 만들어 두었다**. 없다면(다른 프로젝트·새 DB) `docs/db/fbgrowth_test_table.sql`을 SQL Editor에서 실행한다.
+- [ ] **0-3. 테스트 버튼 만들기** (내 브랜치에서만. `DEV_TEST_BUTTON=1`일 때만 보이는 **개발 전용** 버튼):
+  - 위치: **손님 시작 화면(룰렛이 있는 화면)**(`U/views/splash.py`)의 "📱 로그인" 버튼(`key="login_open"`) 옆. 화면 코드는 `api`를 직접 부르지 말고 `U/user_repository.py`를 통해서만 서버를 부른다.
+  - 서버: `POST /api/dev/db-test`(`B/routers/dev.py` 신규, SQL은 `B/stores/`의 신규 저장소에). `test` 테이블에 임의 값을 INSERT → 같은 행을 다시 SELECT → 값이 같으면 `{"result": 1}`, 아니면 `{"result": 0}`. 확인용 행은 지운다.
+  - 서버 `.env`에 `DEV_TEST_BUTTON=true`일 때만 이 경로를 열고, 꺼져 있으면 404. 화면 쪽은 환경변수 `DEV_TEST_BUTTON=1`일 때만 버튼을 보인다. `.env.example`에도 적는다.
+  - 화면에는 결과 `1`(정상) 또는 실패 이유를 표시한다.
+- [ ] **0-4. 테스트**: `cd backend && uv run pytest -q`와 `python -m pytest tests -q`가 통과하는지 확인한다.
+- [ ] **0-5. 버튼 확인**: 서버와 손님 화면(`streamlit run user/app.py`)을 `DEV_TEST_BUTTON`을 켠 채 실행하고, 버튼을 눌러 `1`이 나오는지 본다.
+- [ ] **0-6. 커밋·푸시·PR**: 한국어 커밋 메시지로 커밋하고 내 포크에 푸시한 뒤, **본 리포 `dev`로 PR**을 보낸다(본문: 변경 내용·테스트 방법·테스트 결과·미해결 문제).
+- [ ] **0-7. 마무리**: 이 PR은 흐름 확인용이므로 **머지하지 않고 PR만 닫는다**(버튼 코드는 `dev`에 들어가지 않는다). 확인이 끝나면 위 항목을 모두 `[x]`로 바꾸고 맨 위 진행 순서 표의 0번 상태를 "완료"로 고친다. 이 체크 변경은 첫 실제 기능 PR에 함께 넣는다.
+
+> 이 단계에서 막히면(포크·푸시·DB 연결·PR 권한 등) 구현을 시작하지 말고 먼저 팀에 알린다. 실제 문제 기록은 `docs/TODO_충돌_오류.md`에 남긴다.
 
 ---
 
@@ -129,7 +150,7 @@ UI(대시보드 KPI 카드) → A/views/dashboard.py → repo.stats(rule) (A/adm
 
 **상세 설명 / TODO**
 
-- [ ] 더미 주석처리: `B/routers/admin/stats.py`의 `dummy.dashboard_stats()` 줄, `B/dummy.py`의 `dashboard_stats`와 `"GET /admin/api/stats"` 줄.
+- [ ] 더미 주석처리: `B/routers/admin/stats.py`의 `dummy.dashboard_stats()` 줄, `B/dummy/stats_data.py`의 `dashboard_stats`와 `"GET /admin/api/stats"` 줄.
 - [ ] `B/services/stats.py dashboard()`를 파일 안 TODO 순서대로 구현(반환 키는 `dummy.dashboard_stats()`와 같게: `today_orders, avg_order_amount, new_customers, returning_customers, age_groups, genders, popular_menus, ai`).
 - [ ] `B/stores/stats.py`(신규): 기간 내 주문 목록(줄·구성 메뉴 포함), 추천 노출 수 조회. `shop_orders.py`는 수정하지 않는다. 재현의 `recommendation_count()`가 준비되면 그것을 써도 된다.
 - [ ] 라우터 TODO대로 `today = datetime.now(KST).date()`, `rule = grade_rule(settings)`로 호출.

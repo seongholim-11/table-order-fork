@@ -1,0 +1,11 @@
+"""AI 추천 노출 기록 더미. (담당: 재현)"""
+
+
+# 이 파일이 맡은 더미 엔드포인트. 실제 구현으로 바꾸면 해당 줄과 아래 함수를 같이 지운다.
+ENDPOINTS = {
+    "POST /api/recommendations": "recommendation_logged",
+}
+
+
+def recommendation_logged() -> dict:
+    return {"id": 10}

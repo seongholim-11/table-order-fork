@@ -2,7 +2,7 @@
 
 테이블별 코드는 shop_menus / shop_orders / shop_calls / shop_recommendations 파일에 나뉘어 있고,
 여기서는 하나의 ShopStore 로 합쳐 `app.state.shop` 으로 쓴다 (라우터는 shop.xxx() 를 부른다).
-[뼈대] 지금은 각 메서드가 NotImplementedError 이고 라우터는 dummy.py 응답을 돌려준다.
+[뼈대] 지금은 각 메서드가 NotImplementedError 이고 라우터는 dummy/ 응답을 돌려준다.
 """
 
 from app.stores import shop_calls, shop_menus, shop_orders, shop_recommendations

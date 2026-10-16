@@ -6,7 +6,7 @@
 |---|---|
 | 경로 표기 | `B/`=`backend/app/` · `A/`=`admin/` · `U/`=`user/` · `T/`=루트 `tests/` · `BT/`=`backend/tests/` |
 | 브랜치 | 본 리포를 포크 → 작업마다 `feat/한글설명` 새 브랜치 → PR은 본 리포 `dev`로만. `dev`·`main`에서 바로 작업하지 않는다 |
-| 더미 주석처리 (더미 기능만, 구현보다 먼저) | ① 라우터의 `return dummy.xxx(...)` 줄을 `#`으로 주석처리하고 그 아래에 `raise NotImplementedError`를 둔다 ② `B/dummy.py`의 해당 함수와 `DUMMY_ENDPOINTS` 줄을 **같이** 주석처리한다(한쪽만 하면 `test_every_listed_dummy_function_exists`가 실패) ③ 구현·테스트가 끝나면 주석처리해 둔 줄을 지운다 |
+| 더미 주석처리 (더미 기능만, 구현보다 먼저) | ① 라우터의 `return dummy.xxx(...)` 줄을 `#`으로 주석처리하고 그 아래에 `raise NotImplementedError`를 둔다 ② `B/dummy/` 안의 본인 담당 `*_data.py`(예: `menu_data.py`)에서 해당 함수와 그 파일의 `ENDPOINTS` 줄을 **같이** 주석처리한다(한쪽만 하면 `test_every_listed_dummy_function_exists`가 실패. `dummy/__init__.py`는 고치지 않는다) ③ 구현·테스트가 끝나면 주석처리해 둔 줄을 지운다 |
 | 건드리지 않는 것 | 화면쪽 더미(`U/menu_data.py`, `A/admin_dummy_data.py`)는 서버 없이도 화면이 뜨게 하는 대체 데이터라 지우지 않는다 |
 | SQL 위치 | SQL은 `B/stores/`에서만 쓴다. 라우터에는 쓰지 않는다. 테이블 정의 기준은 `docs/db/fbgrowth_schema.sql` |
 | 테스트 | 서버 `cd backend && uv run pytest -q` · 화면+통합 `python -m pytest tests -q`. 둘 다 실패 없이 통과해야 PR을 보낸다. 테스트를 skip·삭제해서 통과시키지 않는다(더미 교체 시 `skip` 제거만 허용) |
@@ -18,6 +18,7 @@
 
 | 순서 | 할 일 | API | 상태 |
 |---|---|---|---|
+| 0 | 0. 개발 흐름 확인 (테스트 버튼) | `POST /api/dev/db-test` (개발 전용) | 확인 전 |
 | 1 | 1. 메뉴 저장소 + 손님 메뉴 목록 | `GET /api/v1/menus` | 더미 |
 | 2 | 2. 관리자 메뉴 관리 | `GET·POST·PATCH·DELETE /api/v1/owner/menus` | 더미 |
 | 3 | 3. 카테고리 | `GET /api/v1/categories`, `POST·PATCH·DELETE /api/v1/owner/categories` | 더미 |
@@ -28,14 +29,34 @@
 
 | 파일 | 누구와 | 규칙 |
 |---|---|---|
-| `B/routers/user.py` | 재현·석원 | `list_menus`(`/menus`) 함수만 수정 |
+| `B/routers/menus.py` | (서준 전담) | `list_menus`(`/menus`) 함수. 이 파일은 서준만 수정 |
 | `B/routers/admin/content.py`, `B/seed/content.json`, `GET /api/content` | 재현(AI 질문·날씨·규칙), 석원(룰렛·직원 호출) | 본인 항목(`categories`)만 옮기고 지운다. 마지막에 모두 옮겨졌는지 확인한 사람(서준)이 파일을 삭제 |
-| `B/dummy.py` | 재현·수용·석원 | `menus`, `admin_menus`, `menu_saved`, `content_item('categories')` 관련 줄만 |
+| `B/dummy/` | 재현·수용·석원 | `menu_data.py`(`menus`, `admin_menus`, `menu_saved`)와 `content_data.py`의 `content_item('categories')` 관련 줄만 |
 | `B/stores/shop.py` | 재현(주문)·석원(직원 호출) | `ShopStore`는 믹스인 합치는 곳이라 `self.seed_menus()` 한 줄만 건드린다 |
 | `A/admin_repository.py` | 모두 | `# ---- 메뉴 ----`, `# ---- 카테고리 CRUD ----`, `# ---- 메뉴 등록 ----` 구역에서만 수정 |
 | `U/user_repository.py` | 재현·석원 | `ENDPOINTS["menus"]`·`content`의 `categories` 줄만 |
 
 **다른 사람이 서준의 데이터를 쓴다**: 재현의 주문(`menu_id` 연결), 재현의 추천(`menus.weight`), 석원의 룰렛 서비스 메뉴(`menu_id` FK), 수용의 품절 알림. 그래서 메뉴 저장소(1번)를 **가장 먼저** 끝내고 알려 주는 것이 팀 전체에 도움이 된다.
+
+---
+
+## 0. 개발 흐름 확인 (테스트 버튼) — 가장 먼저
+
+본격적으로 구현하기 전에, 내 PC에서 **포크 → 브랜치 → DB 쓰기·읽기 → 커밋·푸시 → PR** 흐름이 막힘없이 되는지 한 번 확인한다. AI에게 아래 내용을 그대로 시키면 된다.
+
+- [ ] **0-1. 포크·브랜치**: 본 리포를 포크해 내려받고, `dev` 기준으로 `feat/개발흐름-확인-내이름` 같은 새 브랜치를 만든다.
+- [ ] **0-2. test 테이블 확인**: Supabase `table-order`에는 `test` 테이블(`id`, `value`, `created_at`, RLS 켜짐)을 **이미 만들어 두었다**. 없다면(다른 프로젝트·새 DB) `docs/db/fbgrowth_test_table.sql`을 SQL Editor에서 실행한다.
+- [ ] **0-3. 테스트 버튼 만들기** (내 브랜치에서만. `DEV_TEST_BUTTON=1`일 때만 보이는 **개발 전용** 버튼):
+  - 위치: **손님 시작 화면(룰렛이 있는 화면)**(`U/views/splash.py`)의 "📱 로그인" 버튼(`key="login_open"`) 옆. 화면 코드는 `api`를 직접 부르지 말고 `U/user_repository.py`를 통해서만 서버를 부른다.
+  - 서버: `POST /api/dev/db-test`(`B/routers/dev.py` 신규, SQL은 `B/stores/`의 신규 저장소에). `test` 테이블에 임의 값을 INSERT → 같은 행을 다시 SELECT → 값이 같으면 `{"result": 1}`, 아니면 `{"result": 0}`. 확인용 행은 지운다.
+  - 서버 `.env`에 `DEV_TEST_BUTTON=true`일 때만 이 경로를 열고, 꺼져 있으면 404. 화면 쪽은 환경변수 `DEV_TEST_BUTTON=1`일 때만 버튼을 보인다. `.env.example`에도 적는다.
+  - 화면에는 결과 `1`(정상) 또는 실패 이유를 표시한다.
+- [ ] **0-4. 테스트**: `cd backend && uv run pytest -q`와 `python -m pytest tests -q`가 통과하는지 확인한다.
+- [ ] **0-5. 버튼 확인**: 서버와 손님 화면(`streamlit run user/app.py`)을 `DEV_TEST_BUTTON`을 켠 채 실행하고, 버튼을 눌러 `1`이 나오는지 본다.
+- [ ] **0-6. 커밋·푸시·PR**: 한국어 커밋 메시지로 커밋하고 내 포크에 푸시한 뒤, **본 리포 `dev`로 PR**을 보낸다(본문: 변경 내용·테스트 방법·테스트 결과·미해결 문제).
+- [ ] **0-7. 마무리**: 이 PR은 흐름 확인용이므로 **머지하지 않고 PR만 닫는다**(버튼 코드는 `dev`에 들어가지 않는다). 확인이 끝나면 위 항목을 모두 `[x]`로 바꾸고 맨 위 진행 순서 표의 0번 상태를 "완료"로 고친다. 이 체크 변경은 첫 실제 기능 PR에 함께 넣는다.
+
+> 이 단계에서 막히면(포크·푸시·DB 연결·PR 권한 등) 구현을 시작하지 말고 먼저 팀에 알린다. 실제 문제 기록은 `docs/TODO_충돌_오류.md`에 남긴다.
 
 ---
 
@@ -67,14 +88,14 @@
 **흐름**
 ```
 UI(주문 화면 · 카테고리 탭 · 메뉴 카드) → U/views/order.py → ctx.MENU ← U/user_repository.py load_content
- → GET /api/menus → B/routers/user.py list_menus
+ → GET /api/menus → B/routers/menus.py list_menus
  → B/stores/shop_menus.py menus() → DB(menus 60행, sort_order 순)
  → 컬럼 이름 변환(cat/desc/soldout) → [{id, cat, name, desc, price, soldout, ...}] → UI 메뉴 카드
 ```
 
 **상세 설명 / TODO**
 
-- [ ] 더미 주석처리: `B/routers/user.py list_menus`의 `dummy.menus()` 줄, `B/dummy.py`의 `menus()`와 `"GET /api/menus"` 줄. (`admin_menus()`와 `menu_saved()`가 `menus()`를 쓰므로 2번과 순서를 같이 맞춘다 → 1·2번을 같은 PR로 묶는 것을 추천)
+- [ ] 더미 주석처리: `B/routers/menus.py list_menus`의 `dummy.menus()` 줄, `B/dummy/menu_data.py`의 `menus()`와 `"GET /api/menus"` 줄. (`admin_menus()`와 `menu_saved()`가 `menus()`를 쓰므로 2번과 순서를 같이 맞춘다 → 1·2번을 같은 PR로 묶는 것을 추천)
 - [ ] `B/stores/shop_menus.py` 구현: `seed_menus`, `menus`, `menu`, `save_menu`, `delete_menu`(파일 안 TODO 순서대로). 컬럼 목록은 `MENU_FIELDS`.
 - [ ] `B/stores/shop.py`의 `# TODO: 구현 후 self.seed_menus() 를 불러…` 주석 줄을 실제 호출로 바꾼다(그 한 줄만).
 - [ ] 추가한 메뉴 id는 문자열이다(`c1`, `m3fa2b1`). 숫자로 가정하지 않는다.
@@ -120,7 +141,7 @@ UI(메뉴 관리 · 표 편집 후 저장) → A/views/menu.py save_menu_changes
 
 **상세 설명 / TODO**
 
-- [ ] 더미 주석처리: `B/routers/admin/menus.py`의 `dummy.admin_menus()`, `dummy.menu_saved(...)`, 삭제의 더미 줄과 `menu_categories()` 안의 `dummy.content_item("categories")`, `B/dummy.py`의 `admin_menus`·`menu_saved`와 `DUMMY_ENDPOINTS`의 `"GET /admin/api/menus"`, `"PUT /admin/api/menus/{menu_id}"` 줄.
+- [ ] 더미 주석처리: `B/routers/admin/menus.py`의 `dummy.admin_menus()`, `dummy.menu_saved(...)`, 삭제의 더미 줄과 `menu_categories()` 안의 `dummy.content_item("categories")`, `B/dummy/menu_data.py`의 `admin_menus`·`menu_saved`와 `ENDPOINTS`의 `"GET /admin/api/menus"`, `"PUT /admin/api/menus/{menu_id}"` 줄.
 - [ ] 라우터의 TODO 순서대로: ① `cat`이 `menu_categories()`에 없으면 422 ② 없는 id면 등록(필수값 검사), 있으면 보낸 필드만 수정 `shop.save_menu(menu_id, fields)` ③ 삭제는 `shop.delete_menu`가 `False`면 404.
 - [ ] `menu_categories()`는 3번(카테고리 저장소)이 끝나면 `categories` 테이블을 읽게 바꾼다. 그 전에는 `B/seed/content.json`의 카테고리를 그대로 읽는 임시 코드로 둔다(TODO 주석 표시).
 - [ ] 응답 `{categories, menus}` 모양을 바꾸지 않는다(화면 `A/admin_repository.py`가 이 모양을 기대).
@@ -201,5 +222,5 @@ UI(추천 가중치 · 슬라이더 조절 · 저장) → A/views/weights.py ren
 ## 5. 정리 (마지막)
 
 - [ ] `B/seed/content.json`에 남은 키가 없으면 `B/routers/admin/content.py`, `GET /api/content`, `dummy.content()`/`content_item()`을 삭제하고 `U/user_repository.py _fetch_content`가 새 경로만 쓰는지 확인한다.
-- [ ] `B/dummy.py`가 비면 `AGENTS.md`의 "더미 상태" 섹션을 삭제한다(PR에 AGENTS.md 변경 포함, 팀에 알림).
-- [ ] `docs/DB_SCHEMA.md`와 `docs/db/*.sql`을 바꿨다면 두 문서를 같이 고치고 팀에 알린다.
+- [ ] `B/dummy/`의 `*_data.py`가 모두 비면(그때 `dummy/` 폴더 자체를 지운다) `AGENTS.md`의 "더미 상태" 섹션을 삭제한다(PR에 AGENTS.md 변경 포함, 팀에 알림).
+- [ ] `docs/DB_설계.md`와 `docs/db/*.sql`을 바꿨다면 두 문서를 같이 고치고 팀에 알린다.

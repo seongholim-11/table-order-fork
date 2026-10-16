@@ -8,8 +8,9 @@
 from fastapi import APIRouter, Depends
 
 from app.core.dependencies import require_admin
-from app.routers.admin import content, members, menus, orders, sms, stats, system
+from app.routers.admin import alerts, calls, chat, content, external, members, menus, opportunities, orders, owner, sms, stats, system
 
 router = APIRouter(prefix="/admin/api", tags=["관리자"], dependencies=[Depends(require_admin)])
-for _module in (menus, orders, members, stats, sms, content, system):
+# 아래 6개(owner~opportunities)는 아직 엔드포인트가 없는 빈 틀이다. 구현할 때 이 파일은 고치지 않고 해당 파일에만 추가한다.
+for _module in (menus, orders, members, stats, sms, content, system, owner, external, chat, alerts, opportunities, calls):
     router.include_router(_module.router)

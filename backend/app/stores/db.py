@@ -11,7 +11,10 @@ import threading
 from datetime import date, datetime, timezone
 
 SERIAL_TABLES = {"members", "orders", "order_items", "order_item_components", "staff_calls", "recommendation_events", "sms_logs", "coupons",
-                 "table_logins"}  # id 가 자동 증가인 테이블
+                 "table_logins",
+                 # 아래 5개는 스키마(docs/db/fbgrowth_schema.sql)에서 id 가 자동 증가지만 아직 INSERT 하는 코드가 없던 테이블.
+                 # 여기에 없으면 Postgres 에서 INSERT 뒤 id 가 None 으로 돌아오므로 미리 넣어 둔다.
+                 "roulette_prizes", "staff_call_items", "quiz_options", "chat_messages", "alerts"}  # id 가 자동 증가인 테이블
 
 
 def is_postgres(url: str) -> bool:

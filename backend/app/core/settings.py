@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     grade_regular_visits: int = 5
     grade_dormant_days: int = 60
 
-    # QR 로그인 / 카카오 (docs/PRODUCTION_PLAN.md 1장)
+    # QR 로그인 / 카카오 (docs/정식_구현_계획.md 1장)
     public_base_url: str = "http://localhost:8000"  # 휴대폰이 접속할 서버 주소 (QR에 들어감)
     kakao_rest_api_key: str = ""
     kakao_client_secret: str = ""
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     login_ttl_seconds: int = 180
     jwt_expire_minutes: int = 720
 
-    # 문자 발송 / 솔라피 (docs/PRODUCTION_PLAN.md 2장)
+    # 문자 발송 / 솔라피 (docs/정식_구현_계획.md 2장)
     solapi_api_key: str = ""
     solapi_api_secret: str = ""
     solapi_sender_number: str = ""  # 솔라피에 등록된 발신번호

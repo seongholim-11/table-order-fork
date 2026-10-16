@@ -25,19 +25,19 @@ streamlit run admin/app.py --server.port 8502   # 관리자 (현재 토큰 입�
 - 린터·포매터·빌드 설정은 없다. 완료 기준은 위 두 테스트가 실패 없이 통과하는 것(skip은 허용).
 
 ## 구조
-- `backend/app/`: `routers/`(user.py, auth.py, admin/) → `services/` → `stores/`(SQL은 여기만) , `dummy.py`(더미 응답), `seed/`.
+- `backend/app/`: `routers/`(손님 API는 기능별 파일: user.py(회원·로그인 기록), store/menus/orders/coupons/roulette/staff_calls/ai/content.py, auth.py, admin/) → `services/` → `stores/`(SQL은 여기만) , `dummy/`(더미 응답, 담당별 `*_data.py`), `seed/`.
 - `user/`, `admin/`: `app.py`는 진입점만. 화면은 `views/`, 공용 UI는 `ui/`, 세션 상태·계산은 `state/`. 폴더명을 `pages`로 쓰지 않는다(Streamlit 자동 멀티페이지 때문).
 - 화면 코드는 `api`를 직접 부르지 않고 `user/user_repository.py`, `admin/admin_repository.py`만 부른다.
 - API 경로: 손님 `/api/...`, 관리자 `/admin/api/...`. 기준 문서는 `docs/api/FBGrowth_API_경로_통합_정리_최종_v7_목록표만.md`, 담당 분배는 `docs/api/FBGrowth_API_담당_분배_3-2-2-2-1.md`.
 - 담당자별 TODO: `docs/todo/TODO_{성호,재현,수용,서준,석원}.md`
-- 문서 목록: `docs/NOTICE_TEAM.md`(팀원 공지, 어떤 문서를 언제 보는지), `docs/todo/`(담당자별 TODO), `docs/api/`(API 경로·담당 분배), `docs/TODO_CONFLICTS_AND_ERRORS.md`(충돌·오류), `docs/DEVELOPMENT_GUIDE.md`·`docs/DB_SCHEMA.md`·`docs/FLOW_*.md`·`docs/CODE_TOUR.md`.
-- TODO 진행 중 충돌·오류와 해결: `docs/TODO_CONFLICTS_AND_ERRORS.md`
-- 상세: `docs/DEVELOPMENT_GUIDE.md`(API 추가 순서), `docs/DB_SCHEMA.md`(DB 설계), `docs/FLOW_*.md`(기능 흐름), `docs/CODE_TOUR.md`.
+- 문서 목록: `docs/팀_공지.md`(팀원 공지, 어떤 문서를 언제 보는지), `docs/todo/`(담당자별 TODO), `docs/api/`(API 경로·담당 분배), `docs/TODO_충돌_오류.md`(충돌·오류), `docs/개발_가이드.md`·`docs/DB_설계.md`·`docs/기능흐름_*.md`·`docs/코드_둘러보기.md`.
+- TODO 진행 중 충돌·오류와 해결: `docs/TODO_충돌_오류.md`
+- 상세: `docs/개발_가이드.md`(API 추가 순서), `docs/DB_설계.md`(DB 설계), `docs/기능흐름_*.md`(기능 흐름), `docs/코드_둘러보기.md`.
 
 ## 더미 상태 (팀원이 구현할 뼈대)
-- 실제 구현은 **QR 로그인**(`/api/auth/*`, `/api/members/me`, `/api/tables/{n}/logins`)과 **문자 발송**(`/admin/api/marketing/sms/*`), 고객 목록(`GET /admin/api/members`)뿐이다. 나머지 엔드포인트는 `backend/app/dummy.py`의 더미 응답을 돌려주고 저장하지 않는다.
+- 실제 구현은 **QR 로그인**(`/api/auth/*`, `/api/members/me`, `/api/tables/{n}/logins`)과 **문자 발송**(`/admin/api/marketing/sms/*`), 고객 목록(`GET /admin/api/members`)뿐이다. 나머지 엔드포인트는 `backend/app/dummy/`의 더미 응답을 돌려주고 저장하지 않는다.
 - 아직 더미인 엔드포인트 찾기: `grep -rn "dummy\." backend/app/routers`, 목록은 `dummy.DUMMY_ENDPOINTS`.
-- 실제 DB로 교체하는 방법: ① 라우터의 `dummy.xxx()` 호출을 store/service 호출로 바꾸고(라우터·stores의 TODO 주석, `NotImplementedError` 뼈대에 구현할 내용이 적혀 있음) ② `dummy.py`의 해당 함수와 `DUMMY_ENDPOINTS` 줄을 지우고 ③ 해당 테스트의 `skip`을 제거한다. 이전 구현 참고: 커밋 `a8b3d14`.
+- 실제 DB로 교체하는 방법: ① 라우터의 `dummy.xxx()` 호출을 store/service 호출로 바꾸고(라우터·stores의 TODO 주석, `NotImplementedError` 뼈대에 구현할 내용이 적혀 있음) ② `dummy/`의 해당 `*_data.py`에서 함수와 `ENDPOINTS` 줄을 지우고(`dummy/__init__.py`는 고치지 않는다) ③ 해당 테스트의 `skip`을 제거한다. 이전 구현 참고: 커밋 `a8b3d14`.
 - 교체가 끝나 더미가 없어지면 이 섹션을 삭제한다.
 
 ## 정해진 제품 규칙 (어기지 말 것)
@@ -48,7 +48,7 @@ streamlit run admin/app.py --server.port 8502   # 관리자 (현재 토큰 입�
 - AI 챗봇은 제미나이 무료 API를 쓰고 RAG 없이 DB 데이터를 근거로 답한다.
 - 문자 발송은 솔라피. `SMS_DRY_RUN=true`(기본)이면 실제 전송 없이 기록만 한다.
 - 관리자 인증(Supabase Auth `owners`)은 모든 개발이 끝난 뒤 마지막에 한다. 지금은 `ADMIN_TOKEN` 방식을 쓰고, 챗봇 `owner_id` 문제도 그때까지 보류.
-- DB 설계는 `docs/DB_SCHEMA.md`와 `docs/db/fbgrowth_schema.sql`이 기준이며 Supabase `table-order` 프로젝트에 적용되어 있다. 서버 `stores/`는 아직 SQLite 호환 구조이므로 Supabase 스키마로 옮기는 작업이 남아 있다.
+- DB 설계는 `docs/DB_설계.md`와 `docs/db/fbgrowth_schema.sql`이 기준이며 Supabase `table-order` 프로젝트에 적용되어 있다. 서버 `stores/`는 아직 SQLite 호환 구조이므로 Supabase 스키마로 옮기는 작업이 남아 있다.
 
 ## 작업 원칙
 - 수정하는 파일 수를 최대한 줄인다. 요청과 무관한 파일은 건드리지 않는다.
@@ -58,7 +58,7 @@ streamlit run admin/app.py --server.port 8502   # 관리자 (현재 토큰 입�
 
 ## 금지 구역
 - `.env`, 비밀 키(`SOLAPI_*`, `SUPABASE_SERVICE_ROLE_KEY`, `JWT_SECRET`, `ADMIN_TOKEN`)를 커밋하거나 화면·로그에 노출하지 않는다.
-- 스키마(`stores/*.py`의 `SCHEMA`, `docs/db/*.sql`)를 바꾸면 `docs/DB_SCHEMA.md`도 함께 고치고 팀에 알린다. 기존 `backend/app.db`에는 반영되지 않으므로 지우고 서버를 다시 켠다.
+- 스키마(`stores/*.py`의 `SCHEMA`, `docs/db/*.sql`)를 바꾸면 `docs/DB_설계.md`도 함께 고치고 팀에 알린다. 기존 `backend/app.db`에는 반영되지 않으므로 지우고 서버를 다시 켠다.
 - 라우터에서 SQL을 쓰지 않는다(`stores/` 메서드만).
 - 테스트를 skip·삭제해서 통과시키지 않는다(더미 교체 시 skip 제거만 허용).
 

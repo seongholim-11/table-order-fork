@@ -1,4 +1,4 @@
-"""QR 로그인 API. 흐름은 docs/PRODUCTION_PLAN.md 1장 참고.
+"""QR 로그인 API. 흐름은 docs/정식_구현_계획.md 1장 참고.
 
 태블릿: POST /qr → 화면에 QR 표시 → WS /ws/{secret} 로 대기
 휴대폰: QR(= /kakao/start) → 광고성 문자 수신 동의(선택) → 카카오 로그인 → /kakao/callback

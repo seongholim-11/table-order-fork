@@ -60,19 +60,19 @@
 
 | 화면 | 메서드 | 경로 | 설명 | 구현 현황 | 수정할 주요 파일 |
 |---|---|---|---|---|---|
-| 1-1. 스플래시 (룰렛 · 로그인 · 주문 시작) | GET | `/api/v1/store` | 매장 정보(이름·지점·슬로건·테이블 수) 조회 | 더미 | `B/routers/user.py`(`/store` 함수) `B/stores/store_info.py` |
+| 1-1. 스플래시 (룰렛 · 로그인 · 주문 시작) | GET | `/api/v1/store` | 매장 정보(이름·지점·슬로건·테이블 수) 조회 | 더미 | `B/routers/store.py` `B/stores/store_info.py` |
 | 1-1. 스플래시 (룰렛 · 로그인 · 주문 시작) | GET | `/api/v1/roulette/status` | 남은 룰렛 기회, 로그인한 회원별 룰렛 참여·당첨 상태 | 부분 구현 | `B/routers/roulette.py`(신규) `B/stores/tablet_logins.py` `U/state/roulette.py` |
 | 1-1. 스플래시 (룰렛 · 로그인 · 주문 시작) | POST | `/api/v1/roulette/plays` | 룰렛 돌리기: 서버가 당첨 칸 결정·회원당 1회 검증, 결과(칸 번호·할인율 또는 서비스 메뉴 ID) 반환 | 더미 | `B/routers/roulette.py` `B/stores/coupons.py` `U/ui/roulette.py` `U/views/splash.py` |
-| 1-2. 주문 화면 (카테고리 · 메뉴 · 장바구니 · 주문 확인) | POST | `/api/v1/orders` | 주문 생성(주문 확인 다이얼로그) | 더미 | `B/routers/user.py`(`/orders` 함수) `B/stores/shop_orders.py` `U/state/cart.py` |
+| 1-2. 주문 화면 (카테고리 · 메뉴 · 장바구니 · 주문 확인) | POST | `/api/v1/orders` | 주문 생성(주문 확인 다이얼로그) | 더미 | `B/routers/orders.py` `B/stores/shop_orders.py` `U/state/cart.py` |
 | 1-3. 주문내역 다이얼로그 | GET | `/api/v1/tables/{tableId}/orders` | 테이블 누적 주문 내역·합계 | 미구현 | `B/routers/orders.py`(신규) `B/stores/shop_orders.py` `U/ui/dialogs.py` |
 | 1-5. AI 질문 · 추천 결과 | GET | `/api/v1/ai/questions` | 추천 질문 목록(단계별 선택지) | 더미 | `B/routers/ai.py`(신규) `U/views/ai.py` `U/state/quiz.py` `U/ai_quiz_data.py` |
 | 1-5. AI 질문 · 추천 결과 | POST | `/api/v1/ai/recommendations` | 답변 + 시간대·날씨로 메뉴 조합 추천, 추천 기록 저장 | 더미 | `B/routers/ai.py` `B/stores/shop_recommendations.py` `U/recommendations.py` |
 | 1-5. AI 질문 · 추천 결과 | GET | `/api/v1/weather/current` | 현재 날씨(화면에 "날씨 ○○" 표시) | 더미 | `B/routers/ai.py` `B/services/weather.py`(신규, 성호도 가져다 씀) |
 | 1-5. AI 질문 · 추천 결과 | GET | `/api/v1/ai/recommendation-rules` | 추천 규칙(조합 할인율, 메뉴 짝·음료 구성, 매운맛 조합 구분, 표시 이름) | 더미 | `B/routers/ai.py` `U/recommendation_data.py` |
-| 1-6. 쿠폰함 (v7 추가) | GET | `/api/v1/coupons` | 내 쿠폰 목록(안 쓴 쿠폰 먼저, `used_at`이 null이면 사용 가능) | 더미 | `B/routers/user.py`(`/coupons` 함수) `B/stores/coupons.py` |
-| 1-6. 쿠폰함 (v7 추가) | GET | `/api/tables/{tableNo}/coupons` | 이 태블릿에 로그인한 회원들의 쿠폰함(주문 화면 🎟️ 쿠폰함 팝업) | 더미 | `B/routers/user.py` `B/stores/coupons.py` `U/state/coupons.py` `U/ui/coupons.py` |
-| 1-6. 쿠폰함 (v7 추가) | PUT | `/api/tables/{tableNo}/logins/prize` | 룰렛 당첨 기록 + 쿠폰함에 쿠폰 발급(하루 1회, 위반 시 409) | 더미 | `B/routers/user.py` `B/stores/tablet_logins.py`(`set_prize`) `B/stores/coupons.py` |
-| 1-6. 쿠폰함 (v7 추가) | POST | `/api/orders` | 주문 시 `coupon_ids`로 쿠폰 사용 처리(`used_at` 기록) | 더미 | `B/routers/user.py` `B/stores/coupons.py`(`use`) |
+| 1-6. 쿠폰함 (v7 추가) | GET | `/api/v1/coupons` | 내 쿠폰 목록(안 쓴 쿠폰 먼저, `used_at`이 null이면 사용 가능) | 더미 | `B/routers/coupons.py` `B/stores/coupons.py` |
+| 1-6. 쿠폰함 (v7 추가) | GET | `/api/tables/{tableNo}/coupons` | 이 태블릿에 로그인한 회원들의 쿠폰함(주문 화면 🎟️ 쿠폰함 팝업) | 더미 | `B/routers/coupons.py` `B/stores/coupons.py` `U/state/coupons.py` `U/ui/coupons.py` |
+| 1-6. 쿠폰함 (v7 추가) | PUT | `/api/tables/{tableNo}/logins/prize` | 룰렛 당첨 기록 + 쿠폰함에 쿠폰 발급(하루 1회, 위반 시 409) | 더미 | `B/routers/roulette.py` `B/stores/tablet_logins.py`(`set_prize`) `B/stores/coupons.py` |
+| 1-6. 쿠폰함 (v7 추가) | POST | `/api/orders` | 주문 시 `coupon_ids`로 쿠폰 사용 처리(`used_at` 기록) | 더미 | `B/routers/orders.py` `B/stores/coupons.py`(`use`) |
 | 2-7. 주문 이력 | GET | `/api/v1/owner/orders` | 주문 목록(기간·테이블·메뉴·금액·고객 조건) | 더미 | `B/routers/admin/orders.py` `B/stores/shop_orders.py` `A/views/orders.py` `A/order_filters.py` |
 
 ## 수용 (비율 2) · 관리자 대시보드 · 고객 등급
@@ -100,7 +100,7 @@
 | 화면 | 메서드 | 경로 | 설명 | 구현 현황 | 수정할 주요 파일 |
 |---|---|---|---|---|---|
 | 1-2. 주문 화면 (카테고리 · 메뉴 · 장바구니 · 주문 확인) | GET | `/api/v1/categories` | 카테고리 목록 | 더미 | `B/routers/menus.py`(신규) `B/stores/shop_menus.py` `U/menu_data.py` `U/state/menu_groups.py` |
-| 1-2. 주문 화면 (카테고리 · 메뉴 · 장바구니 · 주문 확인) | GET | `/api/v1/menus` | 메뉴 목록(품절 여부·매운맛 단계 포함) | 더미 | `B/routers/user.py`(`/menus` 함수) `B/stores/shop_menus.py` `B/seed/menu.json` `U/views/order.py` `U/menu_images.py` |
+| 1-2. 주문 화면 (카테고리 · 메뉴 · 장바구니 · 주문 확인) | GET | `/api/v1/menus` | 메뉴 목록(품절 여부·매운맛 단계 포함) | 더미 | `B/routers/menus.py` `B/stores/shop_menus.py` `B/seed/menu.json` `U/views/order.py` `U/menu_images.py` |
 | 2-3. 메뉴 관리 | GET | `/api/v1/owner/menus` | 관리자용 메뉴 목록(비공개·품절 포함) | 더미 | `B/routers/admin/menus.py` `B/stores/shop_menus.py` `A/views/menu.py` |
 | 2-3. 메뉴 관리 | POST | `/api/v1/owner/menus` | 메뉴 등록(이름·가격·설명·이미지·매운맛·가중치·세트 가능) | 더미 | `B/routers/admin/menus.py` `B/stores/shop_menus.py` |
 | 2-3. 메뉴 관리 | PATCH | `/api/v1/owner/menus/{menuId}` | 메뉴 수정(가격·설명·판매 여부·매운맛 등) | 더미 | `B/routers/admin/menus.py` `B/stores/shop_menus.py` |
@@ -130,8 +130,8 @@
 
 | 파일 | 건드리는 사람 | 충돌 위험 | 충돌을 줄이는 방법 |
 |---|---|---|---|
-| `B/dummy.py` (`DUMMY_ENDPOINTS` 포함) | 재현·수용·서준·석원 | 높음: 더미 함수와 `DUMMY_ENDPOINTS` 줄이 한 파일에 붙어 있어, 이웃한 줄을 지우면 충돌 | 각자 본인 함수와 본인 `DUMMY_ENDPOINTS` 줄만 지우고, 빈 줄·이웃 줄은 건드리지 않음. 작업마다 PR을 작게 만들어 자주 머지하고, 머지 전에 `dev`를 먼저 받아 옴. 근본 해결은 아래 "코드 분리 제안" 1번 |
-| `B/routers/user.py` | 재현(`/store`·`/orders`·`/coupons`·쿠폰함·당첨), 서준(`/menus`), 석원(`/calls`·`/content`의 룰렛·직원 호출 항목) | 중간: 함수 단위로는 겹치지 않지만 맨 위 import와 `OrderIn`·`CallIn` 같은 모델이 붙어 있음 | 새 엔드포인트는 위 표의 (신규) 라우터 파일에 만들고, `user.py`에서는 본인 함수만 지움. import 줄 추가는 한 줄씩만, 모델은 본인 것만 수정 |
+| `B/dummy/` (분리 완료) | 담당별 `*_data.py`는 한 사람씩 | 낮음: 담당 파일이 나뉘어 겹치지 않음. `content_data.py`(서준·석원·재현)와 `order_data.py`의 `members`(재현·수용)만 같이 씀 | 본인 `*_data.py`의 함수와 `ENDPOINTS` 줄만 지움. `dummy/__init__.py`는 고치지 않음 |
+| `B/routers/` 손님 API (분리 완료) | 파일별 담당: `store.py`·`orders.py`·`coupons.py`·`roulette.py`·`ai.py` 재현, `menus.py` 서준, `staff_calls.py`·`roulette_prizes.py` 석원, `content.py` 서준·석원·재현 | 낮음: 파일이 나뉨 | `user.py`는 성호 전담(회원·태블릿 로그인). 새 엔드포인트는 해당 기능 파일에 추가하고 `factory.py`는 고치지 않음 |
 | `B/factory.py` 와 `B/routers/admin/__init__.py` | 신규 라우터를 만드는 모두 | 중간: 등록 줄을 같은 위치에 한 줄씩 추가하므로 충돌 | 성호가 선작업으로 (신규) 라우터 파일을 빈 틀로 만들어 등록까지 한 번에 머지(아래 "코드 분리 제안" 2번). 그 뒤로는 이 두 파일을 아무도 수정하지 않음 |
 | `B/routers/admin/content.py` , `GET /api/content` , `B/seed/content.json` | 서준(카테고리), 석원(룰렛·직원 호출 항목), 재현(AI 질문·날씨·추천 규칙) | 중간: 6가지 콘텐츠가 한 JSON·한 엔드포인트에 있음 | 각자 자기 항목을 새 엔드포인트로 옮기고 JSON에서는 본인 항목 키만 지움. 모든 항목이 옮겨지면 서준이 마지막에 `content.py`·`content.json`을 삭제 |
 | `B/stores/shop_orders.py` | 재현(주문 생성·누적·이력) | 낮음: 재현 혼자 씀 | 수용의 통계는 이 파일을 고치지 않고 `B/stores/stats.py`(신규)에서 읽기 SQL을 따로 만듦 |
@@ -146,13 +146,13 @@
 | `U/user_repository.py` | 재현(주문·추천), 석원(직원 호출), 서준(메뉴 불러오기 `load_content`) | 중간: 한 클래스 3개에 메서드가 같은 순서로 반복됨 | 본인 기능의 메서드만 수정하고, 새 메서드는 파일 끝에 추가 |
 | `U/app.py` | 거의 없음 | 낮음 | 진입점이라 수정하지 않음 |
 | `BT/test_dummy_get.py` , `BT/test_shop_admin.py` , `T/test_data_source.py` , `T/test_admin_data_source.py` , `T/test_qr_login_e2e.py` | 해당 기능을 교체하는 모두 (`skip` 제거 때문) | 중간: 한 파일에 여러 담당의 테스트가 섞임 | 본인 테스트 함수의 `skip` 줄만 지우고, 새 테스트는 본인 이름의 새 파일(예: `BT/test_roulette.py`)에 작성 |
-| `docs/DB_SCHEMA.md` , `docs/db/fbgrowth_schema.sql` , `AGENTS.md` | 스키마·규칙을 바꾸는 사람 | 낮음~중간: 드물게만 수정 | 스키마를 바꾸면 해당 변경을 먼저 팀에 알리고, 표 한 구역만 수정하는 작은 PR로 먼저 머지 |
+| `docs/DB_설계.md` , `docs/db/fbgrowth_schema.sql` , `AGENTS.md` | 스키마·규칙을 바꾸는 사람 | 낮음~중간: 드물게만 수정 | 스키마를 바꾸면 해당 변경을 먼저 팀에 알리고, 표 한 구역만 수정하는 작은 PR로 먼저 머지 |
 
-## 코드 분리 제안 (이번에는 실행하지 않음, 승인 시 선작업 PR 하나로 처리)
+## 코드 분리 제안 (1·2번은 실행 완료, 3·4번은 하지 않음)
 
 | 번호 | 제안 | 줄이는 충돌 | 담당·시점 |
 |---|---|---|---|
-| 1 | `B/dummy.py`를 `B/dummy/` 폴더로 나눠 담당 기능별 파일(`menus.py`, `orders.py`, `stats.py` 등)로 쪼개고, `DUMMY_ENDPOINTS`도 파일별로 둠 | `dummy.py`의 가장 큰 충돌 지점 해소 | 성호, 다른 사람이 구현을 시작하기 전에 먼저 머지 |
-| 2 | `B/routers/user.py`를 기능별 라우터(`menus`, `orders`, `coupons`, `roulette`, `staff_calls`, `ai`)로 쪼개고, (신규) 라우터 파일을 빈 틀로 만들어 `factory.py`·`admin/__init__.py`에 한 번에 등록 | `user.py`, `factory.py`, `admin/__init__.py` 충돌 해소 | 성호, 1번과 같은 PR |
-| 3 | `A/views/marketing.py`와 `A/marketing_ai.py`를 `marketing_sms`·`marketing_chat`·`marketing_recommend`로 쪼갬 | 성호와 석원의 같은 파일 수정 해소 | 성호, 1번과 같은 PR 또는 바로 뒤 |
-| 4 | `A/admin_repository.py`의 `ApiBackend`를 기능별 믹스인 파일로 쪼갬 | 관리자 호출 모음 파일 충돌 해소 | 수용, 1~3번 머지 뒤 |
+| 1 (완료) | `B/dummy.py`를 `B/dummy/` 폴더로 나눠 담당 기능별 파일(`menu_data.py`, `order_data.py`, `stats_data.py` 등)로 쪼개고, `ENDPOINTS`도 파일별로 둠(`dummy/__init__.py`가 합쳐서 `DUMMY_ENDPOINTS`로 내보냄) | `dummy.py`의 가장 큰 충돌 지점 해소 | 성호, 다른 사람이 구현을 시작하기 전에 먼저 머지 |
+| 2 (완료) | `B/routers/user.py`를 기능별 라우터(`menus`, `orders`, `coupons`, `roulette`, `staff_calls`, `ai`)로 쪼개고, (신규) 라우터 파일을 빈 틀로 만들어 `factory.py`·`admin/__init__.py`에 한 번에 등록 | `user.py`, `factory.py`, `admin/__init__.py` 충돌 해소 | 성호, 1번과 같은 PR |
+| 3 (보류) | `A/views/marketing.py`와 `A/marketing_ai.py`를 `marketing_sms`·`marketing_chat`·`marketing_recommend`로 쪼갬 | 성호와 석원의 같은 파일 수정 해소 | 성호, 1번과 같은 PR 또는 바로 뒤 |
+| 4 (보류) | `A/admin_repository.py`의 `ApiBackend`를 기능별 믹스인 파일로 쪼갬 | 관리자 호출 모음 파일 충돌 해소 | 수용, 1~3번 머지 뒤 |

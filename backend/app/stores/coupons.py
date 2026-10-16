@@ -35,7 +35,7 @@ class CouponStore:
         return self.db.one("SELECT 1 AS x FROM coupons WHERE member_id=? AND issued_at>=?",
                            (member_id, _today_start_utc())) is not None
 
-    # ---- 아래는 [뼈대]: 시그니처만 남겼다. 지금은 라우터가 dummy.py 응답을 돌려준다.
+    # ---- 아래는 [뼈대]: 시그니처만 남겼다. 지금은 라우터가 dummy/ 응답을 돌려준다.
     def issue(self, member_id: int, table_no: int, kind: str, label: str, emoji: str,
               percent: int | None, item_id: str | None,
               prize_id: int | None = None, table_login_id: int | None = None) -> dict:
