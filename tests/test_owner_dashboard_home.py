@@ -34,7 +34,8 @@ def test_dashboard_is_first_and_combines_today_with_sales_trend(monkeypatch):
     assert app.sidebar.radio(key="nav_sub_대시보드").options[0] == "한눈에 보기"
 
     html = "\n".join(element.value for element in app.get("html"))
-    assert "오늘 주문" in html and "최근 7일 매출" in html and "일별 매출 (최근 14일)" in html
+    assert "오늘 주문" in html and "최근 매출 (7일)" in html and "일별 매출 (최근 14일)" in html
+    assert html.index("매출 <small>") < html.index("고객 <small>") < html.index("메뉴 <small>")
     assert html.index("일별 매출 (최근 14일)") < html.index("인기 메뉴 TOP 10")
 
 
@@ -71,6 +72,23 @@ def test_all_dashboard_sales_metrics_follow_dummy_orders(monkeypatch):
     assert summary["last_day_revenue"] == summary["by_day"][summary["last_day"]]
     assert sum(summary["ticket_bands"].values()) == summary["orders"]
 
+    latest_day = recent["주문 시각"].max().normalize()
+    today = recent[recent["주문 시각"].dt.normalize() == latest_day]
+    today_member_revenue = int(today.loc[today["customer_id"].notna(), "금액"].sum())
+    today_guest_revenue = int(today.loc[today["customer_id"].isna(), "금액"].sum())
+    assert summary["member_revenue"] == today_member_revenue
+    assert summary["guest_revenue"] == today_guest_revenue
+    assert summary["member_revenue"] + summary["guest_revenue"] == summary["last_day_revenue"]
+    assert summary["member_revenue_share"] == today_member_revenue / summary["last_day_revenue"]
+    expected_tables = today.groupby("테이블").size().sort_values(ascending=False).head(5)
+    assert summary["top_tables"] == {f"{int(table)}번": int(count) for table, count in expected_tables.items()}
+    assert all({"name", "amount", "orders", "table", "kind"} <= set(customer) for customer in summary["top_customers"])
+    assert all(customer["table"] in set(today["테이블"]) for customer in summary["top_customers"])
+    assert {customer["kind"] for customer in summary["top_customers"]} <= {"회원", "비회원"}
+    assert any(customer["kind"] == "회원" for customer in summary["top_customers"])
+    expected_top_share = sum(customer["amount"] for customer in summary["top_customers"]) / today["금액"].sum()
+    assert summary["top_customer_share"] == expected_top_share
+
     buyer_ids = {int(value) for value in recent["customer_id"].dropna().unique()}
     buyer_grades = members[members["customer_id"].isin(buyer_ids)]["등급"]
     expected_returning = buyer_grades.isin(["재방문", "단골"]).sum() / len(buyer_grades)
@@ -84,3 +102,15 @@ def test_all_dashboard_sales_metrics_follow_dummy_orders(monkeypatch):
     expected_popular = sorted(quantities.items(), key=lambda item: -item[1])[:10]
     actual_popular = [(item["name"], item["qty"]) for item in repo.stats(repo_mod.DEFAULT_RULE)["popular_menus"]]
     assert actual_popular == expected_popular
+
+
+def test_customer_age_groups_start_at_twenty_and_keep_every_customer(monkeypatch):
+    monkeypatch.setenv("DATA_SOURCE", "dummy")
+    repo = repo_mod.connect("change-me").repo
+    members = repo.members(repo_mod.DEFAULT_RULE)
+    age_groups = repo.stats(repo_mod.DEFAULT_RULE)["age_groups"]
+
+    assert list(age_groups) == ["20대", "30대", "40대", "50대 이상"]
+    assert "20대 미만" not in set(members["연령대"])
+    assert sum(age_groups.values()) == len(members)
+    assert all(count > 0 for count in age_groups.values())

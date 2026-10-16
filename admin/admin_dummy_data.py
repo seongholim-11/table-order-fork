@@ -15,7 +15,7 @@ from user import menu_data  # noqa: E402
 
 TODAY = date(2026, 10, 12)
 GRADES = ["신규", "재방문", "단골", "휴면"]  # admin_repository 도 여기 것을 가져다 쓴다
-AGE_GROUPS = ["20대 미만", "20대", "30대", "40대", "50대 이상"]
+AGE_GROUPS = ["20대", "30대", "40대", "50대 이상"]
 DUMMY_ORDER_COUNT = 1000  # 매출 추이와 회원·비회원 비교가 충분히 보이도록 한 달 주문량을 넉넉히 만든다.
 DUMMY_TODAY_ORDER_COUNT = 80
 
@@ -64,7 +64,8 @@ def _grade(visits: int, last: date, rule: dict) -> str:
 
 def _age_group(year: int) -> str:
     age = TODAY.year - year
-    return "20대 미만" if age < 20 else "20대" if age < 30 else "30대" if age < 40 else "40대" if age < 50 else "50대 이상"
+    # 화면에는 20대 미만 구간을 두지 않으므로 최저 연령 구간은 20대로 합친다.
+    return "20대" if age < 30 else "30대" if age < 40 else "40대" if age < 50 else "50대 이상"
 
 
 class DummyBackend:
@@ -80,7 +81,9 @@ class DummyBackend:
         for i in range(1, 61):
             self.members_.append({
                 "id": i, "nickname": f"손님{i:02d}", "gender": r.choice(["남", "여"]),
-                "birth_year": r.choice([2008, 1998, 1992, 1984, 1975]),
+                # 기존 20대 미만 더미 고객은 성인 연령대 네 구간에 고르게 다시 분산한다.
+                # 주문이 이 회원 id와 연결되므로 회원별 주문·매출도 같은 연령대로 자동 귀속된다.
+                "birth_year": r.choice([2002, 1995, 1986, 1974]),
                 "visit_count": r.choice([1, 1, 1, 2, 2, 3, 4, 5, 6, 8, 12]),
                 "last_visit": TODAY - timedelta(days=r.choice([0, 1, 2, 3, 5, 8, 14, 21, 35, 50, 70, 95, 130])),
                 "marketing_consent": r.random() < 0.7, "opted_out": False})
@@ -98,6 +101,19 @@ class DummyBackend:
                                  "ai_combo": r.random() < 0.45,
                                  "roulette_discount_percent": 0, "recommendation_event_id": None})
         self.orders_.sort(key=lambda o: o["ts"], reverse=True)
+        # 직원 호출 화면을 서버 없이 먼저 확인할 수 있도록 대기/완료 호출을 함께 준비한다.
+        # 실제 API도 같은 필드(id, table_no, items, ts, done)를 반환하면 화면 코드는 바꿀 필요가 없다.
+        call_specs = [
+            (1, 7, ["물", "수저 2개"], 4, False),
+            (2, 12, ["앞접시 3개"], 7, False),
+            (3, 3, ["직원 호출"], 11, False),
+            (4, 21, ["물티슈", "물"], 18, True),
+            (5, 9, ["소주잔 2개"], 26, True),
+        ]
+        call_base = datetime(TODAY.year, TODAY.month, TODAY.day, 21, 30, tzinfo=timezone(timedelta(hours=9)))
+        self.calls_ = [{"id": call_id, "table_no": table_no, "items": items,
+                        "ts": _iso(call_base - timedelta(minutes=minutes_ago)), "done": done}
+                       for call_id, table_no, items, minutes_ago, done in call_specs]
 
     # ---- 로그인 / 매장 -----------------------------------------------------
     def login(self, token: str) -> bool:
@@ -148,6 +164,18 @@ class DummyBackend:
     def orders(self) -> list:
         nick = {m["id"]: m["nickname"] for m in self.members_}
         return [{**o, "nickname": nick.get(o["member_id"])} for o in self.orders_]
+
+    # ---- 직원 호출 ------------------------------------------------------------
+    def calls(self) -> list:
+        """최신 호출부터 반환한다. 대기/완료 구분과 정렬은 화면에서도 한 번 더 보장한다."""
+        return [dict(call) for call in sorted(self.calls_, key=lambda call: call["ts"], reverse=True)]
+
+    def call_done(self, call_id: int) -> dict:
+        call = next((call for call in self.calls_ if call["id"] == call_id), None)
+        if call is None:
+            raise Unsupported("직원 호출을 찾을 수 없습니다.")
+        call["done"] = True
+        return dict(call)
 
     def stats(self, rule: dict) -> dict:
         today = [o for o in self.orders_ if o["ts"][:10] >= TODAY.isoformat()]  # UTC 기준 근사

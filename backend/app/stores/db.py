@@ -96,6 +96,22 @@ class Database:
             self._conn.executescript(sql)
             self._conn.commit()
 
+    def atomic(self, statements: list[tuple[str, tuple]]) -> None:
+        """여러 변경을 한 트랜잭션으로 실행한다. 하나라도 실패하면 전부 이전 상태로 되돌린다."""
+        with self._lock:
+            if self.pg:
+                with self._conn.transaction():
+                    for sql, params in statements:
+                        self._execute(sql, params)
+                return
+            try:
+                for sql, params in statements:
+                    self._conn.execute(sql, params)
+                self._conn.commit()
+            except Exception:
+                self._conn.rollback()
+                raise
+
     def to_list(self, value) -> str | list:
         """목록 컬럼에 넣을 값: Postgres 는 배열(text[]), SQLite 는 JSON 문자열."""
         return list(value) if self.pg else json.dumps(list(value), ensure_ascii=False)

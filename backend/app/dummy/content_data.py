@@ -1,4 +1,4 @@
-"""화면용 콘텐츠(카테고리·룰렛·직원호출 항목·AI 질문·날씨·추천 규칙) 더미. (카테고리 서준 / 룰렛·직원호출 석원 / AI 질문·날씨·추천 규칙 재현이 함께 쓴다)"""
+"""화면용 콘텐츠(카테고리·직원호출 항목·AI 질문·날씨·추천 규칙) 더미."""
 
 from app.dummy._common import _json
 
@@ -10,7 +10,7 @@ ENDPOINTS = {
 
 
 def content() -> dict:
-    """카테고리·룰렛·직원호출 항목·AI 질문·날씨·추천 규칙. 모양은 seed/content.json 과 같다."""
+    """아직 개별 DB API로 옮기지 않은 화면 콘텐츠. 모양은 seed/content.json 과 같다."""
     return _json("content.json")
 
 

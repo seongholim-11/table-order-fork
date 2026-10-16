@@ -8,7 +8,7 @@ from tests.conftest import ADMIN, login
 
 def test_user_get_dummies(client):
     assert {"name", "branch", "slogan", "tables"} <= client.get("/api/v1/store").json().keys()
-    assert set(client.get("/api/content").json()) == {"categories", "roulette_prizes", "staff_calls",
+    assert set(client.get("/api/content").json()) == {"categories", "staff_calls",
                                                        "quiz_questions", "weather", "rules"}
     assert client.get("/api/content/categories").json()[0]["id"] and client.get("/api/content/nope").status_code == 404
     menus = client.get("/api/menus").json()

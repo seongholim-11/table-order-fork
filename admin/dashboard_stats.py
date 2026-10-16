@@ -49,7 +49,8 @@ def summarize(orders: pd.DataFrame, members: pd.DataFrame, tables: int | None = 
         "turnover_today": round(len(today_df) / used_tables, 1),
         "turnover_avg": round(len(df) / days / used_tables, 1),
         "tables": used_tables,
-        "top_tables": {f"{int(t)}번": int(n) for t, n in per_table.sort_values(ascending=False).head(5).items()},
+        # 사장님이 지금 붐비는 테이블을 볼 수 있도록 최근 30일 누적이 아닌 마지막 영업일 주문만 센다.
+        "top_tables": {f"{int(t)}번": int(n) for t, n in today_df.groupby("테이블").size().sort_values(ascending=False).head(5).items()},
         "customer_grades": {g: int(grades.get(g, 0)) for g in GRADE_ORDER},
         "returning_share": (sum(int(grades.get(g, 0)) for g in ("재방문", "단골")) / grades.sum()) if grades.sum() else None,
         "ai_avg_ticket": int(ai["금액"].mean()) if len(ai) else None,
@@ -84,8 +85,21 @@ def _trend_stats(all_orders: pd.DataFrame, df: pd.DataFrame) -> dict:
     last_day_rev, same_weekday_rev = int(all_daily.get(last, 0)), int(all_daily.get(last - timedelta(days=7), 0))
     member = df[df["customer_id"].notna()]
     guest = df[df["customer_id"].isna()]
-    spend = member.groupby("customer_id").agg(닉네임=("닉네임", "first"), 금액=("금액", "sum"), 횟수=("금액", "size"))
-    top = spend.sort_values("금액", ascending=False).head(5)
+    today = df[df["주문 시각"].dt.normalize() == last]
+    today_member_orders = today[today["customer_id"].notna()]
+    today_guest_orders = today[today["customer_id"].isna()]
+    today_member_revenue = int(today_member_orders["금액"].sum())
+    today_guest_revenue = int(today_guest_orders["금액"].sum())
+    # 서비스가 필요한 손님을 바로 찾을 수 있도록 회원은 고객별, 신원을 모르는 비회원은 테이블별로 합친다.
+    today_member = today[today["customer_id"].notna()].sort_values("주문 시각")
+    member_spend = today_member.groupby("customer_id").agg(
+        닉네임=("닉네임", "first"), 금액=("금액", "sum"), 횟수=("금액", "size"), 테이블=("테이블", "last"))
+    member_rows = [{"name": row["닉네임"], "amount": int(row["금액"]), "orders": int(row["횟수"]),
+                    "table": int(row["테이블"]), "kind": "회원"} for _, row in member_spend.iterrows()]
+    guest_spend = today[today["customer_id"].isna()].groupby("테이블").agg(금액=("금액", "sum"), 횟수=("금액", "size"))
+    guest_rows = [{"name": "비회원", "amount": int(row["금액"]), "orders": int(row["횟수"]),
+                   "table": int(table), "kind": "비회원"} for table, row in guest_spend.iterrows()]
+    top_customers = sorted(member_rows + guest_rows, key=lambda row: row["amount"], reverse=True)[:5]
     bands = {name: int(((df["금액"] >= lo) & ((df["금액"] < hi) if hi else True)).sum()) for name, lo, hi in TICKET_BANDS}
     return {
         "by_day": by_day,
@@ -93,11 +107,16 @@ def _trend_stats(all_orders: pd.DataFrame, df: pd.DataFrame) -> dict:
         "week_revenue": this_week, "week_change": _change(this_week, prev_week),
         "last_day_revenue": last_day_rev, "last_day_change": _change(last_day_rev, same_weekday_rev),
         "member_order_share": len(member) / len(df),
+        # 오늘 전체 매출은 회원 매출과 비회원 매출의 합이며, 화면의 비중은 주문 건수가 아닌 금액으로 계산한다.
+        "member_revenue_share": today_member_revenue / last_day_rev if last_day_rev else None,
+        "member_revenue": today_member_revenue,
+        "guest_revenue": today_guest_revenue,
         "member_avg_ticket": int(member["금액"].mean()) if len(member) else None,
         "guest_avg_ticket": int(guest["금액"].mean()) if len(guest) else None,
         "ticket_bands": bands,
-        "top_customers": [{"name": r["닉네임"], "amount": int(r["금액"]), "orders": int(r["횟수"])} for _, r in top.iterrows()],
-        "top_customer_share": float(top["금액"].sum() / member["금액"].sum()) if len(member) and member["금액"].sum() else None,
+        "top_customers": top_customers,
+        "top_customer_share": (sum(row["amount"] for row in top_customers) / today["금액"].sum()
+                               if top_customers and today["금액"].sum() else None),
     }
 
 

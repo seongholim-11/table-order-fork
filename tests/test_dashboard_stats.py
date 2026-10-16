@@ -30,8 +30,11 @@ def test_trend_stats():
     assert sum(x["ticket_bands"].values()) == x["orders"]
     assert x["last_day_revenue"] == x["by_day"][x["last_day"]]
     assert 0 <= x["member_order_share"] <= 1
+    assert x["member_revenue"] + x["guest_revenue"] == x["last_day_revenue"]
+    assert 0 <= x["member_revenue_share"] <= 1
     tops = [c["amount"] for c in x["top_customers"]]
     assert tops == sorted(tops, reverse=True) and len(tops) <= 5
+    assert all(c["table"] >= 1 and c["kind"] in ("회원", "비회원") for c in x["top_customers"])
     assert 0 < x["top_customer_share"] <= 1
 
 

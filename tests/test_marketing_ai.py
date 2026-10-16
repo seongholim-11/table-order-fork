@@ -77,7 +77,7 @@ def test_sidebar_sub_menus_are_collapsible_and_select_tabs():
     assert app.sidebar.radio(key="nav_sub_주문 이력").options == ["전체 주문", "고객별 주문"]
     assert [e.label for e in app.sidebar.expander] == ["📊 대시보드", "👥 고객 등급", "🧾 주문 이력", "💬 마케팅"]
     assert [e.proto.expanded for e in app.sidebar.expander] == [False, False, False, True]  # 선택된 묶음만 펼쳐서 시작
-    assert "직원 호출" not in app.sidebar.radio(key="nav_top").options
+    assert "직원 호출" in app.sidebar.radio(key="nav_top").options
     app.sidebar.radio(key="nav_sub_주문 이력").set_value("고객별 주문").run()
     assert not app.exception and any("고객" in s.label for s in app.selectbox)
     assert app.query_params["page"] == "주문 이력" and app.query_params["tab"] == "고객별 주문"

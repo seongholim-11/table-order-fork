@@ -20,7 +20,7 @@
 |---|---|---|---|
 | 0 | 0. 개발 흐름 확인 (테스트 버튼) | `POST /api/dev/db-test` (개발 전용) | 확인 전 |
 | 1 | 1. 직원 호출 (손님 호출 → 관리자 확인) | `POST /api/v1/staff-calls`, `GET /api/v1/staff-call-items`, `GET /api/admin/calls`, `POST /api/admin/calls/{callId}/done` | 더미 |
-| 2 | 2. 룰렛 설정 | `GET /api/v1/roulette/prizes`, `PUT /api/v1/owner/roulette/prizes` | 더미 |
+| 2 | 2. 룰렛 설정 | `GET /api/v1/roulette/prizes`, `PUT /api/v1/owner/roulette/prizes` | 완료 |
 | 3 | 3. 관리자 AI 추천 | `GET /api/admin/marketing/opportunities?round=` | 미구현 |
 
 **다른 팀원과 겹치는 지점**
@@ -168,12 +168,12 @@ UI(관리자 > 이벤트 > 룰렛 · 칸 편집 · 저장) → A/views/events.py
 
 **상세 설명 / TODO**
 
-- [ ] `B/stores/roulette_prizes.py`(신규): `list()`(`sort_order` 순, 화면 모양으로 변환: `short_text→short`, `menu_id→item_id`), `replace(prizes)`, 비어 있을 때 `content.json`의 `roulette_prizes`로 시드. **재현이 쓰는 `list()`의 반환 모양을 먼저 합의**한다.
-- [ ] `B/routers/roulette_prizes.py`(신규): 손님용 `GET /api/v1/roulette/prizes`, 관리자용 `PUT /admin/api/owner/roulette/prizes`(인증 필요). 서버 검증은 `save_roulette`와 같은 규칙.
-- [ ] 더미 주석처리: `B/seed/content.json`의 `roulette_prizes` 키는 옮긴 뒤 지운다. `B/routers/admin/content.py`의 룰렛용 `PUT /content/{name}` 사용부는 직원 호출(1-1)과 함께 정리(서준이 마지막 확인).
-- [ ] `A/admin_repository.py`: `ENDPOINTS["roulette"]`와 `ApiBackend.roulette_prizes`/`save_roulette_prizes`의 경로를 새 경로로 바꾼다(이 두 메서드만).
-- [ ] `U/user_repository.py _fetch_content`의 `roulette_prizes`를 새 경로로 받도록 **그 줄만** 수정.
-- [ ] `B/dummy/content_data.py`의 `content_saved`와 `"PUT /admin/api/content/{name}"` 줄은 직원 호출·카테고리가 모두 옮겨진 뒤 삭제.
+- [x] `B/stores/roulette_prizes.py`(신규): `list()`(`sort_order` 순, 화면 모양으로 변환: `short_text→short`, `menu_id→item_id`), `replace(prizes)`, 비어 있을 때 전용 시드의 룰렛 설정으로 초기화.
+- [x] `B/routers/roulette_prizes.py`(신규): 손님용 `GET /api/v1/roulette/prizes`, 관리자용 `PUT /admin/api/owner/roulette/prizes`(인증 필요). 서버 검증은 `save_roulette`와 같은 규칙.
+- [x] 더미 정리: `B/seed/content.json`의 `roulette_prizes` 키를 전용 시드로 옮겼다. 공용 콘텐츠 저장 엔드포인트는 직원 호출·카테고리 이관 뒤 정리한다.
+- [x] `A/admin_repository.py`: `ENDPOINTS["roulette"]`와 `ApiBackend.roulette_prizes`/`save_roulette_prizes`의 경로를 새 경로로 변경.
+- [x] `U/user_repository.py _fetch_content`의 `roulette_prizes`를 새 경로로 받도록 수정.
+- [x] `B/dummy/content_data.py`에서 룰렛 더미를 분리했다. 공용 `content_saved`는 직원 호출·카테고리가 아직 사용하므로 유지한다.
 
 ---
 
