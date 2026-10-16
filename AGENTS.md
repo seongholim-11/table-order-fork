@@ -6,9 +6,20 @@
 - 소통·주석·커밋 메시지는 한국어로 한다.
 
 ## 실행·테스트 (모두 이 리포에서 확인한 명령)
-- 서버 설치·실행: `cd backend && cp .env.example .env && uv sync && uv run fastapi dev main.py` (http://127.0.0.1:8000/docs)
-- 화면 설치: `uv venv .venv && uv pip install -r requirements.txt`
-- 화면 실행(서버 없이 더미): `DATA_SOURCE=dummy streamlit run user/app.py` / `streamlit run admin/app.py --server.port 8502`
+```bash
+# 서버 (http://127.0.0.1:8000/docs)
+cd backend
+cp .env.example .env
+uv sync
+uv run fastapi dev main.py
+
+# 페이지 (저장소 루트에서, 서버가 켜져 있어야 QR 로그인·문자 발송이 동작)
+uv venv .venv
+source .venv/Scripts/activate   # macOS/Linux 는 source .venv/bin/activate
+uv pip install -r requirements.txt
+streamlit run user/app.py --server.port 8501    # 사용자 (?table=12 로 테이블 지정)
+streamlit run admin/app.py --server.port 8502   # 관리자 (현재 토큰 입력 생략. 끄려면 ADMIN_SKIP_TOKEN=0, 토큰은 ADMIN_TOKEN)
+```
 - 서버 테스트: `cd backend && uv run pytest -q`
 - 화면+통합 테스트: 저장소 루트에서 `python -m pytest tests -q` (streamlit·pytest·backend 의존성이 모두 설치된 환경 필요)
 - 린터·포매터·빌드 설정은 없다. 완료 기준은 위 두 테스트가 실패 없이 통과하는 것(skip은 허용).
