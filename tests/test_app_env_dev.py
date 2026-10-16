@@ -50,6 +50,17 @@ def test_user_app_auto_login_in_dev(server, monkeypatch):
     assert app.session_state["access_token"]
 
 
+def test_user_app_dev_login_even_without_server(monkeypatch):
+    """서버가 안 닿아도(DB INSERT 불가) dev 에서는 임시 회원으로 로그인된 상태가 된다."""
+    monkeypatch.setenv("APP_ENV", "dev")
+    api.set_client(None)
+    monkeypatch.setattr(api, "API_URL", "http://127.0.0.1:1")  # 아무도 듣지 않는 주소
+    app = AppTest.from_file(USER_APP, default_timeout=30).run()
+    assert not app.exception
+    assert app.session_state["member"]["nickname"] == "개발테스트"
+    api.set_client(None)
+
+
 @pytest.mark.parametrize("env", ["prod", None])
 def test_user_app_not_logged_in_when_not_dev(server, monkeypatch, env):
     if env is None:

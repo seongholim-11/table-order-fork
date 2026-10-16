@@ -80,7 +80,14 @@ def dev_auto_login():
     ss._dev_login_tried = True
     event = server.dev_login(ss.table)
     if event:
-        finish_login(event)
+        finish_login(event)  # 서버가 회원·로그인 기록을 DB 에 INSERT 하고 토큰을 준 경우
+        return
+    # 서버가 꺼져 있거나 DB INSERT 가 안 되는 경우에도 개발 화면은 로그인된 것처럼 보이게 임시 회원을 둔다.
+    # 토큰이 없어 서버 기능(쿠폰 저장 등)은 못 쓰지만 화면 흐름은 확인할 수 있다.
+    ss.member = {"id": 0, "nickname": server.DEV_NICKNAME}
+    ss.members = [{"id": 0, "nickname": server.DEV_NICKNAME, "at": datetime.now(KST).strftime("%H:%M"),
+                   "eligible": False, "prize": None}]
+    ss.granted_ids = [0]
 
 
 def _restore_members(token, m):
