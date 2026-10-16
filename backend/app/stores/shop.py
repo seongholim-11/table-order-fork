@@ -1,7 +1,8 @@
 """메뉴·주문·직원 호출·추천 기록 저장소.
 
 테이블별 코드는 shop_menus / shop_orders / shop_calls / shop_recommendations 파일에 나뉘어 있고,
-여기서는 하나의 ShopStore 로 합쳐 `app.state.shop` 으로 쓴다 (라우터는 기존처럼 shop.xxx() 를 부른다).
+여기서는 하나의 ShopStore 로 합쳐 `app.state.shop` 으로 쓴다 (라우터는 shop.xxx() 를 부른다).
+[뼈대] 지금은 각 메서드가 NotImplementedError 이고 라우터는 dummy.py 응답을 돌려준다.
 """
 
 from app.stores import shop_calls, shop_menus, shop_orders, shop_recommendations
@@ -19,4 +20,4 @@ class ShopStore(MenuMixin, OrderMixin, CallMixin, RecommendationMixin):
         self.db = db
         for schema in SCHEMAS:
             db.script(schema)
-        self.seed_menus()
+        # TODO: 구현 후 self.seed_menus() 를 불러 빈 메뉴 테이블을 seed 로 채운다.

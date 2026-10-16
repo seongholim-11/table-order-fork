@@ -28,7 +28,5 @@ async def list_calls():
 
 @router.post("/calls/{call_id}/done")
 async def finish_call(call_id: int, request: Request):
-    call = request.app.state.shop.finish_call(call_id)
-    if not call:
-        raise HTTPException(404, "없는 호출입니다.")
-    return call
+    """호출 처리 완료. [더미] 저장하지 않고 완료된 호출을 돌려준다. TODO: shop.finish_call(call_id), 없으면 404."""
+    return dummy.call_finished(call_id)

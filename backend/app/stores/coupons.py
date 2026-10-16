@@ -2,12 +2,12 @@
 
 룰렛은 회원당 하루 1회(한국 시간 기준, 다른 테이블에서도 같은 날은 불가)이므로
 '오늘 이 회원에게 발급된 쿠폰이 있는가'가 곧 '오늘 룰렛을 돌렸는가'이다.
+[뼈대] issued_today 는 QR 로그인(routers/auth.py)이 쓰므로 남겨 두었고, 나머지는 시그니처만 남겼다.
 """
 
 from datetime import datetime, timedelta, timezone
 
 from app.stores.db import Database
-from app.stores.members import now_iso
 
 KST = timezone(timedelta(hours=9))
 
@@ -35,38 +35,32 @@ class CouponStore:
         return self.db.one("SELECT 1 AS x FROM coupons WHERE member_id=? AND issued_at>=?",
                            (member_id, _today_start_utc())) is not None
 
+    # ---- 아래는 [뼈대]: 시그니처만 남겼다. 지금은 라우터가 dummy.py 응답을 돌려준다.
     def issue(self, member_id: int, table_no: int, kind: str, label: str, emoji: str,
               percent: int | None, item_id: str | None) -> dict:
-        cid = self.db.run("INSERT INTO coupons (member_id, table_no, kind, label, emoji, percent, menu_id, issued_at) "
-                          "VALUES (?,?,?,?,?,?,?,?)",
-                          (member_id, table_no, kind, label, emoji, percent, item_id, now_iso()))
-        return self.get(cid)
+        """룰렛 당첨 쿠폰을 발급하고 get() 모양으로 돌려준다.
+
+        TODO: coupons INSERT (menu_id 칸에 item_id, issued_at 은 now_iso()) 후 get() 으로 반환."""
+        raise NotImplementedError
 
     def get(self, coupon_id: int) -> dict | None:
-        return self.db.one(f"SELECT {COLUMNS} FROM coupons WHERE id=?", (coupon_id,))
+        """TODO: 한 건 조회 (COLUMNS 사용), 없으면 None."""
+        raise NotImplementedError
 
     def for_member(self, member_id: int) -> list[dict]:
-        """내 쿠폰: 안 쓴 것 먼저, 그 안에서는 최근 발급순."""
-        return self.db.all(f"SELECT {COLUMNS} FROM coupons WHERE member_id=? "
-                           "ORDER BY used_at IS NOT NULL, id DESC", (member_id,))
+        """내 쿠폰: 안 쓴 것 먼저, 그 안에서는 최근 발급순.
+
+        TODO: ORDER BY used_at IS NOT NULL, id DESC."""
+        raise NotImplementedError
 
     def for_members(self, member_ids: list[int]) -> list[dict]:
-        """이 태블릿에 로그인한 회원들의 쿠폰 (닉네임 포함). 안 쓴 것 먼저, 최근 발급순."""
-        if not member_ids:
-            return []
-        marks = ",".join("?" * len(member_ids))
-        return self.db.all(
-            f"SELECT c.id, c.member_id, m.nickname, c.table_no, c.kind, c.label, c.emoji, c.percent, c.menu_id AS item_id, "
-            f"c.issued_at, c.used_at, c.used_order_id FROM coupons c JOIN members m ON m.id=c.member_id "
-            f"WHERE c.member_id IN ({marks}) ORDER BY c.used_at IS NOT NULL, c.id DESC", tuple(member_ids))
+        """이 태블릿에 로그인한 회원들의 쿠폰 (닉네임 포함). 안 쓴 것 먼저, 최근 발급순.
+
+        TODO: coupons JOIN members. member_ids 가 비면 빈 목록."""
+        raise NotImplementedError
 
     def use(self, coupon_ids: list[int], member_ids: list[int], order_id: int) -> list[int]:
-        """주문에 쓴 쿠폰을 사용 처리한다. 주어진 회원의 아직 안 쓴 쿠폰만 되고, 처리된 id 를 돌려준다."""
-        used = []
-        for cid in dict.fromkeys(coupon_ids):
-            row = self.get(cid)
-            if row and row["member_id"] in member_ids and row["used_at"] is None:
-                self.db.run("UPDATE coupons SET used_at=?, used_order_id=? WHERE id=? AND used_at IS NULL",
-                            (now_iso(), order_id, cid))
-                used.append(cid)
-        return used
+        """주문에 쓴 쿠폰을 사용 처리하고, 처리된 id 를 돌려준다.
+
+        TODO: 주어진 회원의 아직 안 쓴(used_at 이 null) 쿠폰만 used_at·used_order_id 를 채운다 (같은 id 중복은 한 번만)."""
+        raise NotImplementedError

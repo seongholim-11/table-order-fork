@@ -105,7 +105,8 @@ class DummyBackend:
             ts = datetime(day.year, day.month, day.day, tzinfo=timezone(timedelta(hours=9))) + timedelta(minutes=r.randint(1020, 1430))
             self.orders_.append({"id": i, "ts": _iso(ts), "table_no": r.randint(1, 30), "member_id": r.choice(self.members_)["id"],
                                  "lines": lines, "total": sum(l["unit"] * l["qty"] for l in lines),
-                                 "ai_combo": r.random() < 0.45})
+                                 "ai_combo": r.random() < 0.45,
+                                 "roulette_discount_percent": 0, "recommendation_event_id": None})
         self.orders_.sort(key=lambda o: o["ts"], reverse=True)
 
     # ---- 로그인 / 매장 -----------------------------------------------------

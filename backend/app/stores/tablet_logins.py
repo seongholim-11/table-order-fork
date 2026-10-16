@@ -46,12 +46,8 @@ class TabletLoginStore:
         return [{**r, "eligible": bool(r["eligible"])} for r in rows]
 
     def set_prize(self, table_no: int, member_id: int, prize: str) -> bool:
-        """룰렛 결과를 기록한다. 이미 돌린 회원이면 덮어쓰지 않는다 (회원당 1회)."""
-        row = self.db.one("SELECT id FROM table_logins WHERE table_no=? AND member_id=? AND logged_in_at>=? "
-                          "ORDER BY id DESC LIMIT 1", (table_no, member_id, self._cutoff()))
-        if not row:
-            return False
-        self.db.run("UPDATE table_logins SET prize_text=?, played_at=? WHERE id=? AND prize_text IS NULL",
-                    (prize, _iso(datetime.now(timezone.utc)), row["id"]))
-        row = self.db.one("SELECT prize_text FROM table_logins WHERE id=?", (row["id"],))
-        return row["prize_text"] == prize
+        """룰렛 결과를 기록한다. 이미 돌린 회원이면 덮어쓰지 않는다 (회원당 1회). [뼈대]
+
+        TODO: 이 태블릿(table_no)의 가장 최근 로그인 기록(_cutoff 이후)을 찾아 prize_text 가 비어 있을 때만
+              prize_text·played_at 을 채우고, 기록돼 있으면 True / 없거나 이미 다른 값이면 False."""
+        raise NotImplementedError

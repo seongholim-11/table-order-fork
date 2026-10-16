@@ -2,9 +2,9 @@
 
 Supabase 에서는 orders(주문) / order_items(줄) / order_item_components(AI 조합 구성 메뉴) 세 테이블로 나뉜다.
 밖으로는 예전처럼 ts·lines 를 가진 주문 하나로 돌려준다.
-"""
 
-from app.stores.members import now_iso
+[뼈대] 시그니처와 스키마만 남겼다. 구현은 TODO 를 따라 채운다.
+"""
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS orders (
@@ -22,47 +22,18 @@ CREATE TABLE IF NOT EXISTS order_item_components (
 
 
 class OrderMixin:
-    def _menu_id(self, value) -> str | None:
-        """menus 에 있는 id 만 연결한다 (조합 줄 'combo:...' 나 지워진 메뉴는 null)."""
-        return value if value and self.db.one("SELECT 1 FROM menus WHERE id=?", (value,)) else None
-
     def add_order(self, table_no: int, lines: list[dict], total: int, member_id: int | None) -> dict:
-        ai = any(str(l.get("id", "")).startswith("combo:") for l in lines)
-        oid = self.db.run("INSERT INTO orders (table_no, member_id, total, ai_combo, created_at) VALUES (?,?,?,?,?)",
-                          (table_no, member_id, total, ai, now_iso()))
-        for l in lines:
-            combo = str(l.get("id", "")).startswith("combo:")
-            item_id = self.db.run(
-                "INSERT INTO order_items (order_id, menu_id, kind, name, option_label, unit_price, original_unit_price, qty) "
-                "VALUES (?,?,?,?,?,?,?,?)",
-                (oid, None if combo else self._menu_id(l.get("id")), "combo" if combo else "menu", l["name"],
-                 l.get("opt", ""), l["unit"], l.get("original_unit"), l["qty"]))
-            for c in l.get("components") or []:
-                self.db.run("INSERT INTO order_item_components (order_item_id, menu_id, name, option_label, qty) VALUES (?,?,?,?,?)",
-                            (item_id, self._menu_id(c.get("id")), c["name"], c.get("opt", ""), c["qty"]))
-        return self.order(oid)
+        """주문을 저장하고 order() 모양({id, table_no, member_id, total, ai_combo, ts, lines, ...})을 돌려준다.
 
-    def _order(self, r: dict) -> dict:
-        r["ts"], r["ai_combo"], r["lines"] = r.pop("created_at"), bool(r["ai_combo"]), []
-        for it in self.db.all("SELECT * FROM order_items WHERE order_id=? ORDER BY id", (r["id"],)):
-            line = {"id": it["menu_id"] or "", "name": it["name"], "opt": it["option_label"], "unit": it["unit_price"],
-                    "qty": it["qty"]}
-            if it["original_unit_price"] is not None:
-                line["original_unit"] = it["original_unit_price"]
-            comps = self.db.all("SELECT menu_id, name, option_label, qty FROM order_item_components "
-                                "WHERE order_item_id=? ORDER BY id", (it["id"],))
-            if comps:
-                line["components"] = [{"id": c["menu_id"] or "", "name": c["name"], "opt": c["option_label"], "qty": c["qty"]}
-                                      for c in comps]
-            r["lines"].append(line)
-        return r
+        TODO: orders INSERT (줄 id 가 'combo:' 로 시작하는 줄이 있으면 ai_combo=True).
+        TODO: 줄마다 order_items INSERT (combo 줄은 menu_id=null, kind='combo'), components 는 order_item_components 에 저장.
+        TODO: menus 에 있는 id 만 menu_id 로 연결 (없으면 null)."""
+        raise NotImplementedError
 
     def order(self, order_id: int) -> dict:
-        return self._order(self.db.one("SELECT * FROM orders WHERE id=?", (order_id,)))
+        """TODO: 주문 한 건 + 줄(lines, 조합 구성 components) 조회. created_at 은 ts 로 내보낸다."""
+        raise NotImplementedError
 
     def orders(self, member_id: int | None = None) -> list[dict]:
-        if member_id is None:
-            rows = self.db.all("SELECT * FROM orders ORDER BY id DESC")
-        else:
-            rows = self.db.all("SELECT * FROM orders WHERE member_id=? ORDER BY id DESC", (member_id,))
-        return [self._order(r) for r in rows]
+        """TODO: 최신순 주문 목록. member_id 가 있으면 그 회원 것만."""
+        raise NotImplementedError

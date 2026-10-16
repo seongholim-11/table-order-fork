@@ -5,10 +5,12 @@
   2. 이 파일에서 그 함수와 아래 DUMMY_ENDPOINTS 의 줄을 지운다 (다른 엔드포인트는 그대로 둔다).
 라우터에서 `dummy.` 로 시작하는 호출이 남아 있으면 아직 더미인 엔드포인트다. (`grep -rn "dummy\\." app/routers`)
 
+쓰기(POST/PUT/DELETE)도 같은 방식으로 DB 에 저장하지 않고 "성공한 것처럼" 더미 응답을 돌려준다(아래 `# ---- 쓰기` 구역).
+교체할 때는 라우터의 TODO 주석을 따라 store 함수를 구현하고 해당 더미 함수를 지운다.
+
 QR 로그인(/api/auth/*, /api/members/me, /api/tables/{n}/logins)과 문자 발송(/admin/api/marketing/sms/*)은 더미가 아니다.
 고객 목록(GET /admin/api/members)도 문자 발송 대상·수신거부와 같은 회원 id 를 쓰므로 DB 를 그대로 읽는다.
-응답 모양은 지금 화면(user/, admin/)이 쓰는 것과 같다. 쓰기(POST/PUT/DELETE)는 그대로 DB 에 저장되지만,
-더미 GET 은 그 값을 읽지 않으므로 저장한 결과가 조회에 반영되지 않는다.
+응답 모양은 지금 화면(user/, admin/)이 쓰는 것과 같다. 더미 쓰기는 아무것도 저장하지 않으므로 이후 조회에도 반영되지 않는다.
 """
 
 import json
@@ -27,7 +29,14 @@ DUMMY_ENDPOINTS = {
     "GET /admin/api/menus": "admin_menus",
     "GET /admin/api/orders": "orders",
     "GET /admin/api/calls": "calls",
-    "GET /admin/api/stats": "dashboard_inputs",
+    "GET /admin/api/stats": "dashboard_stats",
+    "POST /api/orders": "order_created",
+    "POST /api/calls": "call_created",
+    "POST /api/recommendations": "recommendation_logged",
+    "PUT /api/tables/{table_no}/logins/prize": "prize_saved",
+    "PUT /admin/api/menus/{menu_id}": "menu_saved",
+    "PUT /admin/api/content/{name}": "content_saved",
+    "POST /admin/api/calls/{call_id}/done": "call_finished",
 }
 
 
@@ -129,6 +138,54 @@ def calls() -> list[dict]:
             {"id": 1, "ts": _ago(hours=2), "table_no": 8, "items": ["물티슈"], "done": True}]
 
 
-def dashboard_inputs() -> dict:
-    """대시보드 통계를 계산할 입력(주문·회원·추천 노출 수). 계산은 services/stats.py 가 한다."""
-    return {"orders": orders(), "members": members(), "recommendations": 9}
+def dashboard_stats() -> dict:
+    """대시보드 통계(고정 값). 실제 구현에서는 services/stats.py 의 dashboard() 가 주문·회원으로 계산한다."""
+    return {
+        "today_orders": 3, "avg_order_amount": 30666, "new_customers": 1, "returning_customers": 2,
+        "age_groups": {"20대 미만": 1, "20대": 2, "30대": 1, "40대": 1, "50대 이상": 1},
+        "genders": {"여": 3, "남": 3},
+        "popular_menus": [{"name": "역전 옛날통닭 (한 마리·후라이드)", "qty": 17}, {"name": "생맥주 500cc", "qty": 8},
+                          {"name": "감자튀김", "qty": 1}],
+        "ai": {"recommendations": 9, "ai_orders": 3, "hit_rate": 0.333,
+               "definition": "AI 조합이 포함된 주문 수 / 추천이 노출된 횟수 (임시 기준)"},
+    }
+
+
+# ---- 쓰기(POST/PUT/DELETE): 저장하지 않고 화면이 깨지지 않는 성공 응답만 돌려준다 ----
+def order_created(coupon_ids: list[int] | None = None) -> dict:
+    return {"no": 13, "ai_combo": False, "used_coupon_ids": list(coupon_ids or [])}
+
+
+def call_created() -> dict:
+    return {"id": 4}
+
+
+def recommendation_logged() -> dict:
+    return {"id": 10}
+
+
+def prize_saved(prize: str, kind: str | None, emoji: str, percent: int | None, item_id: str | None) -> dict:
+    """룰렛 당첨 저장 결과. 쿠폰 종류를 함께 보냈으면 방금 발급된 것처럼 쿠폰 한 장을 돌려준다."""
+    coupon = None
+    if kind:
+        coupon = {"id": 4, "member_id": 1, "table_no": 1, "kind": kind, "label": prize, "emoji": emoji,
+                  "percent": percent, "item_id": item_id, "issued_at": _ago(seconds=0), "used_at": None,
+                  "used_order_id": None}
+    return {"ok": True, "coupon": coupon}
+
+
+def menu_saved(menu_id: str, fields: dict) -> dict:
+    """저장된 메뉴 한 건. 더미 메뉴에 보낸 필드를 덮어쓴 모양이다 (없는 id 면 기본값으로 채운 새 메뉴)."""
+    base = next((m for m in menus() if m["id"] == menu_id),
+                {"id": menu_id, "cat": "side", "name": "새 메뉴", "desc": "", "price": 0, "emoji": "🍽️", "tags": [],
+                 "soldout": False, "spicy": 0, "weight": 50, "set_ok": False, "image_url": ""})
+    return {**base, **fields}
+
+
+def content_saved(data):
+    return data
+
+
+def call_finished(call_id: int) -> dict:
+    base = next((c for c in calls() if c["id"] == call_id), calls()[0])
+    return {**base, "id": call_id, "done": True}

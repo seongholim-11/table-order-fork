@@ -73,27 +73,27 @@ async def list_menus(request: Request):
 
 @router.post("/orders", status_code=201)
 async def create_order(body: OrderIn, request: Request, member: dict | None = Depends(optional_member)):
-    order = request.app.state.shop.add_order(
-        body.table_no, [l.model_dump(exclude_none=True) for l in body.lines], body.total, member["id"] if member else None)
-    used = []
-    if body.coupon_ids and member:  # 이 태블릿에 로그인한 회원이 주문할 때만 쿠폰을 쓸 수 있다
-        tablet_ids = [r["id"] for r in request.app.state.tablet_logins.list(body.table_no)]
-        if member["id"] in tablet_ids:
-            used = request.app.state.coupons.use(body.coupon_ids, tablet_ids, order["id"])
-    return {"no": order["id"], "ai_combo": order["ai_combo"], "used_coupon_ids": used}
+    """주문 생성. [더미] 저장하지 않고 성공 응답만 돌려준다.
+
+    TODO: shop.add_order(table_no, lines, total, member_id) 로 주문·주문 줄 저장 (ai_combo: 줄 id 가 'combo:' 로 시작하면 True).
+    TODO: 로그인 회원이면 이 태블릿 로그인 회원의 쿠폰만 coupons.use(coupon_ids, tablet_member_ids, order_id) 로 사용 처리.
+    """
+    return dummy.order_created(body.coupon_ids)
 
 
 @router.post("/calls", status_code=201)
 async def create_call(body: CallIn, request: Request):
-    return {"id": request.app.state.shop.add_call(body.table_no, body.items)["id"]}
+    """직원 호출 등록. [더미] 저장하지 않는다. TODO: shop.add_call(table_no, items)."""
+    return dummy.call_created()
 
 
 @router.post("/recommendations", status_code=201)
 async def log_recommendation(body: RecommendationIn, request: Request, member: dict | None = Depends(optional_member)):
-    """추천 조합이 손님에게 노출된 사실을 기록한다 (AI 추천 적중률의 분모)."""
-    rid = request.app.state.shop.add_recommendation(body.table_no, member["id"] if member else None,
-                                                    body.params, body.combo_ids)
-    return {"id": rid}
+    """추천 조합이 손님에게 노출된 사실을 기록한다 (AI 추천 적중률의 분모). [더미] 저장하지 않는다.
+
+    TODO: shop.add_recommendation(table_no, member_id, params, combo_ids).
+    """
+    return dummy.recommendation_logged()
 
 
 @router.get("/members/me")
@@ -132,19 +132,15 @@ async def tablet_logins(table_no: int, request: Request, member: dict = Depends(
 
 @router.put("/tables/{table_no}/logins/prize")
 async def tablet_login_prize(table_no: int, body: PrizeIn, request: Request, member: dict = Depends(current_member)):
-    rows = _tablet_rows(request, table_no, member)
-    if all(r["id"] != body.member_id for r in rows):
-        raise HTTPException(404, "이 태블릿에서 로그인한 회원이 아닙니다.")
-    coupons = request.app.state.coupons
-    if coupons.issued_today(body.member_id):  # 회원당 하루 1회: 다른 테이블에서 돌렸어도 오늘은 불가, 내일은 가능
-        raise HTTPException(409, "오늘 이미 룰렛을 돌린 회원입니다.")
-    if body.kind and not ((body.kind == "discount" and body.percent) or (body.kind == "free" and body.item_id)):
-        raise HTTPException(422, "할인 쿠폰은 percent, 서비스 쿠폰은 item_id 가 필요합니다.")
-    if not request.app.state.tablet_logins.set_prize(table_no, body.member_id, body.prize):
-        raise HTTPException(409, "이미 룰렛을 돌린 회원입니다.")
-    coupon = coupons.issue(body.member_id, table_no, body.kind, body.prize, body.emoji, body.percent,
-                           body.item_id) if body.kind else None
-    return {"ok": True, "coupon": coupon}
+    """룰렛 당첨을 기록하고 쿠폰함에 쿠폰을 발급한다. [더미] 저장하지 않고 성공 응답만 돌려준다.
+
+    TODO: 이 태블릿에 로그인한 회원인지 확인(_tablet_rows, 아니면 404).
+    TODO: 회원당 하루 1회(KST) 검사 coupons.issued_today(member_id) → 이미 돌렸으면 409.
+    TODO: kind 가 있으면 할인은 percent, 서비스는 item_id 필수(아니면 422).
+    TODO: tablet_logins.set_prize(table_no, member_id, prize) 로 당첨 기록 → 이미 기록돼 있으면 409.
+    TODO: kind 가 있으면 coupons.issue(...) 로 쿠폰 발급.
+    """
+    return dummy.prize_saved(body.prize, body.kind, body.emoji, body.percent, body.item_id)
 
 
 @router.get("/v1/coupons")

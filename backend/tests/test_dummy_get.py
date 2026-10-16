@@ -1,4 +1,4 @@
-"""더미로 돌려주는 GET 엔드포인트(app/dummy.py)가 화면이 쓰는 모양을 유지하는지 확인한다.
+"""더미로 돌려주는 엔드포인트(app/dummy.py, GET 과 쓰기)가 화면이 쓰는 모양을 유지하는지 확인한다.
 
 실제 DB 로 바꾼 엔드포인트는 여기서 빼고 자기 테스트를 만든다."""
 
@@ -39,3 +39,33 @@ def test_every_listed_dummy_function_exists():
     for names in dummy.DUMMY_ENDPOINTS.values():
         for n in names.split(" / "):
             assert callable(getattr(dummy, n))
+
+
+# ---- 쓰기(POST/PUT/DELETE)도 저장 없이 화면이 깨지지 않는 성공 응답을 돌려준다 ----
+def test_user_write_dummies(client):
+    h = login(client, "가")
+    line = {"id": "c1", "name": "역전 옛날통닭", "unit": 18000, "qty": 2}
+    r = client.post("/api/orders", headers=h, json={"table_no": 5, "lines": [line], "total": 36000, "coupon_ids": [7]})
+    assert r.status_code == 201 and r.json() == {"no": r.json()["no"], "ai_combo": False, "used_coupon_ids": [7]}
+    assert client.post("/api/orders", json={"table_no": 6, "lines": [line], "total": 36000}).status_code == 201  # 비회원
+    assert client.post("/api/orders", json={"table_no": 6, "lines": [], "total": 0}).status_code == 422  # 스키마 검증은 그대로
+    assert client.post("/api/calls", json={"table_no": 3, "items": ["💧 물"]}).json()["id"]
+    assert client.post("/api/recommendations", json={"table_no": 1, "params": {}, "combo_ids": ["classic"]}).json()["id"]
+    me = client.get("/api/members/me", headers=h).json()["id"]
+    prize = {"member_id": me, "prize": "10% 할인", "kind": "discount", "percent": 10, "emoji": "🎟️"}
+    r = client.put("/api/tables/1/logins/prize", headers=h, json=prize)
+    assert r.status_code == 200 and r.json()["ok"] and r.json()["coupon"]["label"] == "10% 할인"
+    assert client.put("/api/tables/1/logins/prize", headers=h, json={"member_id": me, "prize": "꽝"}).json()["coupon"] is None
+
+
+def test_admin_write_dummies(client):
+    saved = client.put("/admin/api/menus/c2", headers=ADMIN, json={"weight": 90, "soldout": True}).json()
+    assert saved["id"] == "c2" and saved["weight"] == 90 and saved["soldout"] is True and saved["name"]
+    assert client.put("/admin/api/menus/new1", headers=ADMIN, json={"name": "신메뉴", "cat": "anju", "price": 9000}).json()["name"] == "신메뉴"
+    assert client.put("/admin/api/menus/c2", headers=ADMIN, json={"weight": 101}).status_code == 422  # 스키마 검증은 그대로
+    assert client.delete("/admin/api/menus/c2", headers=ADMIN).status_code == 204
+    assert client.put("/admin/api/content/staff_calls", headers=ADMIN, json=["💧 물"]).json() == ["💧 물"]
+    done = client.post("/admin/api/calls/3/done", headers=ADMIN).json()
+    assert done["id"] == 3 and done["done"] is True
+    for method, path in (("put", "/admin/api/menus/c2"), ("delete", "/admin/api/menus/c2"), ("post", "/admin/api/calls/3/done")):
+        assert getattr(client, method)(path).status_code in (401, 422)  # 인증은 그대로

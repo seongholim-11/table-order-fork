@@ -1,21 +1,17 @@
 """관리자: 대시보드 통계."""
 
-from datetime import datetime
-
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Request
 
 from app import dummy
-from app.core.settings import Settings, get_settings
-from app.routers.admin.common import grade_rule
-from app.services import stats as stats_service
-from app.services.grades import KST
 
 router = APIRouter()
 
 
 @router.get("/stats")
-async def dashboard(request: Request, settings: Settings = Depends(get_settings)):
-    """[더미] 더미 주문·회원으로 통계를 계산한다."""
-    d = dummy.dashboard_inputs()
-    return stats_service.dashboard(d["orders"], d["members"], d["recommendations"],
-                                   datetime.now(KST).date(), grade_rule(settings))
+async def dashboard(request: Request):
+    """[더미] 고정 통계 값. 실제 구현은 아래 TODO.
+
+    TODO: 주문·회원·추천 노출 수를 DB 에서 읽어 services.stats.dashboard(orders, members, recommendations, today, rule) 로
+          계산한다. rule 은 routers.admin.common.grade_rule(settings), today 는 datetime.now(KST).date().
+    """
+    return dummy.dashboard_stats()

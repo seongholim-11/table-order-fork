@@ -11,8 +11,11 @@ NON_MENU_CATEGORIES = {"ai", "best"}  # 화면용 가상 카테고리(AI 추천 
 
 
 def menu_categories(request: Request) -> list[dict]:
-    """메뉴를 넣을 수 있는 카테고리. 손님 화면의 카테고리 콘텐츠에서 가져온다."""
-    return [{"id": c["id"], "name": c["name"]} for c in request.app.state.content.get("categories")
+    """메뉴를 넣을 수 있는 카테고리 (ai·best 제외). [더미] 더미 콘텐츠에서 가져온다.
+
+    TODO: request.app.state.content.get("categories") 로 저장된 카테고리를 읽는다.
+    """
+    return [{"id": c["id"], "name": c["name"]} for c in dummy.content_item("categories")
             if c["id"] not in NON_MENU_CATEGORIES]
 
 
@@ -38,17 +41,14 @@ async def menus():
 
 @router.put("/menus/{menu_id}")
 async def save_menu(menu_id: str, body: MenuIn, request: Request):
-    """없는 id 면 새 메뉴를 만든다(이름·카테고리·가격 필수), 있으면 보낸 필드만 수정한다."""
-    shop = request.app.state.shop
-    fields = body.model_dump(exclude_none=True)
-    if "cat" in fields and fields["cat"] not in {c["id"] for c in menu_categories(request)}:
-        raise HTTPException(422, "알 수 없는 카테고리입니다.")
-    if not shop.menu(menu_id) and not {"name", "cat", "price"} <= fields.keys():
-        raise HTTPException(422, "새 메뉴는 name, cat, price 가 필요합니다.")
-    return shop.save_menu(menu_id, fields)
+    """메뉴 등록·수정(가중치·품절 포함). [더미] 저장하지 않고 보낸 값을 반영한 메뉴를 돌려준다.
+
+    TODO: cat 이 menu_categories() 에 없으면 422.
+    TODO: 없는 id 면 새로 만들고(name·cat·price 필수, 아니면 422), 있으면 보낸 필드만 수정: shop.save_menu(menu_id, fields).
+    """
+    return dummy.menu_saved(menu_id, body.model_dump(exclude_none=True))
 
 
 @router.delete("/menus/{menu_id}", status_code=204)
 async def delete_menu(menu_id: str, request: Request):
-    if not request.app.state.shop.delete_menu(menu_id):
-        raise HTTPException(404, "없는 메뉴입니다.")
+    """메뉴 삭제. [더미] 아무것도 지우지 않는다. TODO: shop.delete_menu(menu_id), 없으면 404."""
