@@ -237,12 +237,15 @@ def test_weights_save_persists_changes(monkeypatch):
 def test_grade_rule_reset_returns_to_defaults(monkeypatch):
     app = open_menu_page(monkeypatch, "dummy")
     app.sidebar.radio(key="nav_sub_고객 등급").set_value("등급 분류 기준").run()
-    assert app.button(key="rule_reset").disabled
+    assert not app.button(key="rule_reset").disabled
     app.number_input(key="rule_dormant").set_value(120).run()
     assert not app.button(key="rule_reset").disabled
     app.button(key="rule_reset").click().run()
     assert not app.exception
-    assert app.number_input(key="rule_dormant").value == ar.DEFAULT_RULE["dormant"] and app.button(key="rule_reset").disabled
+    assert app.number_input(key="rule_dormant").value == ar.DEFAULT_RULE["dormant"] and not app.button(key="rule_reset").disabled
+    # 이미 기본값이어도 다시 누를 수 있고 결과는 그대로 유지된다.
+    app.button(key="rule_reset").click().run()
+    assert not app.exception and app.number_input(key="rule_dormant").value == ar.DEFAULT_RULE["dormant"]
 
 
 # ---- 새로고침 후 복원 (URL 쿼리) --------------------------------------------------------------------

@@ -6,18 +6,36 @@ Supabase 에서는 orders(주문) / order_items(줄) / order_item_components(AI 
 [뼈대] 시그니처와 스키마만 남겼다. 구현은 TODO 를 따라 채운다.
 """
 
-SCHEMA = """
+SCHEMA = """\
 CREATE TABLE IF NOT EXISTS orders (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, table_no INTEGER NOT NULL, member_id INTEGER, total INTEGER NOT NULL,
-    roulette_discount_percent INTEGER NOT NULL DEFAULT 0, ai_combo INTEGER NOT NULL DEFAULT 0,
-    recommendation_event_id INTEGER, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+    table_no                   INTEGER NOT NULL,
+    member_id                  INTEGER,
+    total                      INTEGER NOT NULL,
+    roulette_discount_percent  INTEGER NOT NULL DEFAULT 0,
+    ai_combo                   INTEGER NOT NULL DEFAULT 0,
+    recommendation_event_id    INTEGER,
+    created_at                 TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS order_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, menu_id TEXT, kind TEXT NOT NULL DEFAULT 'menu',
-    name TEXT NOT NULL, option_label TEXT NOT NULL DEFAULT '', unit_price INTEGER NOT NULL, original_unit_price INTEGER,
-    qty INTEGER NOT NULL);
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id            INTEGER NOT NULL,
+    menu_id             TEXT,
+    kind                TEXT NOT NULL DEFAULT 'menu',
+    name                TEXT NOT NULL,
+    option_label        TEXT NOT NULL DEFAULT '',
+    unit_price          INTEGER NOT NULL,
+    original_unit_price INTEGER,
+    qty                 INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS order_item_components (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, order_item_id INTEGER NOT NULL, menu_id TEXT, name TEXT NOT NULL,
-    option_label TEXT NOT NULL DEFAULT '', qty INTEGER NOT NULL);
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_item_id INTEGER NOT NULL,
+    menu_id       TEXT,
+    name          TEXT NOT NULL,
+    option_label  TEXT NOT NULL DEFAULT '',
+    qty           INTEGER NOT NULL
+);
 """
 
 

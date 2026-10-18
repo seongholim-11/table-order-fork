@@ -3,10 +3,20 @@
 from app.stores.db import Database
 from app.stores.members import now_iso
 
-SCHEMA = """CREATE TABLE IF NOT EXISTS sms_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, month TEXT NOT NULL, request_id TEXT,
-    type TEXT NOT NULL, content TEXT NOT NULL, target_count INTEGER NOT NULL, status TEXT NOT NULL, error TEXT,
-    scheduled_at TEXT)"""
+SCHEMA = """\
+CREATE TABLE IF NOT EXISTS sms_logs (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at   TEXT NOT NULL,
+    month        TEXT NOT NULL,
+    request_id   TEXT,
+    type         TEXT NOT NULL,
+    content      TEXT NOT NULL,
+    target_count INTEGER NOT NULL,
+    status       TEXT NOT NULL,
+    error        TEXT,
+    scheduled_at TEXT
+);
+"""
 
 
 SELECT = "SELECT *, created_at AS ts FROM sms_logs"  # 화면은 예전 키(ts)를 쓴다

@@ -40,6 +40,21 @@ CONTENT_KEYS = ("categories", "staff_calls", "quiz_questions", "weather", "rules
 MODES = ("dummy", "api", "auto")
 
 
+def dev_test_button_enabled() -> bool:
+    """화면 환경변수가 켜져 있을 때만 개발용 DB 테스트 버튼을 보여 준다."""
+    return os.getenv("DEV_TEST_BUTTON", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def dev_db_test() -> dict:
+    """화면에서 서버를 직접 부르지 않고 개발용 DB 왕복 확인을 요청한다."""
+    try:
+        return api.post("/api/dev/db-test") or {"result": 0, "reason": "서버가 빈 응답을 반환했습니다."}
+    except api.ApiError as exc:
+        return {"result": 0, "reason": str(exc.detail)}
+    except api.ApiUnavailable:
+        return {"result": 0, "reason": "서버에 연결할 수 없습니다."}
+
+
 class ContentUnavailable(Exception):
     """api 모드에서 서버 데이터를 가져오지 못함."""
 

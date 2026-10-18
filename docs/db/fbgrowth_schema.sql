@@ -365,7 +365,7 @@ create index if not exists chat_messages_session_idx on chat_messages (session_i
 -- 고객 등급 (GET /api/admin/customers, customers/grades). 휴면 → 단골 → 재방문 → 신규 순으로 판정.
 create or replace function member_grade(visit_count integer, last_visit_at timestamptz,
                                         repeat_min integer default 2, regular_min integer default 5,
-                                        dormant_days integer default 60)
+                                        dormant_days integer default 30)
 returns text language sql stable as $$
   select case
     when last_visit_at is not null
@@ -381,7 +381,7 @@ select m.*,
        member_grade(m.visit_count, m.last_visit_at,
                     coalesce((s.value->>'repeat')::int, 2),
                     coalesce((s.value->>'regular')::int, 5),
-                    coalesce((s.value->>'dormant')::int, 60)) as grade,
+                    coalesce((s.value->>'dormant')::int, 30)) as grade,
        (m.marketing_consent and not m.opted_out and m.phone is not null) as sms_sendable
 from members m
 left join app_settings s on s.key = 'grade_rule';
@@ -430,7 +430,7 @@ create policy "owner own messages" on chat_messages for all to authenticated
 -- 8. 기본값(시드): 설정·날씨 종류. 메뉴·카테고리·룰렛·질문·규칙은 backend/app/seed/*.json 에서 불러온다.
 -- =====================================================================
 insert into app_settings (key, value) values
-  ('grade_rule', '{"repeat": 2, "regular": 5, "dormant": 60}'),
+  ('grade_rule', '{"repeat": 2, "regular": 5, "dormant": 30}'),
   ('sms_limits', '{"SMS": 50, "LMS": 10}')
 on conflict (key) do nothing;
 

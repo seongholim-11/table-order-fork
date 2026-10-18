@@ -103,8 +103,9 @@ MENU_BY_ID = {m["id"]: m for m in MENU}
 # 첫 화면 행운의 룰렛 (5칸, 시계 방향 순서, 첫 칸이 12시 방향). kind: discount(주문 할인) / free(서비스 메뉴)
 ROULETTE_PRIZES = [
     {"label": "모든 메뉴<br><b>5% 할인</b>", "short": "전 메뉴 5% 할인", "emoji": "🎟️", "color": "#f0556b", "kind": "discount", "percent": 5},
+    {"label": "맛보기 먹태구이<br><b>서비스</b>", "short": "맛보기 먹태구이 서비스", "emoji": "🐟", "color": "#8e6e53", "kind": "free", "item_id": "a1"},
     {"label": "계란말이<br><b>서비스</b>", "short": "계란말이 서비스", "emoji": "🥚", "color": "#ff9f1a", "kind": "free", "item_id": "a4"},
-    {"label": "음료<br><b>서비스</b>", "short": "콜라 서비스", "emoji": "🥤", "color": "#f5c518", "kind": "free", "item_id": "d1"},
+    {"label": "노가리 구이<br><b>서비스</b>", "short": "노가리 구이 서비스", "emoji": "🐟", "color": "#f5c518", "kind": "free", "item_id": "a11"},
     {"label": "라면<br><b>서비스</b>", "short": "라면 서비스", "emoji": "🍜", "color": "#4cc764", "kind": "free", "item_id": "d7"},
     {"label": "짜장라면<br><b>서비스</b>", "short": "짜장라면 서비스", "emoji": "🍝", "color": "#3ea0f5", "kind": "free", "item_id": "d8"},
 ]

@@ -1,10 +1,16 @@
 """추천 기록 저장소 (shop.py 의 ShopStore 가 합쳐 쓴다). [뼈대] 시그니처와 스키마만 남겼다."""
 
-SCHEMA = """
+SCHEMA = """\
 CREATE TABLE IF NOT EXISTS recommendation_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, table_no INTEGER NOT NULL, member_id INTEGER,
-    answers TEXT NOT NULL DEFAULT '{}', hour INTEGER, weather_code TEXT, combo_ids TEXT NOT NULL DEFAULT '[]',
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    table_no     INTEGER NOT NULL,
+    member_id    INTEGER,
+    answers      TEXT NOT NULL DEFAULT '{}',
+    hour         INTEGER,
+    weather_code TEXT,
+    combo_ids    TEXT NOT NULL DEFAULT '[]',
+    created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 

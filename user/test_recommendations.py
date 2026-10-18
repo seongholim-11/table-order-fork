@@ -57,6 +57,7 @@ class RecommendationTests(unittest.TestCase):
         self.assertTrue(all(c["discount"] == 0 and c["price"] == c["original"] for c in guest))
         self.assertTrue(all(c["price"] <= 40000 for c in guest))  # 예산은 정가 기준
 
+    @patch.dict("os.environ", {"APP_ENV": "test"})
     def test_guest_sees_full_price_and_login_hint(self):
         app = AppTest.from_file("app.py").run()
         app.button(key="start_btn").click().run()

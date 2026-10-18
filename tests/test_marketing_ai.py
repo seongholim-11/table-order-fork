@@ -169,3 +169,18 @@ def test_removing_a_recipient_shrinks_send_target(monkeypatch):
     assert full == len(ids) >= 2
     assert repo.sms_preview(["휴면"], "문구", member_ids=ids[1:])["targets"] == full - 1
     assert repo.sms_preview(["휴면"], "문구", member_ids=[])["ok"] is False
+
+
+def test_ai_candidates_error_is_shown_instead_of_crashing():
+    """서버가 시간 초과/오류로 답해도 버튼 콜백이 예외로 끝나 화면이 멈추면 안 된다."""
+    from admin.views import marketing
+
+    class BrokenRepo:
+        source = "api"
+
+        def sms_candidates(self):
+            raise repo_mod.api.ApiUnavailable("timed out")
+
+    marketing.ss["ai_candidates"] = ["old"]
+    marketing.make_ai_candidates(BrokenRepo())
+    assert marketing.ss["ai_candidates"] == [] and marketing.ss["ai_picked"] is None

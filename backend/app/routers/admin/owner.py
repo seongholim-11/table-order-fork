@@ -39,7 +39,7 @@ async def save_roulette_prizes(prizes: list[RoulettePrizeIn], request: Request):
     if not any(prize.weight > 0 for prize in prizes):
         raise HTTPException(422, "확률 가중치가 0보다 큰 칸이 하나는 있어야 합니다.")
     missing = [prize.item_id for prize in prizes
-               if prize.kind == "free" and not request.app.state.roulette_prizes.menu_exists(prize.item_id)]
+               if prize.kind == "free" and not request.app.state.roulette_prizes.service_menu_exists(prize.item_id)]
     if missing:
         raise HTTPException(422, f"존재하지 않는 서비스 메뉴입니다: {missing[0]}")
     return request.app.state.roulette_prizes.replace([prize.model_dump(exclude_none=True) for prize in prizes])

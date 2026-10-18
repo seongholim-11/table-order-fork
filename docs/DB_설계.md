@@ -109,6 +109,10 @@ login_sessions ─ members(로그인 완료 시)
 |---|---|
 | `member_grade(...)` | 휴면(마지막 방문 N일 이상) → 단골 → 재방문 → 신규 순으로 판정. 기존 `grades.py`와 같은 규칙 |
 | `v_members_graded` | 회원 + 등급 + 문자 발송 가능 여부(동의·수신거부 아님·번호 있음). 기준은 `app_settings.grade_rule` |
+
+고객 등급 기준 저장(수용 5): 기존 `app_settings`의 `grade_rule` 한 행에 재방문·단골 방문 횟수와 휴면 일수를 저장하고 `updated_at`을 갱신한다. `GET·PUT /admin/api/customers/grades/rules`로 조회·저장하며, 고객 목록·통계·단골 추천·문자 대상은 저장된 기준을 함께 읽는다. 조회 우선순위는 **쿼리 미리보기 > DB 저장값 > 환경 변수 > 코드 기본값**이며 미리보기는 DB를 변경하지 않는다. 별도의 고객 등급 컬럼이나 테이블은 만들지 않는다. 로컬 SQLite의 `app_settings`는 `value`를 JSON 문자열로 저장하며, Supabase의 기존 `jsonb`와 같은 응답을 사용한다. 초기 조회·서버 시작은 기본값 행을 자동 저장하지 않는다.
+
+휴면 **기본값은 30일**로 통일했다(관리자가 저장한 사용자 지정 일수는 유지). 기존 DB에는 [`sooyong_grade_rules_30_days.sql`](db/sooyong_grade_rules_30_days.sql)을 적용해 함수·뷰의 기본값과 과거 시드 `2회·5회·60일`만 수정한다. 회원·주문 데이터는 삭제하지 않는다. 팀 공유 사항: 문자 발송 담당도 같은 저장 기준을 사용하며, `grade_rule()`의 기존 인자·반환 필드는 유지하고 DB 연결만 선택 인자로 추가했다.
 | `v_sms_usage` | 월·종류별 사용량(발송·테스트·예약만 집계, 취소·실패 제외) |
 
 ## API v6 ↔ 테이블 대응

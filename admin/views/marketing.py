@@ -10,6 +10,7 @@ import admin_repository as repo_mod
 import marketing_ai
 from admin.marketing.config import RECOMMENDATION_PAGE_SIZE
 from admin.marketing.recommendations import pick_recommendations as pick_recommendation_page
+from admin.marketing.recommendations import regular_preference_cards, regular_preference_preview_cards
 from admin.ui.widgets import kpi, page_head, sec_title
 from admin_dummy_data import Unsupported
 from admin_repository import GRADES
@@ -23,8 +24,18 @@ STATUS_LABEL = {"sent": ("발송됨", "ok"), "dry_run": ("테스트(DRY RUN)", "
 
 def make_ai_candidates(repo):
     """[AI 문자 생성]: 수신자와 문구를 내부적으로 만들어 후보 버튼으로 보여 준다."""
-    ctx = marketing_ai.build_context(repo, ss["grade_rule"])
-    ss["ai_candidates"] = marketing_ai.suggest_candidates(ctx, *marketing_ai.external_context())
+    if repo.source == "api":
+        # 서버가 매장 데이터·오늘 날씨/행사를 반영해 후보를 만든다 (AI 키가 없으면 템플릿)
+        try:
+            ss["ai_candidates"] = repo.sms_candidates()
+        except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable) as e:
+            # 콜백에서 예외가 나면 화면이 'error' 로 멈추므로, 실패 이유를 알리고 후보만 비운다
+            ss["ai_candidates"] = []
+            st.toast(f"AI 문자 후보를 만들지 못했습니다: {e}", icon="⚠️")
+    else:
+        # 서버 없이 더미로 볼 때는 예전처럼 화면에서 직접 만든다
+        ctx = marketing_ai.build_context(repo, ss["grade_rule"])
+        ss["ai_candidates"] = marketing_ai.suggest_candidates(ctx, *marketing_ai.external_context())
     ss["ai_picked"] = None
 
 
@@ -194,7 +205,7 @@ def marketing_dashboard(repo):
                 st.rerun()
         else:
             st.caption("수신 동의한 회원이 없습니다.")
-        st.caption(f"수신거부 회원 {int(members['수신거부'].sum())}명 — 발송 대상에서 제외됩니다. (회원 본인은 태블릿에서도 거부할 수 있어요)")
+        st.caption(f"수신거부 회원 {int(members['수신거부'].sum())}명 — 발송 대상에서 제외됩니다.")
 
     logs = repo.sms_logs()
     with t_history:
@@ -224,6 +235,29 @@ def pick_recommendations(recs, round_no):
     return pick_recommendation_page(recs, round_no)
 
 
+def _render_regular_preferences(repo):
+    """실제 주문 단골의 멘트를 우선 표시하고, 손님이 없으면 추천 예정 예시를 보여준다."""
+    try:
+        cards = regular_preference_cards(repo.regular_preferences())
+    except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable):
+        # 추가 정보 조회가 실패해도 기존 추천 카드·재추천 버튼은 그대로 사용할 수 있다.
+        st.info("단골 손님 정보를 불러오지 못했어요. 잠시 후 재추천을 눌러 주세요.")
+        return
+    if not cards:
+        # DB에 예시 회원을 넣지 않고도 발표에서 추천 동작과 문구를 보여줄 수 있게 한다.
+        cards = regular_preference_preview_cards(repo.customer_grade_rules()["regular"])
+        sec_title("단골 손님 응대 제안", "AI가 추천할 예정인 멘트를 미리 확인해 보세요")
+        st.caption("지금은 추천 예정 멘트를 예시로 보여드려요. 실제 단골 손님이 방문해 주문하면, "
+                   "그 손님의 방문·주문 기록에 맞는 멘트가 표시되며 문구는 달라질 수 있어요.")
+    else:
+        sec_title("단골 손님 응대 제안", "주문이 확인된 손님에게 메뉴를 건넬 때 참고해 주세요")
+    # 한 안내 안에서 손님별 제안을 읽기 쉽도록 줄바꿈하며, DB 텍스트는 먼저 이스케이프한다.
+    body = "".join(f'<div class="rec" style="grid-column:1 / -1"><div class="rt">{escape(card["title"])}</div>'
+                   f'<div class="rw">{escape(card["why"])}</div>'
+                   f'<div class="ra">{escape(card["action"]).replace(chr(10), "<br>")}</div></div>' for card in cards)
+    st.html(f'<div class="recs regular-preferences">{body}</div>')
+
+
 def marketing_recommend_tab(repo):
     ctx = marketing_ai.build_context(repo, ss["grade_rule"])
     sec_title("사장님을 위한 마케팅 추천", "매장의 모든 데이터를 바탕으로 정리했어요")
@@ -244,6 +278,8 @@ def marketing_recommend_tab(repo):
                  help="다른 마케팅 방법을 추천받아요")
     c_note.caption(f"추천 {page}/{pages} · 눌러서 다른 마케팅 방법을 추천받아요" if pages > 1
                    else "지금은 추천할 방법이 이것뿐이에요. 데이터가 쌓이면 더 다양해져요.")
+    # 원래의 추천 4개·재추천 순환을 마친 뒤, 별도 영역을 덧붙인다.
+    _render_regular_preferences(repo)
 
 
 def marketing_chatbot_tab(repo):

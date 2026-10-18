@@ -251,6 +251,8 @@ def test_marketing_screen_in_dummy_mode_can_preview_and_send(monkeypatch):
     app.sidebar.radio(key="nav_sub_마케팅").set_value("AI 문자").run()
     assert not app.exception and any("더미 데이터로 만든 화면" in c.value for c in app.caption)
     assert any("발송 대상" in c.value for c in app.caption)  # 기본값(휴면)으로 바로 미리보기
+    # 30일 기준으로 대상이 늘어도 발송 동작은 월 잔여 한도 안의 단골 등급으로 검증한다.
+    app.multiselect(key="sms_grades").set_value(["단골"]).run()
     before = len(app.session_state["repo"].sms_logs())
     next(b for b in app.button if b.label == "발송").click().run()
     assert not app.exception and len(app.session_state["repo"].sms_logs()) == before + 1

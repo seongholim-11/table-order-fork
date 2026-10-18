@@ -3,10 +3,14 @@
 [뼈대] 시그니처와 스키마만 남겼다. 구현은 TODO 를 따라 채운다.
 """
 
-SCHEMA = """
+SCHEMA = """\
 CREATE TABLE IF NOT EXISTS staff_calls (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, table_no INTEGER NOT NULL, items TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, done_at TEXT);
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    table_no   INTEGER NOT NULL,
+    items      TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    done_at    TEXT
+);
 """
 
 

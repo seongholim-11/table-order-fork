@@ -68,6 +68,60 @@ def recommend(ctx: dict) -> list[dict]:
     return cards or [dict(EMPTY_RECOMMENDATION)]
 
 
+def regular_preference_preview_cards(regular_visits: int = 5) -> list[dict]:
+    """손님이 아직 없어도 추천 예정 문구를 설명한다. 실제 고객·주문처럼 꾸미지 않는다."""
+    return [
+        {
+            "title": "단골 손님께 AI가 이런 인사를 추천할 예정이에요",
+            "why": f"{regular_visits}회 이상 방문한 단골 손님이 주문하면, 메뉴 취향과 관계없이 방문 횟수와 "
+                   "오늘 주문에 맞는 감사 인사를 추천할 예정이에요.",
+            "action": "추천 예정 멘트 예시\n"
+                      "“또 찾아주셔서 감사합니다. 오늘도 편하게 즐기다 가세요!”\n"
+                      "“오늘 고르신 메뉴도 입맛에 맞으셨으면 좋겠어요. 맛있게 드세요!”",
+        },
+        {
+            "title": "메뉴 취향이 확인되면 이런 멘트를 추천할 예정이에요",
+            "why": "이전 주문에서 같은 메뉴를 80% 이상 고른 기록이 확인되면, "
+                   "취향을 기억하는 인사를 한 건 더 제안할 예정이에요.",
+            "action": "추천 예정 멘트 예시\n"
+                      "“자주 드시던 메뉴 나왔습니다. 오늘도 맛있게 드세요!”",
+        },
+    ]
+
+
+def regular_preference_cards(preferences: list[dict]) -> list[dict]:
+    """방문 감사는 모든 단골에게, 메뉴 기억 제안은 조건을 충족한 한 명에게 안내한다."""
+    chosen = [preference for preference in preferences
+              if preference.get("delivery_menu") and preference.get("today_table") is not None]
+    if not chosen:
+        return []
+    suggestions = [
+        f"{index}. {preference['today_table']}번 테이블 · {preference['nickname']}님께 "
+        f"{preference['delivery_menu']} 메뉴를 드릴 때\n"
+        f"{preference.get('visit_context') or str(preference.get('visit_count', '')) + '회 방문한 단골 손님입니다.'}\n"
+        f"멘트 예시: “{preference.get('visit_note') or '또 찾아주셔서 감사합니다. 오늘도 편하게 즐기다 가세요!'}”"
+        for index, preference in enumerate(chosen, 1)
+    ]
+    cards = [{
+        "title": "오늘은 이런 멘트 어떠세요?",
+        "why": "단골 손님께 다시 찾아주신 감사 인사를 건네 보세요. 메뉴 취향과 관계없이 방문 횟수와 "
+               "오늘 주문 등 확인된 상황에 맞춰 제안해요. 문구는 사장님 말투에 맞게 바꾸셔도 좋아요.",
+        "action": "\n\n".join(suggestions),
+    }]
+    # 취향 제안이 기본 인사를 압도하지 않도록, 메뉴 주문율에 대한 제안은 한 건만 덧붙인다.
+    favorite = next((preference for preference in chosen if preference.get("favorite_menu")
+                     and (preference.get("preference_rate") or 0) >= .8), None)
+    if favorite:
+        cards.append({
+            "title": "자주 드시는 메뉴를 기억하는 인사",
+            "why": "메뉴 취향이 확인된 손님 한 분께는, 기억하고 있다는 말도 함께 건네 보세요.",
+            "action": f"{favorite['today_table']}번 테이블 · {favorite['nickname']}님께 "
+                      f"{favorite['delivery_menu']} 메뉴를 드릴 때\n{favorite['context']}\n"
+                      f"멘트 예시: “{favorite['note']}”",
+        })
+    return cards
+
+
 def pick_recommendations(cards: list[dict], round_no: int) -> tuple[list[dict], int, int]:
     """round_no에 해당하는 네 장을 고르고 마지막 묶음은 앞 카드로 채운다."""
     pages = max(1, -(-len(cards) // RECOMMENDATION_PAGE_SIZE))

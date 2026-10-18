@@ -1,0 +1,39 @@
+# config.production.toml
+
+[server]
+# 모든 네트워크 인터페이스에서 접속 허용
+address = "0.0.0.0"
+
+# 서버 시작 시 브라우저 자동 실행 방지
+headless = true
+
+# 최초 실행 시 이메일 입력 프롬프트 비활성화
+showEmailPrompt = false
+
+# CORS 보호 활성화
+enableCORS = true
+
+# XSRF 보호 활성화
+enableXsrfProtection = true
+
+# 운영 환경에서 파일 변경 감지 비활성화
+fileWatcherType = "none"
+
+
+[client]
+# 사용자에게 상세 오류 정보 숨김
+showErrorDetails = "none"
+
+# 툴바 최소화
+toolbarMode = "minimal"
+
+
+[browser]
+# 외부에서 접속할 도메인
+serverAddress = "your-server.com"
+
+# 외부 HTTPS 접속 포트
+serverPort = 443
+
+# Streamlit 사용 통계 전송 비활성화
+gatherUsageStats = false

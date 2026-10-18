@@ -14,6 +14,7 @@ import httpx
 from app.core.settings import Settings
 from app.services.grades import KST, grade_of
 from app.stores.members import MemberStore
+from app.stores.grade_rules import GradeRuleStore
 from app.stores.sms_logs import SmsLogStore
 
 SMS_LIMIT_BYTES = 90
@@ -63,12 +64,15 @@ class SmsService:
 
     def targets(self, grades: list[str], member_ids: list[int] | None = None) -> list[dict]:
         today = self.clock().date()
-        rule = {"repeat": self.s.grade_repeat_visits, "regular": self.s.grade_regular_visits,
-                "dormant": self.s.grade_dormant_days}
+        rule = self.grade_rule()
         return [m for m in self.members.all()
                 if m["phone"] and m["marketing_consent"] and not m["opted_out"]
                 and grade_of(m, today, **rule) in grades
                 and (member_ids is None or m["id"] in member_ids)]
+
+    def grade_rule(self) -> dict:
+        """문자 미리보기·발송도 고객 화면과 같은 저장 기준을 매번 읽는다."""
+        return GradeRuleStore(self.members.db).resolve(self.s)
 
     def usage(self, month: str | None = None) -> dict:
         month = month or self.clock().strftime("%Y-%m")

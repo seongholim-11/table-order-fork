@@ -84,6 +84,9 @@ hr { border-color: var(--line) !important; }
 .kpi .s { color: var(--ink-3); font-size: 12px; margin-top: 6px; }
 .kpi.accent { background: linear-gradient(135deg, #ff922b, #e8590c); border: 0; }
 .kpi.accent .k, .kpi.accent .s, .kpi.accent .v small { color: rgba(255,255,255,.85); } .kpi.accent .v { color: #fff; }
+/* 증권 시세처럼 매출 상승은 빨강, 하락은 파랑으로 표시한다. 강조 카드에도 같은 색상을 적용한다. */
+.kpi .s.up, .kpi.accent .s.up { color: #dc2626; }
+.kpi .s.down, .kpi.accent .s.down { color: #2563eb; }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 20px 22px; box-shadow: var(--shadow); height: 100%; }
 .panel h3 { margin: 0 0 4px; font-size: 16px; font-weight: 800; }
 .panel .hint { color: var(--ink-3); font-size: 12.5px; margin-bottom: 16px; }
@@ -271,4 +274,35 @@ button:focus-visible { outline: 3px solid rgba(232,89,12,.4) !important; outline
   .page-head { margin-bottom: 6px; }
   [data-testid="stCaptionContainer"] { margin: 0; line-height: 1.4; }
   [data-testid="stForm"] { padding: 14px; }
+}
+
+/* 수용 담당 대시보드 안에서만 카드·행 간격을 통일한다. */
+.st-key-dashboard_layout { --dashboard-gap: 16px; }
+.st-key-dashboard_layout,
+.st-key-dashboard_layout [data-testid="stVerticalBlock"],
+.st-key-dashboard_layout [data-testid="stHorizontalBlock"] { gap: var(--dashboard-gap) !important; }
+/* 제목의 별도 margin과 카드의 100% 높이가 격자 간격에 추가되지 않게 한다. */
+.st-key-dashboard_layout .page-head,
+.st-key-dashboard_layout .sec-title { margin: 0; }
+.st-key-dashboard_layout .panel,
+.st-key-dashboard_layout .kpi { height: auto; min-width: 0; padding: 16px; box-sizing: border-box; }
+.st-key-dashboard_layout .kpis {
+  gap: var(--dashboard-gap); margin-top: 0; grid-auto-rows: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--kpi-min, 190px)), 1fr));
+}
+/* 하나의 격자에 넣으면 항목 수가 달라도 같은 행의 카드 높이와 열 경계가 맞는다. */
+.dashboard-panels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--dashboard-gap, 16px); }
+.dashboard-panels > .panel { height: auto; min-width: 0; box-sizing: border-box; }
+/* 운영 화면의 AI 카드도 같은 간격으로 배치하고 좁아지면 자동으로 한 열로 줄인다. */
+.dashboard-menu-kpis {
+  display: grid; min-width: 0; gap: var(--dashboard-gap, 16px); grid-auto-rows: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+/* AI 카드 네 개가 3개+1개로 갈라지지 않도록 두 열을 유지하고, 좁은 화면은 한 열로 바꾼다. */
+@media (max-width: 1100px) {
+  .dashboard-menu-kpis { grid-template-columns: minmax(0, 1fr); }
+}
+/* 작은 화면에서는 두 열을 억지로 줄이지 않고 한 열로 읽기 쉽게 배치한다. */
+@media (max-width: 760px) {
+  .dashboard-panels { grid-template-columns: minmax(0, 1fr); }
 }

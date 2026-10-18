@@ -15,6 +15,7 @@ def menu_categories(request: Request) -> list[dict]:
 
     TODO: categories 테이블(db/fbgrowth_schema.sql)에서 카테고리를 읽는다.
     """
+
     return [{"id": c["id"], "name": c["name"]} for c in dummy.content_item("categories")
             if c["id"] not in NON_MENU_CATEGORIES]
 
@@ -36,6 +37,7 @@ class MenuIn(BaseModel):
 @router.get("/menus")
 async def menus():
     """[더미] 메뉴 목록과 카테고리."""
+    # 관리자 메뉴 저장소가 구현되기 전까지는 더미 응답을 돌려준다.
     return dummy.admin_menus()
 
 
@@ -46,6 +48,7 @@ async def save_menu(menu_id: str, body: MenuIn, request: Request):
     TODO: cat 이 menu_categories() 에 없으면 422.
     TODO: 없는 id 면 새로 만들고(name·cat·price 필수, 아니면 422), 있으면 보낸 필드만 수정: shop.save_menu(menu_id, fields).
     """
+    # 관리자 메뉴 저장소가 구현되기 전까지는 더미 응답을 돌려준다(저장하지 않음).
     return dummy.menu_saved(menu_id, body.model_dump(exclude_none=True))
 
 

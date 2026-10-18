@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     # 고객 등급 기준 (임시값, 정책 확정 후 조정)
     grade_repeat_visits: int = 2
     grade_regular_visits: int = 5
-    grade_dormant_days: int = 60
+    grade_dormant_days: int = 30  # 휴면: 마지막 방문 후 30일 이상
 
     # QR 로그인 / 카카오 (docs/정식_구현_계획.md 1장)
     public_base_url: str = "http://localhost:8000"  # 휴대폰이 접속할 서버 주소 (QR에 들어감)
@@ -47,6 +47,14 @@ class Settings(BaseSettings):
     sms_monthly_limit: int = 50
     lms_monthly_limit: int = 10
     sms_dry_run: bool = True  # True면 솔라피를 호출하지 않고 로그만 남긴다
+
+    # AI 문자 후보 · 외부 정보 (docs/todo/TODO_성호.md 3번)
+    gemini_api_key: str = ""  # 비어 있으면 AI 대신 템플릿 문구를 쓴다
+    gemini_model: str = "gemini-2.5-flash"
+    seoul_openapi_key: str = ""  # 서울 열린데이터광장 인증키. 비어 있으면 행사 문구는 비워 둔다
+    store_gu: str = "마포구"  # 행사를 찾을 자치구 (매장 위치)
+    store_lat: float = 37.5563  # 날씨를 조회할 매장 위치 (홍대)
+    store_lon: float = 126.9236
 
     @property
     def supabase_enabled(self) -> bool:

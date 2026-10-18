@@ -19,7 +19,7 @@
 | 순서 | 할 일 | API | 상태 |
 |---|---|---|---|
 | 0 | 0. 개발 흐름 확인 (테스트 버튼) | `POST /api/dev/db-test` (개발 전용) | 확인 전 |
-| 1 | 1. 메뉴 저장소 + 손님 메뉴 목록 | `GET /api/v1/menus` | 더미 |
+| 1 | 1. 메뉴 저장소 + 손님 메뉴 목록 | `GET /api/v1/menus` | 구현·테스트 미실행 |
 | 2 | 2. 관리자 메뉴 관리 | `GET·POST·PATCH·DELETE /api/v1/owner/menus` | 더미 |
 | 3 | 3. 카테고리 | `GET /api/v1/categories`, `POST·PATCH·DELETE /api/v1/owner/categories` | 더미 |
 | 4 | 4. 추천 가중치 | `GET·PATCH /api/v1/owner/menus`, `PATCH …/menus/weights` | 더미 |
@@ -60,7 +60,7 @@
 
 ---
 
-## 1. 메뉴 저장소 + 손님 메뉴 목록 (더미)
+## 1. 메뉴 저장소 + 손님 메뉴 목록 (구현, 테스트 미실행)
 
 ### 1-1. `GET /api/v1/menus`
 
@@ -70,7 +70,7 @@
 
 | 방법 | 확인할 것 |
 |---|---|
-| `BT/test_shop_admin.py::test_menu_seeded_and_admin_edits_reach_users`의 `skip` 해제 | 서버 시작 시 `B/seed/menu.json`(60개)이 `menus`에 채워지고 `GET /api/menus`가 60개를 돌려준다 |
+| `BT/test_shop_admin.py::test_menu_seeded_and_user_list_returns_seed_values` | 시드 메뉴 60개와 `c2`의 기본값(품절 아님·가격 20000·가중치 50)을 확인한다 |
 | `BT/test_dummy_get.py::test_user_get_dummies`의 menus 줄 | 새 테스트(`BT/test_menus.py`)로 대체 |
 | 응답 모양 | 각 메뉴에 `id, cat, name, desc, price, emoji, tags, soldout, spicy, weight, set_ok, image_url`가 있다 |
 | 수동 | 손님 주문 화면에서 카테고리를 눌러 메뉴 카드가 보인다. 관리자에서 품절 처리 → 10초 안에 손님 화면에 "품절" 표시 |
@@ -89,17 +89,18 @@
 ```
 UI(주문 화면 · 카테고리 탭 · 메뉴 카드) → U/views/order.py → ctx.MENU ← U/user_repository.py load_content
  → GET /api/menus → B/routers/menus.py list_menus
- → B/stores/shop_menus.py menus() → DB(menus 60행, sort_order 순)
+ → B/stores/shop_menus.py menus() → DB(menus 60행, sort_order 순; 비어 있으면 menu.json 으로 시드)
  → 컬럼 이름 변환(cat/desc/soldout) → [{id, cat, name, desc, price, soldout, ...}] → UI 메뉴 카드
 ```
 
 **상세 설명 / TODO**
 
-- [ ] 더미 주석처리: `B/routers/menus.py list_menus`의 `dummy.menus()` 줄, `B/dummy/menu_data.py`의 `menus()`와 `"GET /api/menus"` 줄. (`admin_menus()`와 `menu_saved()`가 `menus()`를 쓰므로 2번과 순서를 같이 맞춘다 → 1·2번을 같은 PR로 묶는 것을 추천)
-- [ ] `B/stores/shop_menus.py` 구현: `seed_menus`, `menus`, `menu`, `save_menu`, `delete_menu`(파일 안 TODO 순서대로). 컬럼 목록은 `MENU_FIELDS`.
-- [ ] `B/stores/shop.py`의 `# TODO: 구현 후 self.seed_menus() 를 불러…` 주석 줄을 실제 호출로 바꾼다(그 한 줄만).
+- [ ] 더미 코드 정리: `B/routers/menus.py`의 더미 호출과 `B/dummy/menu_data.py`의 `menus()`·`"GET /api/menus"` 항목을 삭제한다. (관리자 메뉴 더미는 TODO 2에서 정리)
+- [ ] 구현 확인: `B/stores/shop_menus.py`의 `seed_menus`, `menus`, `menu`, `save_menu`, `delete_menu`와 `B/stores/shop.py`의 시드 호출을 테스트한다. Postgres에서 메뉴 시드 전에 필요한 카테고리도 준비한다.
 - [ ] 추가한 메뉴 id는 문자열이다(`c1`, `m3fa2b1`). 숫자로 가정하지 않는다.
 - [ ] 끝나면 재현·석원·수용에게 "`shop.menus()`/`menu(id)` 쓸 수 있어요"라고 알린다.
+
+> 현재 코드는 구현됐지만 pytest를 실행하지 않아 완료 체크는 보류한다. 테스트 통과 후 이 항목을 체크하고 진행 순서 상태를 "완료"로 바꾼다.
 
 ---
 

@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from admin.ui.widgets import page_head, sec_title
-from admin_repository import ROULETTE_COLUMNS, ROULETTE_KINDS, ROULETTE_MAX_SLOTS, ROULETTE_MIN_SLOTS, CategoryError
+from admin_repository import ALL_MENU_LABEL, ROULETTE_COLUMNS, ROULETTE_KINDS, ROULETTE_MAX_SLOTS, ROULETTE_MIN_SLOTS, CategoryError
 
 ss = st.session_state
 EVENTS = {"roulette": "🎰  행운의 룰렛"}
@@ -32,7 +32,7 @@ def wheel_preview(table, odds):
     n = len(table)
     stops = ", ".join(f"{c if isinstance(c, str) and c.startswith('#') else '#888'} {i * 100 / n:.2f}% {(i + 1) * 100 / n:.2f}%"
                       for i, c in enumerate(table["색상"]))
-    rows = "".join(f'<div class="bar-row"><span class="n">{escape(str(r["이모지"]))} {escape(str(r["칸 문구"]))}</span>'
+    rows = "".join(f'<div class="bar-row"><span class="n">{escape(str(r["이모지"]))} {escape(str(r["표시 문구"]))}</span>'
                    f'<span class="t"><i style="width:{max(o, 1.5):.0f}%"></i></span><span class="c">{o:g}%</span></div>'
                    for (_, r), o in zip(table.iterrows(), odds))
     return (f'<div class="wheel-preview">'
@@ -42,54 +42,86 @@ def wheel_preview(table, odds):
 
 def render_roulette_panel(repo):
     old = repo.roulette_table()
-    menu_names = list(repo.menus()["메뉴명"])
+    menu_choices = repo.roulette_menu_choices()
+    menu_names = [choice["label"] for choice in menu_choices]
+    menu_emojis = {choice["label"]: choice["emoji"] for choice in menu_choices}
     st.html(f'<div class="mmenu-head"><b>🎰 행운의 룰렛</b><span>칸 {len(old)}개</span></div>')
     c_edit, c_prev = st.columns([3, 2], gap="medium")
     with c_edit:
         sec_title("칸 구성과 당첨 확률", "손님이 로그인하면 회원당 1회 돌릴 수 있어요")
-        with st.container(key="events_table"):  # 표 높이는 화면 높이에 맞춰 CSS 가 정한다
+        with st.container(key="events_table"):
             edited = _roulette_editor(old, menu_names)
-        st.caption(f"칸은 {ROULETTE_MIN_SLOTS}~{ROULETTE_MAX_SLOTS}개. 표 아래 빈 줄에서 칸을 추가하고, 행을 선택해 지울 수 있어요.")
+        st.caption(f"칸은 {ROULETTE_MIN_SLOTS}~{ROULETTE_MAX_SLOTS}개. 메뉴와 종류는 한 번 눌러 목록에서 고를 수 있어요.")
     new = edited.reset_index(drop=True)
     new["확률 가중치"] = pd.to_numeric(new["확률 가중치"], errors="coerce")
     with c_prev:
         sec_title("미리보기", "저장 전 표의 값 기준")
-        shown = new.dropna(subset=["확률 가중치"]).fillna({"이모지": "", "칸 문구": ""})
+        shown = new.dropna(subset=["확률 가중치"]).copy()
+        service_rows = shown["종류"] == ROULETTE_KINDS["free"]
+        shown["이모지"] = "🎟️"
+        shown.loc[service_rows, "이모지"] = shown.loc[service_rows, "서비스 메뉴"].map(menu_emojis).fillna("🍴")
+        shown["표시 문구"] = shown["할인율(%)"].map(lambda value: f"{int(value)}% 할인")
+        shown.loc[service_rows, "표시 문구"] = shown.loc[service_rows, "서비스 메뉴"].fillna("메뉴 선택").map(
+            lambda value: value.split("] ", 1)[-1])
         if shown.empty:
             st.caption("칸을 추가해 주세요.")
         else:
             st.html(wheel_preview(shown, repo.roulette_odds(shown)))
-    _roulette_buttons(repo, old, new)
+    _roulette_buttons(repo, new)
 
 
 def _roulette_editor(old, menu_names):
-    edited = st.data_editor(
-        old, hide_index=True, width="stretch", num_rows="dynamic", height="stretch",
-        key=f"roulette_editor_{ss['roulette_editor_v']}", column_order=ROULETTE_COLUMNS,
-        column_config={
-            "칸 문구": st.column_config.TextColumn(required=True, help="룰렛 칸에 보이는 첫 줄 (둘째 줄은 'N% 할인'·'서비스'가 자동으로 붙어요)"),
-            "이모지": st.column_config.TextColumn(width="small"),
-            "종류": st.column_config.SelectboxColumn(options=list(ROULETTE_KINDS.values()), required=True, width="small",
-                                                   help="할인: 주문 전체 할인 / 서비스: 메뉴 1개를 무료로 담아 줘요"),
-            "할인율(%)": st.column_config.NumberColumn(min_value=0, max_value=100, step=1, format="%d%%", help="종류가 '할인'일 때만 사용"),
-            "서비스 메뉴": st.column_config.SelectboxColumn(options=menu_names, help="종류가 '서비스'일 때만 사용"),
-            "색상": st.column_config.TextColumn(width="small", help="#RRGGBB 형식 (예: #f0556b)", default="#3ea0f5"),
-            "확률 가중치": st.column_config.NumberColumn(min_value=0, step=1, default=1, required=True,
-                                                      help="클수록 잘 나와요. 칸 가중치의 합 대비 비율이 당첨 확률 (0이면 당첨 안 됨)"),
-            "당첨 안내문": st.column_config.TextColumn(help="당첨 후 보여줄 문구. 비우면 자동으로 만들어요"),
-        })
-    return edited
+    """표 셀 대신 바로 누를 수 있는 선택 상자를 사용해 두 번 클릭 문제를 없앤다."""
+    version = ss["roulette_editor_v"]
+    draft_key = f"roulette_draft_{version}"
+    if draft_key not in ss:
+        ss[draft_key] = [{**row, "_id": f"{version}-{index}"} for index, row in enumerate(old.to_dict("records"))]
 
+    rows, delete_id = [], None
+    for row in ss[draft_key]:
+        row_id = row["_id"]
+        with st.container(border=True):
+            menu_col, kind_col, rate_col, weight_col, color_col, delete_col = st.columns([2.5, 1, 1, 1, 1, .6])
+            menu_index = menu_names.index(row["서비스 메뉴"]) if row.get("서비스 메뉴") in menu_names else None
+            menu = menu_col.selectbox("서비스 메뉴", menu_names, index=menu_index, placeholder="메뉴 선택",
+                                      key=f"roulette_menu_{row_id}")
+            # 전체 메뉴는 할인 전용 옵션이므로 선택 즉시 종류를 할인으로 고정한다.
+            selected_kind = ROULETTE_KINDS["discount"] if menu == ALL_MENU_LABEL else row.get("종류", "서비스")
+            kind = kind_col.selectbox("종류", list(ROULETTE_KINDS.values()),
+                                      index=list(ROULETTE_KINDS.values()).index(selected_kind),
+                                      key=f"roulette_kind_{row_id}", disabled=menu == ALL_MENU_LABEL)
+            rates = [5, 10, 15, 20]
+            current_rate = int(row.get("할인율(%)", 5))
+            rate = rate_col.selectbox("할인율", rates, index=rates.index(current_rate) if current_rate in rates else 0,
+                                      format_func=lambda value: f"{value}%", key=f"roulette_rate_{row_id}",
+                                      disabled=kind != ROULETTE_KINDS["discount"])
+            weights = list(range(0, 101, 10))
+            current_weight = int(row.get("확률 가중치", 0))
+            weight = weight_col.selectbox("확률", weights,
+                                          index=weights.index(current_weight) if current_weight in weights else 0,
+                                          format_func=lambda value: f"{value}%", key=f"roulette_weight_{row_id}")
+            color = color_col.color_picker("색상", value=row.get("색상", "#3ea0f5"), key=f"roulette_color_{row_id}")
+            if delete_col.button("삭제", key=f"roulette_delete_{row_id}", use_container_width=True):
+                delete_id = row_id
+            rows.append({"서비스 메뉴": menu, "종류": kind, "할인율(%)": rate,
+                         "확률 가중치": weight, "색상": color, "_id": row_id})
 
-def _roulette_buttons(repo, old, new):
-    dirty = not new.fillna("").astype(str).equals(old.fillna("").astype(str))
-    c_save, c_undo, _ = st.columns([1, 1.3, 5])
-    if c_undo.button("↩ 되돌리기", key="roulette_undo", width="stretch", disabled=not dirty,
-                     help="저장하기 전의 변경을 모두 취소하고 저장된 값으로 돌립니다"):
-        ss["roulette_editor_v"] += 1
-        st.toast("저장하지 않은 변경을 되돌렸어요.", icon="↩️")
+    ss[draft_key] = rows
+    if delete_id is not None:
+        ss[draft_key] = [row for row in rows if row["_id"] != delete_id]
         st.rerun()
-    if c_save.button("변경 저장", type="primary", key="roulette_save", width="stretch", disabled=not dirty):
+    if st.button("＋ 룰렛 칸 추가", key=f"roulette_add_{version}", disabled=len(rows) >= ROULETTE_MAX_SLOTS):
+        next_id = f"{version}-new-{len(rows)}"
+        ss[draft_key].append({"서비스 메뉴": None, "종류": "서비스", "할인율(%)": 5,
+                              "확률 가중치": 0.0, "색상": "#3ea0f5", "_id": next_id})
+        st.rerun()
+    return pd.DataFrame([{key: row.get(key) for key in ROULETTE_COLUMNS} for row in rows], columns=ROULETTE_COLUMNS)
+
+
+def _roulette_buttons(repo, new):
+    # 현재는 DummyBackend에서 관리자 화면 세션에만 저장한다. 손님 Frontend와 공유하는 방식은
+    # 팀 협의 후 같은 repository 메서드의 실제 API 연결로 교체할 수 있도록 화면에서는 저장소만 호출한다.
+    if st.button("저장하기", type="primary", key="roulette_save", use_container_width=True):
         try:
             repo.save_roulette(new)
         except CategoryError as e:
@@ -97,6 +129,7 @@ def _roulette_buttons(repo, old, new):
         except Exception as e:  # noqa: BLE001 - 서버 오류 메시지를 그대로 보여준다
             st.error(f"저장하지 못했습니다: {e}")
         else:
+            ss.pop(f"roulette_draft_{ss['roulette_editor_v']}", None)
             ss["roulette_editor_v"] += 1
             st.toast("룰렛 설정을 저장했습니다. 손님 화면에는 잠시 뒤 반영돼요.", icon="✅")
             st.rerun()

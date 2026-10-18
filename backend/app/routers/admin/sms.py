@@ -75,3 +75,9 @@ def sms_cancel(log_id: int, request: Request):
 @router.get("/marketing/sms/logs")
 async def sms_logs(request: Request):
     return request.app.state.sms_logs.logs()
+
+
+@router.post("/marketing/sms/candidates")
+def sms_candidates(request: Request):
+    """AI 문자 후보 여러 개(키워드·수신 등급·문구·출처)를 만든다. 외부 호출이 있어 동기 함수로 둔다."""
+    return request.app.state.sms_candidates.candidates()

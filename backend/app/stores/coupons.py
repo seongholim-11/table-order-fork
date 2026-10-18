@@ -11,10 +11,24 @@ from app.services.grades import KST
 from app.stores.db import Database
 
 
-SCHEMA = """CREATE TABLE IF NOT EXISTS coupons (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, member_id INTEGER NOT NULL, table_no INTEGER NOT NULL,
-    table_login_id INTEGER, prize_id INTEGER, kind TEXT NOT NULL, label TEXT NOT NULL, emoji TEXT NOT NULL DEFAULT '🎁',
-    percent INTEGER, menu_id TEXT, issued_at TEXT NOT NULL, expires_at TEXT, used_at TEXT, used_order_id INTEGER)"""
+SCHEMA = """\
+CREATE TABLE IF NOT EXISTS coupons (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id     INTEGER NOT NULL,
+    table_no      INTEGER NOT NULL,
+    table_login_id INTEGER,
+    prize_id     INTEGER,
+    kind          TEXT NOT NULL,
+    label         TEXT NOT NULL,
+    emoji         TEXT NOT NULL DEFAULT '🎁',
+    percent       INTEGER,
+    menu_id       TEXT,
+    issued_at     TEXT NOT NULL,
+    expires_at    TEXT,
+    used_at       TEXT,
+    used_order_id INTEGER
+);
+"""
 
 COLUMNS = "id, member_id, table_no, kind, label, emoji, percent, menu_id AS item_id, issued_at, used_at, used_order_id"
 

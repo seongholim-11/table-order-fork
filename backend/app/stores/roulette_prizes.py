@@ -7,7 +7,7 @@ from pathlib import Path
 
 from app.stores.db import Database
 
-SCHEMA = """
+SCHEMA = """\
 CREATE TABLE IF NOT EXISTS roulette_prizes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     label TEXT NOT NULL,
@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS roulette_prizes (
 
 SEED_PATH = Path(__file__).resolve().parent.parent / "seed" / "roulette_prizes.json"
 MENU_SEED_PATH = Path(__file__).resolve().parent.parent / "seed" / "menu.json"
+SERVICE_MENU_IDS = {"a1", "a4", "a11", "d7", "d8"}
 
 
 class RoulettePrizeStore:
@@ -45,11 +46,20 @@ class RoulettePrizeStore:
                  **({"percent": row["percent"]} if row["kind"] == "discount" else {"item_id": row["menu_id"]})}
                 for row in rows]
 
-    def menu_exists(self, menu_id: str) -> bool:
-        """메뉴 담당 DB 전환 전에도 시드 메뉴를 인정하고, 전환 후에는 DB 메뉴도 함께 확인한다."""
-        if self.db.one("SELECT id FROM menus WHERE id=?", (menu_id,)):
-            return True
-        return menu_id in {menu["id"] for menu in json.loads(MENU_SEED_PATH.read_text(encoding="utf-8"))}
+    @staticmethod
+    def _service_allowed(menu: dict) -> bool:
+        """사장님이 정한 다섯 가지 맛보기·간식 메뉴만 서비스 경품으로 허용한다."""
+        return menu["id"] in SERVICE_MENU_IDS
+
+    def service_menu_exists(self, menu_id: str) -> bool:
+        """메뉴 담당 DB 전환 전에는 시드, 전환 후에는 DB 메뉴를 같은 기준으로 검사한다."""
+        row = self.db.one("SELECT id, category_id AS cat, name, price, is_soldout AS soldout "
+                          "FROM menus WHERE id=?", (menu_id,))
+        if row:
+            return self._service_allowed(row)
+        seed = next((menu for menu in json.loads(MENU_SEED_PATH.read_text(encoding="utf-8"))
+                     if menu["id"] == menu_id), None)
+        return bool(seed and self._service_allowed(seed))
 
     def replace(self, prizes: list[dict]) -> list[dict]:
         """칸 순서를 보존해 전체 교체한다. 중간 실패 시 기존 설정이 유지된다."""

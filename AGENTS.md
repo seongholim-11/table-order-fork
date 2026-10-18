@@ -36,7 +36,7 @@ streamlit run admin/app.py --server.port 8502   # 관리자 (APP_ENV=dev 면 토
 - 상세: `docs/개발_가이드.md`(API 추가 순서), `docs/DB_설계.md`(DB 설계), `docs/기능흐름_*.md`(기능 흐름), `docs/코드_둘러보기.md`.
 
 ## 더미 상태 (팀원이 구현할 뼈대)
-- 실제 구현은 **QR 로그인**(`/api/auth/*`, `/api/members/me`, `/api/tables/{n}/logins`)과 **문자 발송**(`/admin/api/marketing/sms/*`), 고객 목록(`GET /admin/api/members`)뿐이다. 나머지 엔드포인트는 `backend/app/dummy/`의 더미 응답을 돌려주고 저장하지 않는다.
+- 실제 구현은 **QR 로그인**(`/api/auth/*`, `/api/members/me`, `/api/tables/{n}/logins`), **문자 발송**(`/admin/api/marketing/sms/*`), 고객 목록(`GET /admin/api/members`), 손님 메뉴 목록(`GET /api/menus`)이다. 나머지 기능은 더미 응답을 돌려주거나 아직 구현되지 않았다.
 - 아직 더미인 엔드포인트 찾기: `grep -rn "dummy\." backend/app/routers`, 목록은 `dummy.DUMMY_ENDPOINTS`.
 - 실제 DB로 교체하는 방법: ① 라우터의 `dummy.xxx()` 호출을 store/service 호출로 바꾸고(라우터·stores의 TODO 주석, `NotImplementedError` 뼈대에 구현할 내용이 적혀 있음) ② `dummy/`의 해당 `*_data.py`에서 함수와 `ENDPOINTS` 줄을 지우고(`dummy/__init__.py`는 고치지 않는다) ③ 해당 테스트의 `skip`을 제거한다. 이전 구현 참고: 커밋 `a8b3d14`.
 - 교체가 끝나 더미가 없어지면 이 섹션을 삭제한다.

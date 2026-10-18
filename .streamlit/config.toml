@@ -1,12 +1,13 @@
-[theme]
-base = "dark"
-primaryColor = "#ffb703"
-backgroundColor = "#121214"
-secondaryBackgroundColor = "#1e1e22"
-textColor = "#f5f5f5"
-
-[client]
-toolbarMode = "minimal"
+# user/와 admin/에 적용될 공통 설정을 적용한다.
+# 개별 설정은 각 폴더의 config.toml에 작성한다.
 
 [server]
-headless = true
+address = "localhost"
+showEmailPrompt = false
+
+[client]
+# showDetailErrors = "none" 
+toolbarMode =  "minimal"
+
+[browser]
+gatherUsageStats = false

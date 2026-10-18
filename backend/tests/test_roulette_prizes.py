@@ -31,6 +31,7 @@ def test_rejects_bad_prizes(client):
         [{**prize, "weight": 0} for prize in _prizes()],
         [{**_prizes()[0], "percent": None}, _prizes()[1]],
         [_prizes()[0], {**_prizes()[1], "item_id": "missing"}],
+        [_prizes()[0], {**_prizes()[1], "item_id": "c1"}],  # 한 마리 치킨 같은 메인 메뉴는 서비스 대상이 아니다.
     ]
     for body in bad_cases:
         assert client.put("/admin/api/owner/roulette/prizes", headers=ADMIN, json=body).status_code == 422

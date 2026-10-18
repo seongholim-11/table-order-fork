@@ -17,7 +17,7 @@ import os
 import re
 import sys
 import uuid
-from html import escape, unescape
+from html import escape
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -44,7 +44,7 @@ KST = timezone(timedelta(hours=9))
 SPICY_LABELS = {0: "안 매움", 1: "순한맛", 2: "보통맛", 3: "아주 매움"}
 SPICY_VALUES = {v: k for k, v in SPICY_LABELS.items()}
 MODES = ("dummy", "api", "auto")
-DEFAULT_RULE = {"repeat": 2, "regular": 5, "dormant": 60}
+DEFAULT_RULE = {"repeat": 2, "regular": 5, "dormant": 30}
 MENU_COLUMNS = ["id", "메뉴명", "카테고리", "가격", "설명", "이미지 URL", "판매 여부", "매운 정도", "추천 가중치", "세트 가능"]
 
 
@@ -93,11 +93,32 @@ class ApiBackend:
     def members(self, rule):
         return api.get(ENDPOINTS["members"], self.token, params=rule)
 
+    def customer_grades(self, rule):
+        """고객 등급 카드와 대시보드가 함께 쓰는 서버 집계 결과."""
+        return api.get("/admin/api/customers/grades", self.token, params=rule)
+
+    def customer_grade_rules(self):
+        """서버에 설정된 기본 등급 기준을 조회한다."""
+        return api.get("/admin/api/customers/grades/rules", self.token)
+
+    def save_customer_grade_rules(self, rule):
+        """화면 미리보기와 구분해서 관리자가 저장을 누를 때만 요청한다."""
+        return api.put("/admin/api/customers/grades/rules", self.token, json=rule)
+
     def orders(self):
         return api.get(ENDPOINTS["orders"], self.token)
 
     def stats(self, rule):
-        return api.get(ENDPOINTS["stats"], self.token)
+        # 미리 본 등급 기준을 오늘 신규·재방문 집계에도 적용한다.
+        return api.get(ENDPOINTS["stats"], self.token, params=rule)
+
+    def sales_insights(self, rule):
+        """추가 통계 전체를 한 번에 읽어 그래프마다 주문을 다시 조회하지 않는다."""
+        return api.get(f"{ENDPOINTS['stats']}/insights", self.token, params=rule)
+
+    def menu_alerts(self):
+        """품절 상태와 인기 메뉴 여부를 실제 DB에서 조회한다."""
+        return api.get("/admin/api/alerts", self.token)
 
     def calls(self):
         return api.get(ENDPOINTS["calls"], self.token)
@@ -116,6 +137,11 @@ class ApiBackend:
 
     def sms_cancel(self, log_id):
         return api.post(f"{ENDPOINTS['sms']}/logs/{log_id}/cancel", self.token)
+
+    def sms_candidates(self):
+        """AI 문자 후보 [{keywords, grades, body, source}] 를 서버가 만들어 준다 (날씨·행사·매장 데이터 반영)."""
+        # 서버가 날씨·행사·AI 를 차례로 부르면 기본 제한(5초)을 넘기 쉬워 이 호출만 넉넉히 기다린다
+        return api.post(f"{ENDPOINTS['sms']}/candidates", self.token, timeout=60)
 
     def sms_logs(self):
         return api.get(f"{ENDPOINTS['sms']}/logs", self.token)
@@ -141,9 +167,25 @@ COLOR_PRESETS = {"주황": ["#f6b93b", "#e55039"], "초록": ["#b8e994", "#38ada
 
 
 ROULETTE_MIN_SLOTS, ROULETTE_MAX_SLOTS = 2, 8
-ROULETTE_COLUMNS = ["칸 문구", "이모지", "종류", "할인율(%)", "서비스 메뉴", "색상", "확률 가중치", "당첨 안내문"]
+ROULETTE_COLUMNS = ["서비스 메뉴", "종류", "할인율(%)", "확률 가중치", "색상"]
 ROULETTE_KINDS = {"discount": "할인", "free": "서비스"}
 _HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
+SERVICE_MENU_IDS = ("a1", "a4", "a11", "d7", "d8", "d1", "j1", "b1")
+SERVICE_MENU_NAMES = {"a1": "맛보기 먹태구이", "d1": "탄산음료", "j1": "소주 1병", "b1": "생맥주 1잔"}
+ALL_MENU_LABEL = "[할인] 전체 메뉴"
+
+
+def _service_menu_allowed(menu: dict) -> bool:
+    """사장님이 정한 맛보기·간식·음료 메뉴만 룰렛 서비스로 허용한다."""
+    return menu["id"] in SERVICE_MENU_IDS
+
+
+def _menu_emoji(name: str, original: str = "") -> str:
+    """메뉴 이름을 보고 서비스 카드에 어울리는 이모지를 자동 배정한다."""
+    emoji_rules = (("계란", "🥚"), ("감자", "🍟"), ("치즈볼", "🧀"), ("닭똥집", "🍗"), ("오징어", "🦑"),
+                   ("새우", "🍤"), ("먹태", "🐟"), ("떡볶이", "🌶️"), ("노가리", "🐟"), ("건어물", "🦑"), ("콜라", "🥤"),
+                   ("사이다", "🥤"), ("라면", "🍜"), ("주먹밥", "🍙"), ("공깃밥", "🍚"), ("땅콩", "🥜"))
+    return next((emoji for word, emoji in emoji_rules if word in name), original if original and original != "🍽️" else "🍴")
 
 
 class CategoryError(Exception):
@@ -266,16 +308,32 @@ class AdminRepository:
         return {"saved": saved, "deleted": len(deleted)}
 
     # ---- 이벤트: 룰렛 ----
+    def roulette_menu_choices(self) -> list[dict]:
+        """서비스 가능한 메뉴만 카테고리 순으로 묶어 선택 목록을 만든다."""
+        payload = self.backend.menus()
+        category_names = {category["id"]: category["name"] for category in payload["categories"]}
+        category_order = {category["id"]: order for order, category in enumerate(payload["categories"])}
+        choices = []
+        menus = sorted(payload["menus"], key=lambda menu: (category_order.get(menu["cat"], 999), menu["name"]))
+        for menu in menus:
+            if _service_menu_allowed(menu):
+                category = category_names.get(menu["cat"], menu["cat"])
+                display_name = SERVICE_MENU_NAMES.get(menu["id"], menu["name"])
+                choices.append({"id": menu["id"], "name": display_name, "category": category,
+                                "label": f"[{category}] {display_name}",
+                                "emoji": _menu_emoji(display_name, menu.get("emoji", ""))})
+        return [{"id": None, "name": "전체 메뉴", "category": "할인", "label": ALL_MENU_LABEL, "emoji": "🎟️"}, *choices]
+
     def roulette_table(self) -> pd.DataFrame:
         """룰렛 칸 목록 → 편집용 표. 서버의 칸 모양은 user/menu_data.py 의 ROULETTE_PRIZES 와 같다."""
-        names = {m["id"]: m["name"] for m in self.backend.menus()["menus"]}
+        choices = {choice["id"]: choice for choice in self.roulette_menu_choices() if choice["id"]}
         rows = []
         for p in self.backend.roulette_prizes():
             free = p["kind"] == "free"
-            rows.append({"칸 문구": unescape(re.sub(r"<[^>]+>", "", p["label"].split("<br>")[0])), "이모지": p.get("emoji", ""),
-                         "종류": ROULETTE_KINDS[p["kind"]], "할인율(%)": 0 if free else int(p.get("percent", 0)),
-                         "서비스 메뉴": names.get(p.get("item_id"), p.get("item_id")) if free else None,
-                         "색상": p.get("color", "#888888"), "확률 가중치": p.get("weight", 1), "당첨 안내문": p.get("short", "")})
+            choice = choices.get(p.get("item_id"))
+            rows.append({"서비스 메뉴": choice["label"] if free and choice else ALL_MENU_LABEL,
+                         "종류": ROULETTE_KINDS[p["kind"]], "할인율(%)": 5 if free else int(p.get("percent", 5)),
+                         "확률 가중치": float(p.get("weight", 1)), "색상": p.get("color", "#888888")})
         return pd.DataFrame(rows, columns=ROULETTE_COLUMNS)
 
     @staticmethod
@@ -287,12 +345,10 @@ class AdminRepository:
 
     def save_roulette(self, table: pd.DataFrame) -> None:
         """편집한 표를 검사해 서버 칸 모양으로 바꿔 통째로 저장한다."""
-        ids = {m["name"]: m["id"] for m in self.backend.menus()["menus"]}
+        choices = {choice["label"]: choice for choice in self.roulette_menu_choices() if choice["id"]}
         prizes = []
         for n, row in enumerate(table.to_dict("records"), 1):
-            line1, kind = _text(row["칸 문구"]).strip(), {v: k for k, v in ROULETTE_KINDS.items()}.get(row["종류"])
-            if not line1:
-                raise CategoryError(f"{n}번째 칸의 문구를 입력해 주세요.")
+            kind = {v: k for k, v in ROULETTE_KINDS.items()}.get(row["종류"])
             if kind is None:
                 raise CategoryError(f"{n}번째 칸의 종류(할인/서비스)를 골라 주세요.")
             color = _text(row["색상"]).strip()
@@ -301,30 +357,55 @@ class AdminRepository:
             weight = row["확률 가중치"]
             if pd.isna(weight) or weight < 0:
                 raise CategoryError(f"{n}번째 칸의 확률 가중치는 0 이상이어야 해요.")
-            prize = {"emoji": _text(row["이모지"]).strip() or "🎁", "color": color, "kind": kind, "weight": float(weight)}
+            prize = {"color": color, "kind": kind, "weight": float(weight)}
             if kind == "discount":
+                if row["서비스 메뉴"] != ALL_MENU_LABEL:
+                    raise CategoryError(f"{n}번째 할인 칸은 전체 메뉴를 골라 주세요.")
                 percent = row["할인율(%)"]
-                if pd.isna(percent) or not 1 <= percent <= 100:
-                    raise CategoryError(f"{n}번째 칸의 할인율은 1~100% 여야 해요.")
-                prize.update(percent=int(percent), label=f"{escape(line1)}<br><b>{int(percent)}% 할인</b>")
-                default_short = f"{line1} {int(percent)}% 할인"
+                if pd.isna(percent) or int(percent) not in (5, 10, 15, 20):
+                    raise CategoryError(f"{n}번째 칸의 할인율은 5·10·15·20% 중에서 골라 주세요.")
+                prize.update(percent=int(percent), emoji="🎟️", label=f"모든 메뉴<br><b>{int(percent)}% 할인</b>")
+                default_short = f"전 메뉴 {int(percent)}% 할인"
             else:
                 menu = _text(row["서비스 메뉴"])
-                if menu not in ids:
+                if menu not in choices:
                     raise CategoryError(f"{n}번째 칸의 서비스 메뉴를 골라 주세요.")
-                prize.update(item_id=ids[menu], label=f"{escape(line1)}<br><b>서비스</b>")
-                default_short = f"{menu} 서비스"
-            prize["short"] = _text(row["당첨 안내문"]).strip() or default_short
+                choice = choices[menu]
+                prize.update(item_id=choice["id"], emoji=choice["emoji"], label=f"{escape(choice['name'])}<br><b>서비스</b>")
+                default_short = f"{choice['name']} 서비스"
+            prize["short"] = default_short
             prizes.append(prize)
         if not ROULETTE_MIN_SLOTS <= len(prizes) <= ROULETTE_MAX_SLOTS:
             raise CategoryError(f"룰렛 칸은 {ROULETTE_MIN_SLOTS}~{ROULETTE_MAX_SLOTS}개여야 해요.")
-        if not any(p["weight"] > 0 for p in prizes):
-            raise CategoryError("확률 가중치가 0보다 큰 칸이 하나는 있어야 해요.")
+        weights = [p["weight"] for p in prizes]
+        if any(weight % 10 for weight in weights) or sum(weights) != 100:
+            raise CategoryError("확률은 10% 단위로 고르고 전체 합계를 100%로 맞춰 주세요.")
         self.backend.save_roulette_prizes(prizes)
 
     # ---- 고객 / 주문 / 통계 ----
+    def regular_preferences(self) -> list[dict]:
+        """마케팅 AI 추천에서 쓸 실제 DB의 오늘 주문한 단골 정보를 읽는다."""
+        # 더미 화면에서 실제 손님의 취향을 알고 있는 것처럼 꾸며 보여주지 않는다.
+        if self.source != "api":
+            return []
+        return api.get("/admin/api/marketing/regular-preferences", self.backend.token)["preferences"]
+
+    def customer_grades(self, rule: dict | None = None) -> dict:
+        """화면에서 다시 세지 않고 백엔드가 집계한 등급별 인원을 사용한다."""
+        return self.backend.customer_grades(rule if rule is not None else self.customer_grade_rules())
+
+    def customer_grade_rules(self) -> dict:
+        """더미·API 여부와 관계없이 현재 기본 기준을 가져온다."""
+        return self.backend.customer_grade_rules()
+
+    def save_customer_grade_rules(self, rule: dict) -> dict:
+        """더미 화면에서 실제 DB에 저장됐다고 오해하지 않도록 막는다."""
+        if self.source != "api":
+            raise Unsupported("기준 저장은 서버에 연결한 화면에서 사용할 수 있어요.")
+        return self.backend.save_customer_grade_rules(rule)
+
     def members(self, rule: dict | None = None) -> pd.DataFrame:
-        rows = self.backend.members(rule or DEFAULT_RULE)["members"]
+        rows = self.backend.members(rule if rule is not None else self.customer_grade_rules())["members"]
         return pd.DataFrame([{
             "customer_id": m["id"], "닉네임": m["nickname"], "성별": m["gender"], "연령대": m["age_group"],
             "방문 횟수": m["visit_count"], "마지막 방문일": _kst_date(m["last_visit_at"]),
@@ -341,7 +422,25 @@ class AdminRepository:
             columns=["order_id", "주문 시각", "customer_id", "닉네임", "테이블", "주문 내역", "금액", "AI 추천 사용"])
 
     def stats(self, rule: dict | None = None) -> dict:
-        return self.backend.stats(rule or DEFAULT_RULE)
+        return self.backend.stats(rule if rule is not None else self.customer_grade_rules())
+
+    def sales_insights(self, rule: dict | None = None) -> dict:
+        """실제 서버의 추가 통계를 읽고, 더미 모드에서는 기존 화면 계산을 유지한다."""
+        if self.source == "api":
+            return self.backend.sales_insights(rule if rule is not None else self.customer_grade_rules())
+        from dashboard_stats import summarize
+
+        return summarize(self.orders(), self.members(rule), tables=self.store()["tables"])
+
+    def menu_alerts(self) -> dict:
+        """API 모드는 DB 품절 알림을, 더미 모드는 기존 시연용 메뉴를 표시한다."""
+        if self.source == "api":
+            alerts = self.backend.menu_alerts()
+            return {"sold_out": [alert["name"] for alert in alerts],
+                    "popular_sold_out": [alert["name"] for alert in alerts if alert["popular"]]}
+        from dashboard_stats import menu_alerts
+
+        return menu_alerts(self.menus(), self.stats()["popular_menus"])
 
     # ---- 직원 호출 ----
     def calls(self) -> list[dict]:

@@ -5,7 +5,7 @@ from app.dummy.content_data import content
 
 # 이 파일이 맡은 더미 엔드포인트. 실제 구현으로 바꾸면 해당 줄과 아래 함수를 같이 지운다.
 ENDPOINTS = {
-    "GET /api/menus": "menus",
+    # "GET /api/menus": "menus",
     "GET /admin/api/menus": "admin_menus",
     "PUT /admin/api/menus/{menu_id}": "menu_saved",
 }

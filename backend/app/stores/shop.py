@@ -20,4 +20,5 @@ class ShopStore(MenuMixin, OrderMixin, CallMixin, RecommendationMixin):
         self.db = db
         for schema in SCHEMAS:
             db.script(schema)
-        # TODO: 구현 후 self.seed_menus() 를 불러 빈 메뉴 테이블을 seed 로 채운다.
+
+        self.seed_menus()

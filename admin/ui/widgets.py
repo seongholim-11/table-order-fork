@@ -15,10 +15,17 @@ def sec_title(text, small=""):
     st.html(f'<div class="sec-title">{escape(text)}' + (f" <small>{escape(small)}</small>" if small else "") + "</div>")
 
 
-def kpi(label, value, unit="", sub="", accent=False):
+def kpi(label, value, unit="", sub="", accent=False, sub_change=None):
+    # 실제 증감률로 색상을 정해 0%와 비교 데이터가 없는 안내는 기본 색상을 유지한다.
+    trend = ""
+    if sub_change is not None:
+        if sub_change > 0:
+            trend = " up"
+        elif sub_change < 0:
+            trend = " down"
     return (f'<div class="kpi{" accent" if accent else ""}"><div class="k">{escape(label)}</div>'
             f'<div class="v">{escape(str(value))}<small>{escape(unit)}</small></div>'
-            + (f'<div class="s">{escape(sub)}</div>' if sub else "") + "</div>")
+            + (f'<div class="s{trend}">{escape(sub)}</div>' if sub else "") + "</div>")
 
 
 def kpi_row(*cards, min_width=None):

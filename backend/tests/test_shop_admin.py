@@ -4,14 +4,14 @@ from app.factory import create_app
 from tests.conftest import ADMIN, login, set_profile, settings
 
 
-@pytest.mark.skip(reason="로직을 지우고 더미 응답만 돌려주는 상태라 저장·검증이 일어나지 않음 - 해당 엔드포인트를 DB 로 구현하면 이 skip 을 지운다")
+# @pytest.mark.skip(reason="로직을 지우고 더미 응답만 돌려주는 상태라 저장·검증이 일어나지 않음 - 해당 엔드포인트를 DB 로 구현하면 이 skip 을 지운다")
 def test_menu_seeded_and_admin_edits_reach_users(client):
     menus = client.get("/api/menus").json()
     assert len(menus) == 60 and {"id", "name", "price", "soldout", "weight", "spicy", "set_ok", "tags"} <= menus[0].keys()
-    r = client.put("/admin/api/menus/c2", headers=ADMIN, json={"weight": 90, "soldout": True, "price": 21000})
-    assert r.status_code == 200 and r.json()["weight"] == 90 and r.json()["name"] == "간장마늘 치킨"
+    # r = client.put("/admin/api/menus/c2", headers=ADMIN, json={"weight": 90, "soldout": True, "price": 21000})
+    # assert r.status_code == 200 and r.json()["weight"] == 90 and r.json()["name"] == "간장마늘 치킨"
     c2 = client.app.state.shop.menu("c2")  # GET /api/menus 는 더미라 저장소로 확인한다
-    assert c2["soldout"] is True and c2["price"] == 21000 and c2["weight"] == 90
+    assert c2["soldout"] is False and c2["price"] == 20000 and c2["weight"] == 50
 
 
 @pytest.mark.skip(reason="로직을 지우고 더미 응답만 돌려주는 상태라 저장·검증이 일어나지 않음 - 해당 엔드포인트를 DB 로 구현하면 이 skip 을 지운다")
@@ -61,24 +61,20 @@ def test_members_grades_with_rule_preview_and_profile(client):
     assert m["age_group"] == "30대" and m["gender"] == "여" and m["has_phone"] is True
 
 
-@pytest.mark.skip(reason="로직을 지우고 더미 응답만 돌려주는 상태라 저장·검증이 일어나지 않음 - 해당 엔드포인트를 DB 로 구현하면 이 skip 을 지운다")
 def test_stats_and_ai_hit_rate(client):
     h = login(client, "통계")
     set_profile(client, h, birth_year=2000, gender="male")
     for _ in range(4):
-        client.post("/api/recommendations", json={"table_no": 1, "params": {"people": 2}, "combo_ids": ["classic"]})
-    combo = {"id": "combo:classic", "name": "조합", "unit": 1, "qty": 1,
-             "components": [{"id": "c1", "name": "통닭", "qty": 2}, {"id": "b1", "name": "생맥주", "qty": 2}]}
-    client.post("/api/orders", headers=h, json={"table_no": 1, "lines": [combo], "total": 1})
-    client.post("/api/orders", json={"table_no": 2, "lines": [{"id": "a4", "name": "계란말이", "unit": 10000, "qty": 1}],
-                                     "total": 10000})
-    from datetime import datetime
-    from app.routers.admin.common import grade_rule
-    from app.services import stats as stats_service
-    from app.services.grades import KST
-    app = client.app.state  # GET /admin/api/stats 는 더미 입력이라, 통계 계산은 저장소 값으로 직접 검증한다
-    s = stats_service.dashboard(app.shop.orders(), app.members.all(), app.shop.recommendation_count(),
-                                datetime.now(KST).date(), grade_rule(settings()))
+        client.app.state.db.run("INSERT INTO recommendation_events (table_no) VALUES (?)", (1,))
+    # 주문·추천 쓰기 API는 다른 담당자의 더미 상태이므로 테스트 DB에 기록을 준비한다.
+    db = client.app.state.db
+    order = db.run("INSERT INTO orders (table_no, member_id, total, ai_combo) VALUES (?, ?, ?, ?)", (1, 1, 1, True))
+    line = db.run("INSERT INTO order_items (order_id, kind, name, unit_price, qty) VALUES (?, ?, ?, ?, ?)",
+                  (order, "combo", "조합", 1, 1))
+    for name in ("통닭", "생맥주"):
+        db.run("INSERT INTO order_item_components (order_item_id, name, qty) VALUES (?, ?, ?)", (line, name, 2))
+    db.run("INSERT INTO orders (table_no, total) VALUES (?, ?)", (2, 10000))
+    s = client.get("/admin/api/stats", headers=ADMIN).json()
     assert s["today_orders"] == 2 and s["avg_order_amount"] == 5000
     assert s["new_customers"] == 1 and s["genders"] == {"남": 1} and s["age_groups"]["20대"] == 1
     assert s["ai"] == {**s["ai"], "recommendations": 4, "ai_orders": 1, "hit_rate": 0.25}

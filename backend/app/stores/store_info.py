@@ -3,9 +3,15 @@
 from app.core.settings import Settings
 from app.stores.db import Database
 
-SCHEMA = """CREATE TABLE IF NOT EXISTS store_info (
-    id INTEGER PRIMARY KEY CHECK (id = 1), name TEXT NOT NULL, branch TEXT NOT NULL,
-    slogan TEXT NOT NULL DEFAULT '', tables INTEGER NOT NULL DEFAULT 30)"""
+SCHEMA = """\
+CREATE TABLE IF NOT EXISTS store_info (
+    id      INTEGER PRIMARY KEY CHECK (id = 1),
+    name    TEXT NOT NULL,
+    branch  TEXT NOT NULL,
+    slogan  TEXT NOT NULL DEFAULT '',
+    tables  INTEGER NOT NULL DEFAULT 30
+);
+"""
 
 
 class StoreInfoStore:

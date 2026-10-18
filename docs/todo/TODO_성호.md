@@ -20,7 +20,7 @@
 |---|---|---|---|
 | 0 | 0. 개발 흐름 확인 (테스트 버튼) | `POST /api/dev/db-test` (개발 전용) | 확인 전 |
 | 1 | 1. QR 로그인 · 2. 문자 발송 점검 | 구현됨 | 새 코드 없이 동작 확인만 |
-| 2 | 3. AI 문자 후보 · 외부 정보(날씨·행사) | 미구현 | 날씨는 재현이 만드는 `B/services/weather.py`를 가져다 씀 |
+| 2 | 3. AI 문자 후보 · 외부 정보(날씨·행사) | 완료 | 날씨는 `B/services/external_info.py`(Open-Meteo)에서 직접 가져옴. 재현의 `weather.py`가 생기면 그쪽으로 바꿀 수 있음 |
 | 3 | 4. AI 챗봇 | 미구현 | 수용의 `B/services/stats.py`를 호출해 매출을 답함 |
 | 4 | 5. 관리자 로그인 | 미구현 | **모든 개발이 끝난 뒤 마지막에** (AGENTS.md 규칙) |
 | 선작업 | `B/dummy/`·`B/routers/` 분리 PR | 완료(PR 머지 후 시작) | `dummy.py`는 `B/dummy/*_data.py`로, `user.py`는 기능별 라우터로 나뉨. 마케팅 화면(`marketing*.py`)과 `admin_repository.py` 분리는 하지 않음 |
@@ -128,7 +128,7 @@ UI(AI 문자 탭 · 발송 버튼) → A/views/marketing.py → A/admin_reposito
 
 ---
 
-## 3. AI 문자 후보 · 외부 정보(날씨·행사) (미구현)
+## 3. AI 문자 후보 · 외부 정보(날씨·행사) (구현됨)
 
 ### 3-1. `POST /api/admin/marketing/sms/candidates` · `GET /api/admin/marketing/external-context`
 
@@ -164,11 +164,12 @@ UI(AI 문구 생성 버튼) → A/views/marketing.py make_ai_candidates → repo
 
 **상세 설명 / TODO**
 
-- [ ] `B/services/sms_candidates.py`(신규)에 `A/marketing_ai.py`의 `keyword_combos`, `template_sms`, `generate_sms`, `suggest_candidates` 로직을 서버용으로 옮긴다. 화면쪽 원본은 지우지 말고 둔다(`DATA_SOURCE=dummy` 대체용).
-- [ ] 회원·주문 요약은 직접 SQL을 쓰지 말고 `B/stores/members.py` 등 기존 store 메서드를 쓴다. 필요한 조회가 없으면 본인이 만든 새 store 파일에 추가한다.
-- [ ] `B/routers/admin/external.py`(신규): `GET /admin/api/marketing/external-context` → 오늘(KST) 행 조회, 없으면 날씨는 재현의 `B/services/weather.py`로 채워 `external_context`에 저장. 행사 문구는 비워 두고 사장님이 입력하는 방식은 추후 결정.
-- [ ] 결정 필요(팀 확인): 현재 문구 생성은 Anthropic API(`ANTHROPIC_API_KEY`)를 쓰고, 챗봇은 제미나이로 정해져 있다. 문자 후보도 제미나이로 통일할지 결정한다.
-- [ ] `A/admin_repository.py`의 `ApiBackend`에 `sms_candidates`, `external_context` 메서드를 추가한다(파일 끝쪽, 본인 구역에만).
+- [x] `B/services/sms_candidates.py`(신규)에 `A/marketing_ai.py`의 `keyword_combos`, `template_sms`, `generate_sms`, `suggest_candidates` 로직을 서버용으로 옮긴다. 화면쪽 원본은 지우지 말고 둔다(`DATA_SOURCE=dummy` 대체용).
+- [x] 회원·주문 요약은 직접 SQL을 쓰지 말고 `B/stores/members.py` 등 기존 store 메서드를 쓴다. 필요한 조회가 없으면 본인이 만든 새 store 파일에 추가한다.
+- [x] `B/routers/admin/external.py`(신규): `GET /admin/api/marketing/external-context` → 오늘(KST) 행 조회, 없으면 날씨는 재현의 `B/services/weather.py`로 채워 `external_context`에 저장. 행사 문구는 비워 두고 사장님이 입력하는 방식은 추후 결정.
+- [x] 결정(구현은 제미나이로 진행, 팀 확인 필요): 현재 문구 생성은 Anthropic API(`ANTHROPIC_API_KEY`)를 쓰고, 챗봇은 제미나이로 정해져 있다. 문자 후보도 제미나이로 통일할지 결정한다.
+- [x] `A/admin_repository.py`의 `ApiBackend`에 `sms_candidates` 메서드를 추가했다(`external_context`는 서버가 후보 생성 때 직접 쓰므로 화면 메서드는 만들지 않음).
+- 구현 메모: 행사는 서울시 문화행사 정보 API(`SEOUL_OPENAPI_KEY`, 마포구·오늘 진행 중 최대 2개), 문구 생성은 제미나이(`GEMINI_API_KEY`, 없으면 템플릿). 메뉴·주문 저장소가 아직 뼈대라 인기·가중치 메뉴는 그 저장소가 구현되면 자동 반영된다.
 
 ---
 

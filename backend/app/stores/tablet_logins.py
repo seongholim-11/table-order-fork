@@ -10,10 +10,20 @@ from app.services.grades import KST
 from app.stores.db import Database
 
 
-SCHEMA = """CREATE TABLE IF NOT EXISTS table_logins (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, table_no INTEGER NOT NULL, member_id INTEGER NOT NULL, login_day TEXT NOT NULL,
-    logged_in_at TEXT NOT NULL, roulette_eligible INTEGER NOT NULL DEFAULT 1, prize_id INTEGER, prize_text TEXT,
-    played_at TEXT, UNIQUE (table_no, member_id, login_day))"""
+SCHEMA = """\
+CREATE TABLE IF NOT EXISTS table_logins (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    table_no         INTEGER NOT NULL,
+    member_id        INTEGER NOT NULL,
+    login_day        TEXT NOT NULL,
+    logged_in_at     TEXT NOT NULL,
+    roulette_eligible INTEGER NOT NULL DEFAULT 1,
+    prize_id         INTEGER,
+    prize_text       TEXT,
+    played_at        TEXT,
+    UNIQUE (table_no, member_id, login_day)
+);
+"""
 
 
 def _iso(dt: datetime) -> str:

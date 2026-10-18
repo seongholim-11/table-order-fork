@@ -4,12 +4,24 @@ from datetime import datetime, timezone
 
 from app.stores.db import Database
 
-SCHEMA = """CREATE TABLE IF NOT EXISTS members (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, kakao_id TEXT UNIQUE NOT NULL, nickname TEXT NOT NULL,
-    phone TEXT, gender TEXT, birthday TEXT, birth_year INTEGER,
-    marketing_consent INTEGER NOT NULL DEFAULT 0, marketing_consent_at TEXT,
-    opted_out INTEGER NOT NULL DEFAULT 0, opted_out_at TEXT,
-    visit_count INTEGER NOT NULL DEFAULT 0, last_visit_at TEXT, created_at TEXT NOT NULL)"""
+SCHEMA = """\
+CREATE TABLE IF NOT EXISTS members (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    kakao_id             TEXT UNIQUE NOT NULL,
+    nickname             TEXT NOT NULL,
+    phone                TEXT,
+    gender               TEXT,
+    birthday             TEXT,
+    birth_year           INTEGER,
+    marketing_consent    INTEGER NOT NULL DEFAULT 0,
+    marketing_consent_at TEXT,
+    opted_out            INTEGER NOT NULL DEFAULT 0,
+    opted_out_at         TEXT,
+    visit_count          INTEGER NOT NULL DEFAULT 0,
+    last_visit_at        TEXT,
+    created_at           TEXT NOT NULL
+);
+"""
 
 
 def now_iso() -> str:
