@@ -36,9 +36,11 @@ def test_is_dev_only_when_exactly_dev(monkeypatch):
         assert api.is_dev() is expected
 
 
-def test_is_dev_false_when_unset_and_no_env_file(monkeypatch, tmp_path):
+def test_is_dev_false_when_unset_and_no_env_file(monkeypatch):
     monkeypatch.delenv("APP_ENV", raising=False)
-    monkeypatch.setattr(api, "Path", lambda *_: tmp_path / "shared" / "api.py")  # backend/.env 가 없는 위치
+    # 임시 폴더를 만들지 않고, 실제로 존재하지 않는 경로에서 .env가 없는 상황을 확인한다.
+    missing_api_path = ROOT / ".missing-test-shared" / "nested" / "api.py"
+    monkeypatch.setattr(api, "Path", lambda *_: missing_api_path)  # backend/.env가 없는 위치
     assert api.is_dev() is False
 
 

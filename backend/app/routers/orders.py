@@ -3,7 +3,6 @@
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
-from app import dummy
 from app.core.dependencies import optional_member
 
 router = APIRouter(prefix="/api", tags=["사용자"])
@@ -28,10 +27,26 @@ class OrderIn(BaseModel):
 
 
 @router.post("/orders", status_code=201)
+@router.post("/v1/orders", status_code=201)
 async def create_order(body: OrderIn, request: Request, member: dict | None = Depends(optional_member)):
-    """주문 생성. [더미] 저장하지 않고 성공 응답만 돌려준다.
+    """주문 생성. 주문 본체와 주문 줄을 저장하고 화면이 쓰는 응답을 돌려준다.
 
-    TODO: shop.add_order(table_no, lines, total, member_id) 로 주문·주문 줄 저장 (ai_combo: 줄 id 가 'combo:' 로 시작하면 True).
-    TODO: 로그인 회원이면 이 태블릿 로그인 회원의 쿠폰만 coupons.use(coupon_ids, tablet_member_ids, order_id) 로 사용 처리.
+    쿠폰의 실제 사용 처리는 3-4에서 같은 주문 id에 연결한다.
     """
-    return dummy.order_created(body.coupon_ids)
+    saved = request.app.state.shop.add_order(body.table_no, [line.model_dump() for line in body.lines], body.total,
+                                              member["id"] if member else None)
+    used_coupon_ids = []
+    if member and body.coupon_ids:
+        # 한 테이블의 로그인 회원들이 공유하는 쿠폰함에서만 사용 처리한다.
+        table_members = request.app.state.tablet_logins.list(body.table_no)
+        used_coupon_ids = request.app.state.coupons.use(
+            body.coupon_ids, [row["id"] for row in table_members], saved["id"])
+    return {"no": saved["id"], "ai_combo": saved["ai_combo"], "used_coupon_ids": used_coupon_ids}
+
+
+@router.get("/v1/tables/{table_no}/orders")
+async def table_orders(table_no: int, request: Request):
+    """현재 유효한 테이블 로그인 이후의 주문과 누적 금액을 돌려준다."""
+    since = request.app.state.tablet_logins.first_valid_login_at(table_no)
+    rows = request.app.state.shop.table_orders(table_no, since)
+    return {"orders": rows, "total": sum(row["total"] for row in rows)}

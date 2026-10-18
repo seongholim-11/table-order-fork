@@ -7,15 +7,18 @@ from tests.conftest import ADMIN
 
 
 @pytest.fixture(autouse=True)
-def _empty_menus(client):
-    """서버가 처음 뜰 때 기본 메뉴가 들어가므로, 빈 DB를 전제로 한 이 파일의 테스트를 위해 메뉴를 비운다."""
-    client.app.state.db.run("DELETE FROM menus")
+def restock_seeded_menus(client):
+    """앱 시작 때 들어오는 시드 품절 메뉴를 각 테스트에서 제외한다."""
+    for menu in client.app.state.shop.menus():
+        if menu["soldout"]:
+            client.app.state.shop.save_menu(menu["id"], {"soldout": False})
 
 
 def add_menu(client, menu_id, name, soldout=False):
-    """메뉴 쓰기 담당 영역을 바꾸지 않고 테스트 DB에만 메뉴를 준비한다."""
-    client.app.state.db.run("INSERT INTO menus (id, category_id, name, price, is_soldout) VALUES (?, ?, ?, ?, ?)",
-                             (menu_id, "anju", name, 1000, soldout))
+    """메뉴 저장소를 거쳐 품절 API 검증에 필요한 메뉴를 준비한다."""
+    client.app.state.shop.save_menu(
+        menu_id, {"cat": "anju", "name": name, "price": 1000, "soldout": soldout}
+    )
 
 
 def add_line(client, menu_id, name, qty=1, kind="menu"):
@@ -48,7 +51,7 @@ def test_current_stock_and_restock_are_visible_without_orders(client):
     alerts = get_alerts(client)
     assert alerts == [{"kind": "soldout", "menu_id": "stock-a", "name": "품절 예시", "title": "품절 메뉴",
                        "detail": "품절 예시 메뉴가 현재 품절이에요.", "popular": False}]
-    client.app.state.db.run("UPDATE menus SET is_soldout=? WHERE id=?", (False, "stock-a"))
+    client.app.state.shop.save_menu("stock-a", {"soldout": False})
     assert get_alerts(client) == []
 
 

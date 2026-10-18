@@ -122,7 +122,10 @@ def marketing_dashboard(repo):
         st.error(f"서버에서 정보를 가져오지 못했습니다: {e}")
         return
     members = repo.members(ss["grade_rule"])
-    pool = members[members["마케팅 수신 동의"] & ~members["수신거부"]]
+    if ss.get("sms_recommendation_notice"):
+        st.success(ss["sms_recommendation_notice"])
+    # 서버의 실제 문자 대상 기준과 동일하게 전화번호가 있는 동의 회원만 센다.
+    pool = members[members["전화번호 보유"] & members["마케팅 수신 동의"] & ~members["수신거부"]]
     # 솔라피 충전 잔액: 조회가 안 되면(키 없음·오류) 이유를 카드에 보여 준다. 더미 모드에는 없으므로 건너뛴다.
     try:
         bal = repo.sms_balance()
@@ -133,7 +136,7 @@ def marketing_dashboard(repo):
             + usage_card("이번 달 LMS", usage["used"]["LMS"])
             + (kpi("솔라피 잔액", f'{int(bal["balance"]):,}', "원", sub=f'포인트 {int(bal["point"]):,}원')
                if bal.get("available") else kpi("솔라피 잔액", "-", "", sub=bal.get("reason", "조회할 수 없습니다.")))
-            + kpi("발송 가능 고객", len(pool), "명", sub=f"전체 회원 {len(members)}명 중 수신 동의", accent=True)
+            + kpi("발송 가능 고객", len(pool), "명", sub=f"전체 회원 {len(members)}명 중 전화번호·수신 동의 확인", accent=True)
             + kpi("수신거부", int(members["수신거부"].sum()), "명", sub="발송 대상에서 자동 제외") + "</div>")
     # 한 화면에 들어오도록 작성 / 발송 내역 / 수신거부·안내를 탭으로 나눈다.
     t_write, t_history, t_optout = st.tabs(["문자 작성", "발송 내역", "수신거부 · 안내"])
@@ -235,13 +238,31 @@ def next_rec_round():
     ss["mk_rec_round"] = ss.get("mk_rec_round", 0) + 1
 
 
+def execute_sms_recommendation(repo, recommendation):
+    """추천 대상을 유지한 채 AI 문자 화면으로 이동하고 문자 초안을 채운다."""
+    members = repo.members(ss["grade_rule"])
+    eligible = members[members["전화번호 보유"] & members["마케팅 수신 동의"] & ~members["수신거부"]]
+    target_ids = set(recommendation.get("member_ids") or [])
+    ss["sms_grades"] = recommendation.get("target_grades") or GRADES
+    ss["sms_body"] = recommendation.get("sms_body") or recommendation["action"]
+    # 같은 등급 전체가 아니라 분석된 세그먼트만 기본 체크되도록 나머지 회원을 제외한다.
+    ss["sms_excluded"] = set(eligible["customer_id"]) - target_ids if target_ids else set()
+    ss["sms_editor_v"] = ss.get("sms_editor_v", 0) + 1
+    ss["ai_candidates"], ss["ai_picked"] = None, None
+    ss["sms_recommendation_notice"] = f"‘{recommendation['title']}’ 추천의 대상과 AI 문자 초안을 불러왔어요."
+    for key in ("nav_top", "nav_sub_대시보드", "nav_sub_고객 등급", "nav_sub_주문 이력"):
+        ss[key] = None
+    ss["nav_sub_마케팅"] = "AI 문자"
+    st.query_params["page"], st.query_params["tab"] = "마케팅", "AI 문자"
+
+
 def pick_recommendations(recs, round_no):
     """추천 목록에서 round_no 번째 묶음을 고른다. 끝까지 보면 처음으로 돌아간다. → (고른 목록, 묶음 번호, 전체 묶음 수)"""
     return pick_recommendation_page(recs, round_no)
 
 
 def _render_regular_preferences(repo):
-    """실제 주문 단골의 멘트를 우선 표시하고, 손님이 없으면 추천 예정 예시를 보여준다."""
+    """오늘 주문한 2회 이상 방문 고객의 실시간 응대 제안을 표시한다."""
     try:
         cards = regular_preference_cards(repo.regular_preferences())
     except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable):
@@ -249,13 +270,19 @@ def _render_regular_preferences(repo):
         st.info("단골 손님 정보를 불러오지 못했어요. 잠시 후 재추천을 눌러 주세요.")
         return
     if not cards:
+        # 실제 DB에 대상이 없을 때 예시 손님을 섞으면 고객 정보로 오해할 수 있다.
+        if repo.source == "api":
+            sec_title("손님 응대 제안")
+            st.info("오늘 주문이 확인된 재방문 고객이 아직 없습니다. 새 주문 후 재추천을 눌러 확인해 주세요.")
+            return
         # DB에 예시 회원을 넣지 않고도 발표에서 추천 동작과 문구를 보여줄 수 있게 한다.
-        cards = regular_preference_preview_cards(repo.customer_grade_rules()["regular"])
-        sec_title("단골 손님 응대 제안", "AI가 추천할 예정인 멘트를 미리 확인해 보세요")
-        st.caption("지금은 추천 예정 멘트를 예시로 보여드려요. 실제 단골 손님이 방문해 주문하면, "
-                   "그 손님의 방문·주문 기록에 맞는 멘트가 표시되며 문구는 달라질 수 있어요.")
+        cards = regular_preference_preview_cards(repo.customer_grade_rules()["repeat"])
+        sec_title("손님 응대 제안", "AI가 추천할 현장 응대를 미리 확인해 보세요")
+        st.caption("지금은 추천 예정 예시예요. 실제 2회 이상 방문 고객이 로그인하고 주문하면, "
+                   "이전 방문·테이블·주문과 오늘 상황에 맞는 서비스 및 인사말로 바뀝니다. "
+                   "새 주문과 상황에 따라 문구는 달라질 수 있어요.")
     else:
-        sec_title("단골 손님 응대 제안", "주문이 확인된 손님에게 메뉴를 건넬 때 참고해 주세요")
+        sec_title("손님 응대 제안", "오늘 다시 온 손님을 알아보고 서비스할 때 참고해 주세요")
     # 한 안내 안에서 손님별 제안을 읽기 쉽도록 줄바꿈하며, DB 텍스트는 먼저 이스케이프한다.
     body = "".join(f'<div class="rec" style="grid-column:1 / -1"><div class="rt">{escape(card["title"])}</div>'
                    f'<div class="rw">{escape(card["why"])}</div>'
@@ -264,34 +291,32 @@ def _render_regular_preferences(repo):
 
 
 def marketing_recommend_tab(repo):
-    ctx = marketing_ai.build_context(repo, ss["grade_rule"])
-    sec_title("사장님을 위한 마케팅 추천", "매장의 모든 데이터를 바탕으로 정리했어요")
-    # 추천의 근거가 되는 핵심 숫자를 먼저 보여 줘서 사장님이 카드 내용을 빠르게 판단할 수 있게 한다.
-    consumers, orders = ctx["members"], ctx["orders"]
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("전체 고객", f"{consumers['total']:,}명")
-    c2.metric("문자 발송 가능", f"{consumers['sendable']:,}명")
-    c3.metric("누적 매출", f"{orders['revenue']:,}원")
-    c4.metric("평균 주문금액", f"{orders['avg']:,}원")
+    sec_title("사장님을 위한 AI 마케팅 추천", "회원·방문·주문·메뉴 데이터를 조합해 네 가지씩 제안해요")
     round_no = ss.get("mk_rec_round", 0)
     try:
-        # API 모드에서는 서버가 DB를 읽어 계산하고, 더미 모드는 같은 응답 모양의 로컬 규칙을 사용한다.
+        # API는 실제 DB, 더미 모드는 1,000명 시연 자료를 같은 추천 계약으로 돌려준다.
         result = repo.opportunities(round_no)
-        recs, page, pages = result["items"], result["page"], result["pages"]
-    except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable):
-        # 추천 API만 일시적으로 실패해도 이미 읽은 화면 데이터로 기존 추천을 계속 보여 준다.
-        st.info("서버 추천을 불러오지 못해 현재 화면 데이터로 추천했어요.")
-        recs, page, pages = pick_recommendations(marketing_ai.recommend(ctx), round_no)
-    cards = "".join(f'<div class="rec"><div class="rt">{i}. {escape(r["title"])}</div>'
-                    f'<div class="rw">{escape(r["why"])}</div><div class="ra">👉 {escape(r["action"])}</div></div>'
-                    for i, r in enumerate(recs, 1))
-    st.html(f'<div class="recs">{cards}</div>')
+    except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable) as e:
+        st.error(f"DB 기반 마케팅 추천을 불러오지 못했어요: {e}")
+        return
+    recs, page, pages = result["items"], result["page"], result["pages"]
+    # 카드와 실행 버튼을 같은 열에서 바로 이어 그린다. 별도 버튼 행을 만들면 화면 폭에 따라
+    # 버튼이 다른 번호의 카드 아래처럼 보일 수 있으므로, 각 버튼은 해당 추천 카드에 붙인다.
+    card_columns = st.columns(len(recs))
+    for index, recommendation in enumerate(recs):
+        with card_columns[index]:
+            st.html(f'<div class="rec recommendation-card"><div class="rt">{index + 1}. {escape(recommendation["title"])}</div>'
+                    f'<div class="rw">{escape(recommendation["why"])}</div>'
+                    f'<div class="ra">👉 {escape(recommendation["action"])}</div></div>')
+            if recommendation.get("action_type") == "sms":
+                st.button("✉️ AI 문자로 실행", key=f"mk_execute_{round_no}_{index}", width="stretch",
+                          on_click=execute_sms_recommendation, args=(repo, recommendation),
+                          help=f"{index + 1}번 추천 실행: {recommendation['title']}")
     c_btn, c_note = st.columns([1, 4], vertical_alignment="center")
     c_btn.button("🔄 재추천", key="mk_rerecommend", on_click=next_rec_round, width="stretch",
                  help="다른 마케팅 방법을 추천받아요")
-    c_note.caption(f"추천 {page}/{pages} · 눌러서 다른 마케팅 방법을 추천받아요" if pages > 1
+    c_note.caption(f"추천 {page}/{pages} · 전체 {result.get('total', len(recs))}개 분석 중 다른 네 가지를 확인해요" if pages > 1
                    else "지금은 추천할 방법이 이것뿐이에요. 데이터가 쌓이면 더 다양해져요.")
-    # 원래의 추천 4개·재추천 순환을 마친 뒤, 별도 영역을 덧붙인다.
     _render_regular_preferences(repo)
 
 
@@ -342,8 +367,9 @@ def marketing_chatbot_tab(repo):
             chat = _server_chat(repo)
             sessions = repo.chat_sessions()
         except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable) as e:
-            st.warning(f"서버 챗봇을 쓸 수 없어 모의 응답으로 대신해요: {e}")
-            server = False
+            # API 모드에서 더미 주문으로 답하면 DB 답변처럼 오해할 수 있으므로 오류만 명확히 알린다.
+            st.error(f"DB 기반 AI 챗봇을 불러오지 못했어요: {e}")
+            return
     if server:
         st.caption("대화는 서버에 저장돼요. 목록에서 이전 대화를 골라 이어서 질문할 수 있어요.")
         labels = {s["id"]: _chat_label(s) for s in sessions}

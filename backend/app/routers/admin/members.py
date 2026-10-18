@@ -22,7 +22,8 @@ async def list_members(request: Request, settings: Settings = Depends(get_settin
         raise HTTPException(422, "단골 기준은 재방문 기준보다 커야 합니다.")
     return {"rule": rule, "members": [
         {"id": m["id"], "nickname": m["nickname"], "gender": gender_label(m["gender"]),
-         "age_group": age_group(m["birth_year"], today), "visit_count": m["visit_count"],
+         "age_group": age_group(m["birth_year"], today), "birthday": m.get("birthday"),
+         "visit_count": m["visit_count"],
          "last_visit_at": m["last_visit_at"], "marketing_consent": bool(m["marketing_consent"]),
          "opted_out": bool(m["opted_out"]), "has_phone": bool(m["phone"]), "grade": grade_of(m, today, **rule)}
         for m in request.app.state.members.all()]}
@@ -67,16 +68,19 @@ router.add_api_route("/customers/{member_id}/opt-out", member_opt_out, methods=[
 
 @router.get("/marketing/regular-preferences")
 async def regular_preferences(request: Request, settings: Settings = Depends(get_settings)):
-    """오늘 주문한 단골의 방문 기록과 확인 가능한 메뉴 선호도를 조회한다."""
+    """오늘 주문한 2회 이상 방문 고객의 과거 기록과 응대 제안을 조회한다."""
     from app.services.customer_notes import regular_notes
     from app.stores.customer_notes import CustomerNotesStore
 
     # 기존 고객 목록 응답은 유지하고 마케팅 화면에서만 선호도 조회를 사용한다.
     store = CustomerNotesStore(request.app.state.db)
-    # 추천도 저장한 단골 기준을 사용한다. 5회보다 낮춘 경우의 주문도 빠뜨리지 않는다.
+    # 재방문 기준(기본 2회)부터 안내해 두 번째 방문을 단골 전환 기회로 활용한다.
     rule = grade_rule(settings, db=request.app.state.db)
-    notes = regular_notes(request.app.state.members.all(), store.orders(rule["regular"]),
-                          store.lines(rule["regular"]), store.menus(),
-                          datetime.now(KST).date(), dormant_days=rule["dormant"],
-                          regular_visits=rule["regular"])
+    today = datetime.now(KST).date()
+    # 날씨는 외부 호출로 지어내지 않고, 기존 서비스가 오늘 DB에 저장한 값이 있을 때만 사용한다.
+    saved_weather = request.app.state.external.store.get(today.isoformat()) or {}
+    notes = regular_notes(request.app.state.members.all(), store.orders(rule["repeat"]),
+                          store.lines(rule["repeat"]), store.menus(), today, dormant_days=rule["dormant"],
+                          repeat_visits=rule["repeat"], regular_visits=rule["regular"],
+                          weather_text=saved_weather.get("weather_text", ""), visits=store.visits(rule["repeat"]))
     return {"preferences": notes}

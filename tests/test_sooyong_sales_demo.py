@@ -17,8 +17,7 @@ def test_removed_customer_ranking_and_red_blue_changes_across_tabs(server, monke
     db = server.app.state.db
     for menu_id, category, price in (("fish", "anju", 14000), ("egg", "anju", 16000),
                                       ("beer", "beer", 5000), ("cola", "drink", 3000)):
-        db.run("INSERT INTO menus (id, category_id, name, price) VALUES (?, ?, ?, ?)",
-               (menu_id, category, menu_id, price))
+        server.app.state.shop.save_menu(menu_id, {"cat": category, "name": menu_id, "price": price})
     today = datetime.now(KST).date()
     for day, total in ((today, 40000), (today - timedelta(days=7), 80000),
                        (today - timedelta(days=8), 100000)):
@@ -52,7 +51,7 @@ def test_table_top_five_follows_database_counts_with_same_revenue(server, monkey
     """화면에 순위를 고정하지 않고 DB 주문 건수 내림차순과 새로고침을 확인한다."""
     db = server.app.state.db
     for menu_id, price in (("fish", 14000), ("beer", 5000), ("cola", 3000)):
-        db.run("INSERT INTO menus (id, category_id, name, price) VALUES (?, ?, ?, ?)", (menu_id, "anju", menu_id, price))
+        server.app.state.shop.save_menu(menu_id, {"cat": "anju", "name": menu_id, "price": price})
     stamp = datetime.now(KST).replace(hour=17, minute=0, second=0, microsecond=0).isoformat()
     for index in range(20):
         order = db.run("INSERT INTO orders (table_no, total, created_at) VALUES (?, ?, ?)", (index + 1, 22000, stamp))

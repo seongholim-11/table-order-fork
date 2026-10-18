@@ -57,7 +57,7 @@ def test_recommend_tab_has_only_recommendations():
     app = open_marketing("AI 추천")
     assert not app.exception
     assert not app.chat_input and not app.text_area
-    assert any('class="recs"' in h.value for h in app.get("html"))
+    assert any('class="rec recommendation-card"' in h.value for h in app.get("html"))
 
 
 def test_sms_tab_has_the_message_editor():
@@ -79,7 +79,7 @@ def test_sidebar_sub_menus_are_collapsible_and_select_tabs():
     assert app.sidebar.radio(key="nav_sub_주문 이력").options == ["전체 주문", "고객별 주문"]
     assert [e.label for e in app.sidebar.expander] == ["📊 대시보드", "👥 고객 등급", "🧾 주문 이력", "💬 마케팅"]
     assert [e.proto.expanded for e in app.sidebar.expander] == [False, False, False, True]  # 선택된 묶음만 펼쳐서 시작
-    assert "직원 호출" in app.sidebar.radio(key="nav_top").options
+    assert "직원 호출" not in app.sidebar.radio(key="nav_top").options  # 직원 호출 메뉴는 제거됨
     app.sidebar.radio(key="nav_sub_주문 이력").set_value("고객별 주문").run()
     assert not app.exception and any("고객" in s.label for s in app.selectbox)
     assert app.query_params["page"] == "주문 이력" and app.query_params["tab"] == "고객별 주문"
@@ -95,18 +95,42 @@ def test_rerecommend_cycles_through_recommendations():
     second, p2, _ = pick_recommendations(recs, 1)
     assert pages == 2 and (p1, p2) == (1, 2)
     assert [r["title"] for r in first] == ["0", "1", "2", "3"]
-    assert [r["title"] for r in second] == ["4", "5", "6", "0"]
+    assert [r["title"] for r in second] == ["4", "5", "6"]
+    assert not ({r["title"] for r in first} & {r["title"] for r in second})
     assert pick_recommendations(recs, 2)[0] == first  # 끝까지 보면 처음으로
     assert pick_recommendations(recs[:2], 5)[2] == 1
 
 
 def test_rerecommend_button_changes_cards():
     app = open_marketing("AI 추천")
-    before = [h.value for h in app.get("html") if 'class="recs"' in h.value]
+    before = [h.value for h in app.get("html") if 'class="rec recommendation-card"' in h.value]
     app.button(key="mk_rerecommend").click().run()
-    after = [h.value for h in app.get("html") if 'class="recs"' in h.value]
+    after = [h.value for h in app.get("html") if 'class="rec recommendation-card"' in h.value]
     assert not app.exception and before and after and before != after
     assert app.session_state["mk_rec_round"] == 1
+
+
+def test_sms_recommendation_moves_to_sms_and_prefills_targets_and_body():
+    app = open_marketing("AI 추천")
+    execute = next(button for button in app.button if button.key and button.key.startswith("mk_execute_"))
+    execute.click().run()
+    assert not app.exception
+    assert app.query_params["tab"] == "AI 문자"
+    assert app.text_area(key="sms_body").value
+    assert app.multiselect(key="sms_grades").value
+    assert any("AI 문자 초안" in success.value for success in app.success)
+
+
+def test_each_sms_button_is_rendered_with_its_own_numbered_card():
+    """네 버튼을 별도 행에 모으지 않고 각 번호 카드와 같은 열에서 바로 이어 그린다."""
+    app = open_marketing("AI 추천")
+    recommendation_cards = [html.value for html in app.get("html")
+                            if 'class="rec recommendation-card"' in html.value]
+    execute_buttons = [button for button in app.button if button.key and button.key.startswith("mk_execute_")]
+    assert len(recommendation_cards) == 4 and len(execute_buttons) == 4
+    assert all(f'<div class="rt">{index}.' in recommendation_cards[index - 1] for index in range(1, 5))
+    assert all(button.help.startswith(f"{index}번 추천 실행:")
+               for index, button in enumerate(execute_buttons, 1))
 
 
 def test_keyword_recipients_and_combos():
@@ -167,7 +191,8 @@ def test_removing_a_recipient_shrinks_send_target(monkeypatch):
     repo = repo_mod.connect("change-me").repo
     full = repo.sms_preview(["휴면"], "문구")["targets"]
     members = repo.members(repo_mod.DEFAULT_RULE)
-    ids = members[members["마케팅 수신 동의"] & ~members["수신거부"] & (members["등급"] == "휴면")]["customer_id"].tolist()
+    ids = members[members["전화번호 보유"] & members["마케팅 수신 동의"]
+                  & ~members["수신거부"] & (members["등급"] == "휴면")]["customer_id"].tolist()
     assert full == len(ids) >= 2
     assert repo.sms_preview(["휴면"], "문구", member_ids=ids[1:])["targets"] == full - 1
     assert repo.sms_preview(["휴면"], "문구", member_ids=[])["ok"] is False

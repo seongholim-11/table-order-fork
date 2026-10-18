@@ -69,10 +69,10 @@ def test_save_requires_admin_token(client, headers):
     assert GradeRuleStore(client.app.state.db).get() is None
 
 
-def test_lower_and_higher_regular_threshold_apply_to_real_order_lookup_and_sms(client):
+def test_regular_threshold_changes_grade_and_sms_but_keeps_repeat_customer_care(client):
     member = prepare(client, visits=3)
     client.app.state.db.run("UPDATE members SET phone=?, marketing_consent=1 WHERE id=?", ("01000000000", member["id"]))
-    assert notes(client) == []
+    assert notes(client)[0]["grade"] == "재방문"
     assert client.app.state.sms.targets(["단골"]) == []
     lower = {"repeat": 2, "regular": 3, "dormant": 30}
     client.put(URL, headers=ADMIN, json=lower)
@@ -80,7 +80,7 @@ def test_lower_and_higher_regular_threshold_apply_to_real_order_lookup_and_sms(c
     assert client.app.state.sms.targets(["단골"])[0]["id"] == member["id"]
     assert client.app.state.sms_candidates.summary()["pool"] == {"단골": 1}
     client.put(URL, headers=ADMIN, json=RULE)
-    assert notes(client) == []
+    assert notes(client)[0]["grade"] == "재방문"
     assert client.app.state.sms.targets(["단골"]) == []
     assert client.app.state.sms_candidates.summary()["pool"] == {"재방문": 1}
 

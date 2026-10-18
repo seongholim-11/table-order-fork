@@ -19,10 +19,10 @@
 | 순서 | 할 일 | API | 상태 |
 |---|---|---|---|
 | 0 | 0. 개발 흐름 확인 (테스트 버튼) | `POST /api/dev/db-test` (개발 전용) | 확인 전 |
-| 1 | 1. 메뉴 저장소 + 손님 메뉴 목록 | `GET /api/v1/menus` | 구현·테스트 미실행 |
-| 2 | 2. 관리자 메뉴 관리 | `GET·POST·PATCH·DELETE /api/v1/owner/menus` | 더미 |
-| 3 | 3. 카테고리 | `GET /api/v1/categories`, `POST·PATCH·DELETE /api/v1/owner/categories` | 더미 |
-| 4 | 4. 추천 가중치 | `GET·PATCH /api/v1/owner/menus`, `PATCH …/menus/weights` | 더미 |
+| 1 | 1. 메뉴 저장소 + 손님 메뉴 목록 | `GET /api/menus` | 구현·테스트 완료 |
+| 2 | 2. 관리자 메뉴 관리 | `GET /api/admin/menus`, `PUT·DELETE /api/admin/menus/{menu_id}` | 구현·테스트 완료 |
+| 3 | 3. 카테고리 | `GET /api/categories`, `GET·POST /api/admin/categories`, `PATCH·DELETE /api/admin/categories/{category_id}` | 구현·테스트 완료; content 정리 남음 |
+| 4 | 4. 추천 가중치·메뉴 일괄 저장 | `GET /api/admin/menus`, `PUT /api/admin/menus/{menu_id}` | 구현·테스트 완료 |
 | 5 | 5. 정리 | `/api/content`, `B/seed/content.json` 삭제 | 마지막 사람이 처리 |
 
 **다른 팀원과 겹치는 지점**
@@ -51,7 +51,7 @@
   - 서버: `POST /api/dev/db-test`(`B/routers/dev.py` 신규, SQL은 `B/stores/`의 신규 저장소에). `test` 테이블에 임의 값을 INSERT → 같은 행을 다시 SELECT → 값이 같으면 `{"result": 1}`, 아니면 `{"result": 0}`. 행은 지우지 않고 `test` 테이블에 남겨 둔다(Supabase에서 값이 실제로 들어갔는지 눈으로 볼 수 있다).
   - 서버 `.env`에 `DEV_TEST_BUTTON=true`일 때만 이 경로를 열고, 꺼져 있으면 404. 화면 쪽은 환경변수 `DEV_TEST_BUTTON=1`일 때만 버튼을 보인다. `.env.example`에도 적는다.
   - 화면에는 결과 `1`(정상) 또는 실패 이유를 표시한다.
-- [ ] **0-4. 테스트**: `cd backend && uv run pytest -q`와 `python -m pytest tests -q`가 통과하는지 확인한다.
+- [x] **0-4. 테스트**: `cd backend && uv run pytest -q`와 `python -m pytest tests -q` 통과 확인.
 - [ ] **0-5. 버튼 확인**: 서버와 손님 화면(`streamlit run user/app.py`)을 `DEV_TEST_BUTTON`을 켠 채 실행하고, 버튼을 눌러 `1`이 나오는지 본다.
 - [ ] **0-6. 커밋·푸시·PR**: `AGENTS.md`의 커밋 메시지 규칙대로 커밋하고 내 포크 `main`에 푸시한 뒤, **본 리포 `dev`로 PR**을 보낸다(제목 `종류: 한글 요약`, 본문: 변경 내용·테스트 방법·테스트 결과·미해결 문제).
 - [ ] **0-7. 마무리**: 이 PR은 흐름 확인용이므로 **머지하지 않고 PR만 닫는다**(버튼 코드는 `dev`에 들어가지 않는다). 확인이 끝나면 위 항목을 모두 `[x]`로 바꾸고 맨 위 진행 순서 표의 0번 상태를 "완료"로 고친다. 이 체크 변경은 첫 실제 기능 PR에 함께 넣는다.
@@ -60,9 +60,9 @@
 
 ---
 
-## 1. 메뉴 저장소 + 손님 메뉴 목록 (구현, 테스트 미실행)
+## 1. 메뉴 저장소 + 손님 메뉴 목록 (완료)
 
-### 1-1. `GET /api/v1/menus`
+### 1-1. `GET /api/menus`
 
 **목표**: 손님 주문 화면의 메뉴 목록(품절 여부·매운맛 단계 포함, 품절도 전부 내려주고 `soldout`로 표시)을 `menus` 테이블에서 읽는다. 먼저 `B/stores/shop_menus.py`(저장소)를 구현하는 작업이다 — 2~4번이 모두 이 저장소를 쓴다.
 
@@ -95,20 +95,20 @@ UI(주문 화면 · 카테고리 탭 · 메뉴 카드) → U/views/order.py → 
 
 **상세 설명 / TODO**
 
-- [ ] 더미 코드 정리: `B/routers/menus.py`의 더미 호출과 `B/dummy/menu_data.py`의 `menus()`·`"GET /api/menus"` 항목을 삭제한다. (관리자 메뉴 더미는 TODO 2에서 정리)
-- [ ] 구현 확인: `B/stores/shop_menus.py`의 `seed_menus`, `menus`, `menu`, `save_menu`, `delete_menu`와 `B/stores/shop.py`의 시드 호출을 테스트한다. Postgres에서 메뉴 시드 전에 필요한 카테고리도 준비한다.
-- [ ] 추가한 메뉴 id는 문자열이다(`c1`, `m3fa2b1`). 숫자로 가정하지 않는다.
+- [x] 더미 코드 정리: `B/routers/menus.py`의 더미 호출과 `B/dummy/menu_data.py`의 `menus()`·`"GET /api/menus"` 항목을 제거했다. (관리자 메뉴 더미는 TODO 2에서 정리)
+- [x] 구현 확인: `B/stores/shop_menus.py`의 `seed_menus`, `menus`, `menu`, `save_menu`, `delete_menu` 및 `B/stores/shop.py`의 시드 호출이 구현돼 있다. Postgres 시드 전에 필요한 카테고리도 준비한다. 테스트 실행은 보류.
+- [x] 추가한 메뉴 id는 문자열이다(`c1`, `m3fa2b1`). 숫자로 가정하지 않는다.
 - [ ] 끝나면 재현·석원·수용에게 "`shop.menus()`/`menu(id)` 쓸 수 있어요"라고 알린다.
 
-> 현재 코드는 구현됐지만 pytest를 실행하지 않아 완료 체크는 보류한다. 테스트 통과 후 이 항목을 체크하고 진행 순서 상태를 "완료"로 바꾼다.
+> 구현과 테스트가 완료됐다. 팀원 알림 여부는 별도로 확인한다.
 
 ---
 
-## 2. 관리자 메뉴 관리 (더미)
+## 2. 관리자 메뉴 관리 (완료)
 
-### 2-1. `GET /api/v1/owner/menus`, `POST /api/v1/owner/menus`, `PATCH /api/v1/owner/menus/{menuId}`, `DELETE /api/v1/owner/menus/{menuId}`
+### 2-1. `GET /api/admin/menus`, `PUT /api/admin/menus/{menu_id}`, `DELETE /api/admin/menus/{menu_id}`
 
-**현재 상태**: 코드는 `GET /admin/api/menus`(메뉴 + 카테고리), `PUT /admin/api/menus/{id}`(없으면 등록, 있으면 수정), `DELETE /admin/api/menus/{id}`이다. 문서 경로(POST/PATCH)와 모양이 다르므로 **먼저 현재 PUT 방식으로 구현**하고, POST/PATCH는 같은 함수를 부르는 얇은 라우트로 추가한다(화면은 PUT을 계속 쓴다).
+**현재 상태**: `GET /api/admin/menus`는 메뉴와 `{id, name}` 형태의 카테고리를 조회한다. `PUT /api/admin/menus/{menu_id}`는 없으면 등록하고 있으면 수정하며, `DELETE /api/admin/menus/{menu_id}`는 메뉴를 삭제한다. 화면도 같은 경로를 사용한다.
 
 **목표**: 사장님이 메뉴를 등록·수정(가격·설명·이미지·판매 여부·매운맛·세트 가능)·삭제하면 DB에 저장되고 손님 화면에 반영된다.
 
@@ -134,7 +134,7 @@ UI(주문 화면 · 카테고리 탭 · 메뉴 카드) → U/views/order.py → 
 **흐름**
 ```
 UI(메뉴 관리 · 표 편집 후 저장) → A/views/menu.py save_menu_changes → repo.save_menus (A/admin_repository.py)
- → PUT /admin/api/menus/{id} {name, cat, price, desc, soldout, spicy, weight, set_ok…}
+ → PUT /api/admin/menus/{menu_id} {name, cat, price, desc, soldout, spicy, weight, set_ok…}
  → B/routers/admin/menus.py save_menu (MenuIn 검증, 카테고리 확인)
  → B/stores/shop_menus.py save_menu (UPSERT) → DB(menus) → 저장된 메뉴 dict
  → 화면이 표를 다시 그림 → (손님) 10초 캐시 뒤 GET /api/menus 로 반영
@@ -142,19 +142,19 @@ UI(메뉴 관리 · 표 편집 후 저장) → A/views/menu.py save_menu_changes
 
 **상세 설명 / TODO**
 
-- [ ] 더미 주석처리: `B/routers/admin/menus.py`의 `dummy.admin_menus()`, `dummy.menu_saved(...)`, 삭제의 더미 줄과 `menu_categories()` 안의 `dummy.content_item("categories")`, `B/dummy/menu_data.py`의 `admin_menus`·`menu_saved`와 `ENDPOINTS`의 `"GET /admin/api/menus"`, `"PUT /admin/api/menus/{menu_id}"` 줄.
-- [ ] 라우터의 TODO 순서대로: ① `cat`이 `menu_categories()`에 없으면 422 ② 없는 id면 등록(필수값 검사), 있으면 보낸 필드만 수정 `shop.save_menu(menu_id, fields)` ③ 삭제는 `shop.delete_menu`가 `False`면 404.
-- [ ] `menu_categories()`는 3번(카테고리 저장소)이 끝나면 `categories` 테이블을 읽게 바꾼다. 그 전에는 `B/seed/content.json`의 카테고리를 그대로 읽는 임시 코드로 둔다(TODO 주석 표시).
-- [ ] 응답 `{categories, menus}` 모양을 바꾸지 않는다(화면 `A/admin_repository.py`가 이 모양을 기대).
-- [ ] 문서 경로용 별칭(`POST /v1/owner/menus`, `PATCH /v1/owner/menus/{menuId}`)은 `save_menu`를 재사용해 추가한다.
+- [x] 더미 코드 정리: 관리자 메뉴 API의 더미 호출은 제거돼 있고 `B/dummy/menu_data.py`의 관리자 메뉴 더미 엔드포인트 항목도 비활성화돼 있다.
+- [x] 라우터 검증: 잘못된 카테고리는 422, 새 메뉴 필수값 누락은 422, 삭제 대상이 없으면 404를 반환하고, 수정은 전달된 필드만 저장한다.
+- [x] `menu_categories()`가 카테고리 저장소를 사용한다. SQLite fallback에서는 `B/seed/content.json`을 읽는다.
+- [x] 응답 `{categories, menus}` 모양을 유지한다(화면 `A/admin_repository.py`가 이 모양을 사용).
+- [x] 메뉴 등록과 수정은 `PUT /api/admin/menus/{menu_id}`의 `save_menu`를 사용한다.
 
 ---
 
-## 3. 카테고리 (더미)
+## 3. 카테고리 (구현·테스트 완료, content 정리 남음)
 
-### 3-1. `GET /api/v1/categories`, `POST·PATCH·DELETE /api/v1/owner/categories`
+### 3-1. `GET /api/categories`, `GET·POST /api/admin/categories`, `PATCH·DELETE /api/admin/categories/{category_id}`
 
-**현재 상태**: 카테고리는 `B/seed/content.json`의 한 항목이고, 관리자가 바꾸면 **목록 전체를 통째로 교체**(`PUT /admin/api/content/categories`)한다. 저장은 되지 않는 더미다. 카테고리 저장소 파일(`stores/…`)은 아직 없다.
+**현재 상태**: `B/stores/categories.py`의 `CategoryStore`가 DB에서 카테고리를 조회·저장한다. 관리자 목록에는 `menu_count`, `is_virtual`이 포함되며, 추가·수정·삭제는 개별 API를 사용한다. 손님은 `GET /api/categories`로 조회한다. 테스트 통과.
 
 **목표**: `categories` 테이블에서 읽고, 추가·수정·삭제 API를 제공한다. 삭제는 그 카테고리에 메뉴가 있으면 불가(409). 가상 카테고리(`ai`, `best`)는 수정·삭제 불가.
 
@@ -172,50 +172,52 @@ UI(메뉴 관리 · 표 편집 후 저장) → A/views/menu.py save_menu_changes
 **흐름**
 ```
 UI(메뉴 관리 · 왼쪽 카테고리 패널 · 추가/수정/삭제) → A/views/menu.py render_category_panel → repo.add_category 등 (A/admin_repository.py)
- → (현재) PUT /admin/api/content/categories (전체 교체) → (변경) POST·PATCH·DELETE /admin/api/…/categories
+ → POST /api/admin/categories 또는 PATCH·DELETE /api/admin/categories/{category_id}
  → B/routers/admin/categories.py(신규) → B/stores/categories.py(신규) → DB(categories)
- → 결과 → 화면이 카테고리 패널을 다시 그림 → (손님) GET /api/content 의 categories ← 같은 테이블에서
+ → 결과 → 화면이 카테고리 패널을 다시 그림 → (손님) GET /api/categories ← 같은 테이블에서
 ```
 
 **상세 설명 / TODO**
 
-- [ ] `B/stores/categories.py`(신규): `list`, `add`, `update`, `delete`, 비어 있을 때 `content.json`의 카테고리로 시드. `ai`, `best`는 `is_virtual=true`.
-- [ ] `B/routers/admin/categories.py`(신규) + 손님용 `GET /api/v1/categories`. 손님 응답은 지금 화면이 받는 모양 `[{id, icon, name, colors:[c1,c2]}]`을 유지한다.
-- [ ] 손님 화면은 `/api/content`의 `categories`를 쓰므로(`U/user_repository.py _fetch_content`), 새 경로를 쓰도록 **본인 줄만** 바꾼다.
-- [ ] `A/admin_repository.py`: 현재 `save_categories`(전체 교체)를 개별 호출로 바꿀 때 `CategoryError` 메시지(이름 중복·빈 이름·메뉴 남음)가 그대로 화면에 나오게 유지한다.
+- [x] `B/stores/categories.py`: `list`, `add`, `update`, `delete` 및 비어 있을 때 `content.json` 기반 시드가 구현돼 있다. `ai`, `best`는 가상 카테고리로 처리한다.
+- [x] 관리자 카테고리 CRUD와 손님용 `GET /api/categories`가 구현돼 있고, 손님 응답 모양 `[{id, icon, name, colors:[c1,c2]}]`을 유지한다.
+- [x] 손님 화면의 `U/user_repository.py`가 `GET /api/categories`를 사용한다.
+- [x] `A/admin_repository.py`가 카테고리 추가·수정·삭제를 개별 API로 호출하고 서버 오류 메시지를 전달한다. 기존 전체 교체 호환 메서드는 남아 있다.
 - [ ] 완료되면 `B/seed/content.json`의 `categories` 키를 지운다(다른 키는 재현·석원이 지움). `content.py`·`content.json`에 남은 키가 없으면 파일을 삭제하고 `B/routers/admin/__init__.py`의 등록 줄도 지운다.
 
 ---
 
-## 4. 추천 가중치 (더미)
+## 4. 추천 가중치·메뉴 일괄 저장 (완료)
 
-### 4-1. `GET /api/v1/owner/menus` (가중치 조회), `PATCH /api/v1/owner/menus/{menuId}` (단건 변경), `PATCH /api/v1/owner/menus/weights` (일괄 저장)
+### 4-1. 가중치 조회·단건 저장·일괄 트랜잭션 저장
 
-**목표**: 관리자 > 추천 가중치 화면에서 메뉴별 가중치(0~100, 기본 50)를 보고 바꿔 저장한다. 이 값은 AI 추천(재현)과 AI 마케팅 추천(석원)이 읽는다.
+**목표**: 관리자 > 추천 가중치 화면과 메뉴 관리 표에서 메뉴를 조회·수정한다. 기존 `PUT /api/admin/menus/{menu_id}`는 메뉴 한 건 또는 `list[MenuIn]`을 받고, 여러 메뉴의 수정·삭제를 한 트랜잭션으로 저장한다. 가중치는 0~100, 기본 50이며 AI 추천(재현)과 AI 마케팅 추천(석원)이 읽는다.
 
-**테스트 방법**: 새 `BT/test_menus.py`에 추가 — 일괄 저장 후 `GET`에서 값이 바뀜 / 범위(0~100) 밖이면 422 / 없는 메뉴 id가 섞이면 전체를 거부(부분 저장 금지) / `weights` 경로가 `{menuId}`로 잘못 해석되지 않음. 화면: `tests/test_admin_menu_page.py`의 가중치 관련 케이스.
+**테스트 방법**: `BT/test_menu_batch.py`에서 여러 필드·행 저장 후 관리자·손님 GET 반영, 잘못된 목록 거부, DB 중간 오류 시 전체 롤백을 확인한다. 화면은 `tests/test_admin_menu_page.py`의 메뉴·가중치 편집 케이스로 확인한다.
 
 **중요 이론**
 
 | 개념 | 한 줄 설명 |
 |---|---|
-| 라우트 선언 순서 | FastAPI는 위에서부터 경로를 맞춰 본다. `PATCH /menus/weights`를 `PATCH /menus/{menu_id}`보다 **먼저** 선언하지 않으면 `weights`가 메뉴 id로 처리된다 |
+| 단건 저장 | `PUT /api/admin/menus/{menu_id}`에서 `weight`만 보내면 메뉴의 다른 값은 유지된다 |
+| 일괄 저장 | 기존 `PUT /api/admin/menus/{menu_id}`에 `[{id, ...변경 필드}]` 또는 `[{id, delete: true}]`를 보내며, URL ID는 첫 항목 ID와 같아야 한다 |
 | 일괄 저장은 원자적으로 | 여러 메뉴를 한 번에 바꿀 때 하나라도 실패하면 전부 취소(트랜잭션)해야 화면과 DB가 어긋나지 않는다 |
 | 가중치의 의미 | 추천 점수 계산에서 곱해지는 값이다. 0이면 추천에서 사실상 제외, 100이면 최우선 |
 
 **흐름**
 ```
-UI(추천 가중치 · 슬라이더 조절 · 저장) → A/views/weights.py render_weight_panel → repo.save_menus
- → (변경) PATCH /admin/api/menus/weights {items:[{id, weight}]}
- → B/routers/admin/menus.py (weights 라우트를 {menu_id} 보다 위에 선언)
- → B/stores/shop_menus.py (여러 행 UPDATE, 한 트랜잭션) → DB(menus.weight)
+UI(메뉴/추천 가중치 표 편집 · 저장·삭제) → AdminRepository.save_menus 또는 save_menu_batch
+ → 기존 PUT /api/admin/menus/{menu_id} [MenuIn 또는 list[MenuIn], 삭제는 delete=true]
+ → B/routers/admin/menus.py 전체 항목 검증 → B/stores/shop_menus.py save_menu
+ → DB.atomic() → DB(menus)
  → 저장된 목록 → UI 슬라이더 값 갱신
 ```
 
 **상세 설명 / TODO**
 
-- [ ] 현재 화면은 가중치도 메뉴 저장(`PUT /menus/{id}`)과 같은 경로로 보낸다. 일괄 라우트를 추가해도 기존 PUT은 유지한다.
-- [ ] `shop_menus.py`에 `save_weights(items)` 추가(서준 파일). 요청 모델은 `B/routers/admin/menus.py`에 `WeightsIn`으로 추가.
+- [x] 기존 `PUT /api/admin/menus/{menu_id}`가 단건 `MenuIn`과 여러 건 `list[MenuIn]`을 모두 받는다.
+- [x] `shop_menus.py save_menu`가 일괄 변경을 트랜잭션으로 저장해 DB 오류 때 전체를 롤백한다. 테스트 실행은 보류.
+- [x] 관리자 메뉴 목록과 손님 메뉴 목록에서 저장된 가중치가 바로 조회되는지 검증했다.
 - [ ] 알림: 가중치를 바꾸면 손님 AI 추천 결과가 달라진다. 재현에게 `menus.weight` 컬럼을 읽는다는 점을 확인해 둔다.
 
 ---

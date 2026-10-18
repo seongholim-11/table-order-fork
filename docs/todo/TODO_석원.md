@@ -19,9 +19,9 @@
 | 순서 | 할 일 | API | 상태 |
 |---|---|---|---|
 | 0 | 0. 개발 흐름 확인 (테스트 버튼) | `POST /api/dev/db-test` (개발 전용) | 확인 전 |
-| 1 | 1. 직원 호출 (손님 호출 → 관리자 확인) | `POST /api/v1/staff-calls`, `GET /api/v1/staff-call-items`, `GET /api/admin/calls`, `POST /api/admin/calls/{callId}/done` | 더미 |
+| 1 | 1. 직원 호출 (손님 호출 → 관리자 확인) | `POST /api/v1/staff-calls`, `GET /api/v1/staff-call-items`, `GET /admin/api/calls`, `POST /admin/api/calls/{callId}/done` | 완료 |
 | 2 | 2. 룰렛 설정 | `GET /api/v1/roulette/prizes`, `PUT /api/v1/owner/roulette/prizes` | 완료 |
-| 3 | 3. 관리자 AI 추천 | `GET /api/admin/marketing/opportunities?round=` | 미구현 |
+| 3 | 3. 관리자 AI 추천 | `GET /api/admin/marketing/opportunities?round=` | 진행 중 |
 
 **다른 팀원과 겹치는 지점**
 
@@ -58,7 +58,7 @@
 
 ---
 
-## 1. 직원 호출 (더미)
+## 1. 직원 호출 (완료)
 
 손님이 "물·수저 주세요"를 누르면 → 관리자가 목록에서 보고 → 처리 완료를 누르는 한 줄기 흐름이다. 4개 API가 모두 `staff_calls`·`staff_call_items` 두 테이블(`B/stores/shop_calls.py`)을 쓴다.
 
@@ -79,9 +79,9 @@ UI(직원 호출 다이얼로그 열기) → U/ui/dialogs.py staff_dialog ← ct
 
 **상세 설명 / TODO**
 
-- [ ] 더미 주석처리: `B/seed/content.json`의 `staff_calls` 키는 `/api/content`로 나오므로 새 API로 옮긴 뒤 **그 키만** 지운다. `B/dummy/content_data.py`의 `content_saved`·`"PUT /admin/api/content/{name}"` 줄은 2번(룰렛 저장)과 같이 쓰이므로 둘 다 옮긴 뒤 정리(서준이 마지막 확인).
-- [ ] `shop_calls.py`에 `items()`(목록)와 비어 있을 때 시드 채우기 추가.
-- [ ] `U/user_repository.py _fetch_content`에서 `staff_calls`를 새 경로로 받도록 **그 줄만** 수정.
+- [x] 더미 정리: `B/seed/content.json`의 `staff_calls` 키를 전용 시드와 API로 분리했다. 공용 콘텐츠 저장 더미는 다른 콘텐츠가 사용하므로 유지한다.
+- [x] `shop_calls.py`에 호출 항목 목록과 비어 있을 때 전용 시드로 복구하는 로직을 추가했다.
+- [x] `U/user_repository.py _fetch_content`에서 `staff_calls`를 새 경로로 받도록 수정했다.
 
 ### 1-2. `POST /api/v1/staff-calls` (직원 호출 등록)
 
@@ -101,11 +101,11 @@ UI(직원 호출 · 항목 선택 · 호출 버튼) → U/ui/dialogs.py staff_di
 
 **상세 설명 / TODO**
 
-- [ ] 더미 주석처리: `create_call`의 `dummy.call_created()` 줄, `B/dummy/call_data.py`의 `call_created`와 `"POST /api/calls"` 줄.
-- [ ] `shop_calls.py`의 `add_call`, `call` 구현(파일 안 TODO 그대로).
-- [ ] 문서 경로 `POST /api/v1/staff-calls`는 같은 함수를 부르는 별칭으로 추가. 기존 `/api/calls`는 유지(화면이 사용 중).
+- [x] 더미 정리: `create_call`의 더미 호출과 `B/dummy/call_data.py`의 직원 호출 더미를 제거했다.
+- [x] `shop_calls.py`의 `add_call`, `call`을 구현했다.
+- [x] `POST /api/v1/staff-calls`와 기존 호환 경로 `/api/calls`가 같은 DB 저장 로직을 사용한다.
 
-### 1-3. `GET /api/admin/calls`, `POST /api/admin/calls/{callId}/done` (관리자 호출 관리)
+### 1-3. `GET /admin/api/calls`, `POST /admin/api/calls/{callId}/done` (관리자 호출 관리)
 
 **목표**: 관리자가 호출 목록(최신순, 처리 여부)을 보고 "처리 완료"를 누르면 `done_at`을 기록한다. **관리자 화면이 아직 없다**(과거 삭제됨) — 화면 추가도 이 작업에 포함된다.
 
@@ -123,9 +123,9 @@ UI(관리자 > 직원 호출 관리 · 처리 완료 버튼) → A/views/calls.p
 
 **상세 설명 / TODO**
 
-- [ ] `shop_calls.py`에 `list_calls()`, `mark_done(call_id)` 추가. 라우터는 `B/routers/admin/calls.py`(신규, 등록은 성호의 선작업 PR 또는 `B/routers/admin/__init__.py` 한 줄).
-- [ ] 화면: `A/views/calls.py`(신규), `A/app.py`에 메뉴 한 줄(성호와 조율), `A/admin_repository.py`의 `ApiBackend`·`AdminRepository`와 `A/admin_dummy_data.py DummyBackend`에 같은 이름의 메서드 추가(더미 백엔드에도 필요: 서버 없이 화면이 떠야 한다).
-- [ ] 새 호출이 들어와도 화면이 자동으로 바뀌지 않는다. 상단에 "🔄 새로고침" 버튼부터 만들고, 자동 갱신(`st.fragment(run_every=…)`)은 선택으로 한다.
+- [x] `shop_calls.py`에 `list_calls()`, `mark_done(call_id)`를 추가하고 `B/routers/admin/calls.py`에 관리자 API를 구현했다.
+- [x] `A/views/calls.py`, `A/app.py`, Repository와 더미 백엔드가 같은 호출 응답 구조를 사용한다.
+- [x] 관리자 직원 호출 화면 상단에 새로고침 버튼을 제공한다.
 
 ---
 
@@ -177,11 +177,11 @@ UI(관리자 > 이벤트 > 룰렛 · 칸 편집 · 저장) → A/views/events.py
 
 ---
 
-## 3. 관리자 AI 추천 (미구현)
+## 3. 관리자 AI 추천 (진행 중)
 
 ### 3-1. `GET /api/admin/marketing/opportunities?round=`
 
-**현재 상태**: "사장님을 위한 마케팅 추천" 카드는 서버가 아니라 **관리자 화면 안**에서 만든다(`A/marketing_ai.py build_context` → `recommend`). 규칙 기반이고 LLM은 쓰지 않는다. 서버 코드와 더미 서버 코드는 없다.
+**현재 상태**: 서버와 더미 서버가 같은 공통 규칙 엔진으로 DB·시연 데이터를 분석한다. 추천은 4개씩 순환하고, 문자 실행형 카드는 AI 문자 화면에 대상과 초안을 넘긴다. 규칙 기반이며 LLM은 쓰지 않는다.
 
 **목표**: 서버가 DB 데이터로 추천 카드 `[{title, why, action}]`를 만들어 돌려준다. 화면의 "🔄 재추천" 버튼은 `round`를 하나 올려 **다음 4개 묶음**을 받는다(끝까지 가면 처음으로). 현재 규칙(휴면 고객·단골·신규·한가한 시간대·인기 메뉴·안 팔리는 메뉴·품절·AI 적중률·수신 동의)을 그대로 서버로 옮긴다.
 
@@ -214,9 +214,10 @@ UI(마케팅 > AI 추천 탭 · 🔄 재추천) → A/views/marketing.py marketi
 
 **상세 설명 / TODO**
 
-- [ ] `B/services/opportunities.py`(신규): `A/marketing_ai.py`의 `build_context`·`recommend`·`pick_recommendations`를 서버 용도로 옮긴다. 화면쪽 원본은 `DATA_SOURCE=dummy` 대체용이라 **지우지 않는다**. 로직을 복사할 때 "같은 입력 → 같은 카드"가 되는지 위 테스트로 확인한다.
-- [ ] 의존 데이터(주문 합계, 적중률 등)는 수용의 `B/services/stats.py dashboard()`를 호출한다. 수용이 끝나기 전에는 그 항목의 카드(AI 적중률 등)를 건너뛰고 TODO 주석을 남긴다(나머지 카드는 동작).
-- [ ] `B/routers/admin/opportunities.py`(신규, 등록은 성호의 선작업 PR 또는 `B/routers/admin/__init__.py` 한 줄). `round`는 `Query(default=0, ge=0)`.
-- [ ] 화면: `A/views/marketing.py`의 `marketing_recommend_tab`, `next_rec_round`, `pick_recommendations`만 수정한다. 서버가 닿으면 서버 카드, 아니면 기존 로컬 계산(`DATA_SOURCE=auto`의 폴백).
-- [ ] `A/admin_repository.py ApiBackend`와 `A/admin_dummy_data.py DummyBackend`에 `opportunities` 메서드 추가(같은 이름·같은 반환 모양).
-- [ ] `A/marketing_ai.py`는 성호(문자 후보 함수)도 수정한다. 석원은 `recommend`와 `build_context`, 성호는 `suggest_candidates`·`generate_sms` 쪽만 건드려 같은 줄을 고치지 않도록 PR 설명에 수정 함수를 적는다.
+- [x] `B/services/opportunities.py`(신규): `A/marketing_ai.py`의 `build_context`·`recommend`·`pick_recommendations`를 서버 용도로 옮긴다. 화면쪽 원본은 `DATA_SOURCE=dummy` 대체용이라 **지우지 않는다**. 로직을 복사할 때 "같은 입력 → 같은 카드"가 되는지 위 테스트로 확인한다.
+- [x] 의존 데이터(주문 합계, 적중률 등)는 수용의 `B/services/stats.py dashboard()`를 호출한다. 수용이 끝나기 전에는 그 항목의 카드(AI 적중률 등)를 건너뛰고 TODO 주석을 남긴다(나머지 카드는 동작).
+- [x] `B/routers/admin/opportunities.py`(신규, 등록은 성호의 선작업 PR 또는 `B/routers/admin/__init__.py` 한 줄). `round`는 `Query(default=0, ge=0)`.
+- [x] 화면: `A/views/marketing.py`의 `marketing_recommend_tab`, `next_rec_round`, `pick_recommendations`만 수정한다. 서버가 닿으면 서버 카드, 아니면 기존 로컬 계산(`DATA_SOURCE=auto`의 폴백).
+- [x] `A/admin_repository.py ApiBackend`와 `A/admin_dummy_data.py DummyBackend`에 `opportunities` 메서드 추가(같은 이름·같은 반환 모양).
+- [x] `A/marketing_ai.py`의 기존 문자 후보 함수는 건드리지 않고, 추천·컨텍스트는 성격별 모듈과 공통 규칙 엔진으로 분리해 충돌을 피했다.
+- [ ] PR 직전 백엔드 전체 테스트의 기존 채팅 세션 최신순 정렬 실패(`BT/test_chat.py`)를 팀과 확인한 뒤 최종 완료 처리한다. 관리자 AI 추천 관련 테스트와 화면·통합 전체 테스트는 통과했다.

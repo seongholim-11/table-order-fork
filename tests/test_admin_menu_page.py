@@ -16,6 +16,7 @@ from app.core.settings import Settings
 from app.factory import create_app
 from app.services.grades import KST
 from shared import api
+ADMIN_API_PREFIX = "/admin/api"
 
 APP = str(ROOT / "admin" / "app.py")
 ADMIN = {"Authorization": "Bearer admin-secret"}
@@ -158,13 +159,13 @@ def test_api_mode_category_and_menu_changes_reach_the_server_and_users(server, m
     button(app, "메뉴 등록").click().run()
     menu = next(m for m in server.get("/api/menus").json() if m["name"] == "가족 세트")
     assert menu["cat"] == created["id"] and menu["price"] == 55000
-    assert created["id"] in [c["id"] for c in server.get("/admin/api/menus", headers=ADMIN).json()["categories"]]
+    assert created["id"] in [c["id"] for c in server.get(f"{ADMIN_API_PREFIX}/menus", headers=ADMIN).json()["categories"]]
 
     # 메뉴가 남은 카테고리는 지울 수 없고, 비운 뒤에는 지울 수 있다
     repo = app.session_state["repo"]
     with pytest.raises(ar.CategoryError):
         repo.delete_category(created["id"])
-    server.delete(f"/admin/api/menus/{menu['id']}", headers=ADMIN)
+    server.delete(f"{ADMIN_API_PREFIX}/menus/{menu['id']}", headers=ADMIN)
     repo.delete_category(created["id"])
     after = server.get("/api/content/categories").json()
     assert created["id"] not in [c["id"] for c in after] and [c["id"] for c in after[:2]] == ["ai", "best"]

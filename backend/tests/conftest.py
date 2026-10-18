@@ -43,5 +43,13 @@ def client():
         yield c
 
 
+@pytest.fixture
+def empty_menu_catalog(client):
+    """테스트가 메뉴 전체 조건을 제어할 수 있도록 기본 시드 메뉴를 비운다."""
+    shop = client.app.state.shop
+    for menu in shop.menus():
+        shop.delete_menu(menu["id"])
+
+
 def at(hour: int, minute: int = 0):
     return lambda: datetime(2026, 10, 12, hour, minute, tzinfo=KST)

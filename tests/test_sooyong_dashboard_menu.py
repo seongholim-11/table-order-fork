@@ -18,11 +18,20 @@ def html_of(screen):
     return "\n".join(element.value for element in screen.get("html"))
 
 
+def restock_seeded_menus(server):
+    """앱 시작 때 들어오는 시드 품절 메뉴를 테스트 간섭에서 제외한다."""
+    for menu in server.app.state.shop.menus():
+        if menu["soldout"]:
+            server.app.state.shop.save_menu(menu["id"], {"soldout": False})
+
+
 def add_soldout_menu(server):
     """더미 목록에는 없는 이름으로 DB와 화면의 실제 연결을 구분한다."""
+    restock_seeded_menus(server)
     db = server.app.state.db
-    db.run("INSERT INTO menus (id, category_id, name, price, is_soldout) VALUES (?, ?, ?, ?, ?)",
-           ("db-stock", "anju", "DB 전용 품절 메뉴", 12345, True))
+    server.app.state.shop.save_menu(
+        "db-stock", {"cat": "anju", "name": "DB 전용 품절 메뉴", "price": 12345, "soldout": True}
+    )
     order = db.run("INSERT INTO orders (table_no, total, ai_combo, created_at) VALUES (?, ?, ?, ?)",
                    (7, 12345, True, datetime.now(timezone.utc).isoformat()))
     db.run("INSERT INTO order_items (order_id, menu_id, name, unit_price, qty) VALUES (?, ?, ?, ?, ?)",
@@ -42,7 +51,7 @@ def test_menu_screen_uses_db_and_has_no_duplicate_customer_cards(server, monkeyp
     assert 'AI 추천 주문 객단가</div><div class="v">12,345' in html
     assert '일반 주문 객단가</div><div class="v">-' in html
     assert all(label not in html for label in ("전체 회원", "휴면 고객", "문자 수신 가능", "고객 관리 · 운영 알림"))
-    server.app.state.db.run("UPDATE menus SET is_soldout=? WHERE id=?", (False, "db-stock"))
+    server.app.state.shop.save_menu("db-stock", {"soldout": False})
     screen.button(key="dashboard_refresh").click().run()
     assert not screen.exception
     assert '품절 메뉴</div><div class="v">0' in html_of(screen)
@@ -70,6 +79,8 @@ def test_menu_stock_does_not_use_dummy_menu_or_customer_repository(server, monke
 
 
 def test_empty_db_menu_screen_does_not_show_dummy_stock(server, monkeypatch):
+    # 메뉴 카탈로그는 시드되지만 기본 품절 상태는 테스트 대상이 아니므로 정리한다.
+    restock_seeded_menus(server)
     screen = open_dashboard(monkeypatch)
     screen.sidebar.radio(key="nav_sub_대시보드").set_value("메뉴").run()
     assert not screen.exception

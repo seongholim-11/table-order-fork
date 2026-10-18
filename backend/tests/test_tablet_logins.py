@@ -3,7 +3,6 @@ import pytest
 from tests.conftest import login
 
 
-@pytest.mark.skip(reason="로직을 지우고 더미 응답만 돌려주는 상태라 저장·검증이 일어나지 않음 - 해당 엔드포인트를 DB 로 구현하면 이 skip 을 지운다")
 def test_tablet_login_records_survive_and_prize_is_once_per_member(client):
     a, b = login(client, "가"), login(client, "나")  # 둘 다 table_no=1 에서 로그인
     other = login(client, "다")

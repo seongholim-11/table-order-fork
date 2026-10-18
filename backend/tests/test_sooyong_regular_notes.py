@@ -18,6 +18,13 @@ def _empty_menus(client):
 URL = "/admin/api/marketing/regular-preferences"
 
 
+def save_menu(client, menu_id, name, category="anju", price=14000):
+    """테스트 메뉴도 메뉴 저장소를 통해 저장한다."""
+    return client.app.state.shop.save_menu(
+        menu_id, {"cat": category, "name": name, "price": price}
+    )
+
+
 def add_order(client, member_id, day, menu_id, name, *, qty=1, kind="menu", table=7):
     """실제 고객 기록 대신 테스트 메모리 DB에만 주문을 준비한다."""
     db = client.app.state.db
@@ -33,8 +40,7 @@ def prepare(client, *, days=5, favorites=4, visits=5, current=True):
     db = client.app.state.db
     for menu_id, name, category in (("note-fish", "먹태구이", "anju"), ("note-egg", "계란말이", "anju"),
                                      ("note-beer", "생맥주", "beer")):
-        db.run("INSERT INTO menus (id, category_id, name, price) VALUES (?, ?, ?, ?)",
-               (menu_id, category, name, 14000))
+        save_menu(client, menu_id, name, category)
     member = client.app.state.members.upsert_login("note-regular", "메모 단골")
     db.run("UPDATE members SET visit_count=? WHERE id=?", (visits, member["id"]))
     for day in range(1, days + 1):
@@ -75,14 +81,15 @@ def test_eighty_percent_history_and_different_today_create_note_without_writing(
 
 
 @pytest.mark.parametrize("kwargs", [{"days": 4}, {"favorites": 3}, {"days": 0}, {"visits": 4}])
-def test_regular_without_preference_gets_visit_notice_but_nonregular_does_not(client, kwargs):
+def test_repeat_customer_without_preference_still_gets_visit_notice(client, kwargs):
     prepare(client, **kwargs)
-    rows = notes(client)
-    if kwargs.get("visits") == 4:
-        assert rows == []
+    row, = notes(client)
+    expected_visits = kwargs.get("visits", 5)
+    assert row["visit_count"] == expected_visits and f"{expected_visits}번째 방문" in row["context"]
+    if "visits" in kwargs:
+        # 방문 등급 기준과 메뉴 선호도는 별개이므로, 4회 방문이어도 충분한 주문 이력이 있으면 취향을 표시한다.
+        assert row["favorite_menu"] == "먹태구이" and row["preference_rate"] == .8
     else:
-        row, = rows
-        assert row["visit_count"] == 5 and "5번째 방문" in row["context"]
         assert row["favorite_menu"] is None and row["preference_rate"] is None
         assert row["changed_today"] is None and "80%" not in row["context"]
         assert "먹태" not in row["note"]
@@ -138,7 +145,7 @@ def test_beer_preference_and_other_members_orders_are_not_customer_snack_evidenc
 
 def test_renamed_menu_keeps_identity_and_soldout_note_does_not_ask_why(client):
     prepare(client)
-    client.app.state.db.run("UPDATE menus SET name=?, is_soldout=? WHERE id=?", ("먹태 새 이름", True, "note-fish"))
+    client.app.state.shop.save_menu("note-fish", {"name": "먹태 새 이름", "soldout": True})
     row, = notes(client)
     assert row["favorite_menu"] == "먹태 새 이름" and "현재 품절" in row["context"]
     assert "품절이라" not in row["note"] and "왜" not in row["note"]
@@ -169,7 +176,7 @@ def test_three_examples_have_real_rates_and_do_not_duplicate_orders(client):
 
     db = client.app.state.db
     for menu_id, name in (("a1", "먹태구이"), ("a2", "골뱅이"), ("a4", "계란말이"), ("a8", "해물파전")):
-        db.run("INSERT INTO menus (id, category_id, name, price) VALUES (?, ?, ?, ?)", (menu_id, "anju", name, 14000))
+        save_menu(client, menu_id, name)
     today = datetime.now(KST).date()
     assert seed_regular_examples(db, today) == {"created_members": 3, "created_orders": 33}
     assert seed_regular_examples(db, today) == {"created_members": 0, "created_orders": 0}
@@ -181,7 +188,7 @@ def test_three_examples_have_real_rates_and_do_not_duplicate_orders(client):
     assert all(not member["marketing_consent"] and not member["phone"] for member in client.app.state.members.all())
 
 
-def test_example_creation_requires_existing_menus_and_is_atomic(client, monkeypatch):
+def test_example_creation_requires_existing_menus_and_is_atomic(client, monkeypatch, empty_menu_catalog):
     from app.stores.regular_examples import seed_regular_examples
 
     db = client.app.state.db
@@ -189,7 +196,7 @@ def test_example_creation_requires_existing_menus_and_is_atomic(client, monkeypa
         seed_regular_examples(db, datetime.now(KST).date())
     assert client.app.state.members.all() == []
     for menu_id in ("a1", "a2", "a4", "a8"):
-        db.run("INSERT INTO menus (id, category_id, name, price) VALUES (?, ?, ?, ?)", (menu_id, "anju", menu_id, 14000))
+        save_menu(client, menu_id, menu_id)
     execute = db._execute
 
     def fail_after_member(sql, params=()):
@@ -208,7 +215,7 @@ def test_example_reset_restores_only_examples_and_keeps_original_records(client)
 
     db = client.app.state.db
     for menu_id in ("a1", "a2", "a4", "a8"):
-        db.run("INSERT INTO menus (id, category_id, name, price) VALUES (?, ?, ?, ?)", (menu_id, "anju", menu_id, 14000))
+        save_menu(client, menu_id, menu_id)
     original = client.app.state.members.upsert_login("original-customer", "기존 고객")
     order, _ = add_order(client, original["id"], 1, "a1", "기존 주문")
     before_order = db.one("SELECT * FROM orders WHERE id=?", (order,))
@@ -227,7 +234,7 @@ def test_example_reset_failure_rolls_back_deletions_too(client, monkeypatch):
 
     db = client.app.state.db
     for menu_id in ("a1", "a2", "a4", "a8"):
-        db.run("INSERT INTO menus (id, category_id, name, price) VALUES (?, ?, ?, ?)", (menu_id, "anju", menu_id, 14000))
+        save_menu(client, menu_id, menu_id)
     today = datetime.now(KST).date()
     seed_regular_examples(db, today)
     before = client.app.state.members.all()
@@ -251,7 +258,7 @@ def test_modified_example_is_not_removed_by_reset(client):
 
     db = client.app.state.db
     for menu_id in ("a1", "a2", "a4", "a8"):
-        db.run("INSERT INTO menus (id, category_id, name, price) VALUES (?, ?, ?, ?)", (menu_id, "anju", menu_id, 14000))
+        save_menu(client, menu_id, menu_id)
     today = datetime.now(KST).date()
     seed_regular_examples(db, today)
     db.run("UPDATE members SET phone=? WHERE kakao_id=?", ("010-0000-0000", EXAMPLES[0][0]))
@@ -274,22 +281,21 @@ def test_serving_another_menu_does_not_deny_favorite_already_ordered_today(clien
     assert "오늘은 다른 메뉴" not in row["note"]
 
 
-def test_only_members_classified_as_regular_by_server_rules_are_used(client):
+def test_repeat_threshold_is_independent_from_regular_grade_threshold(client):
     from app.core.settings import get_settings
 
     member = prepare(client)
     config = Settings(_env_file=None, admin_token="admin-secret", grade_regular_visits=8)
     client.app.dependency_overrides[get_settings] = lambda: config
-    assert notes(client) == []
+    assert notes(client)[0]["grade"] == "재방문"
     client.app.state.db.run("UPDATE members SET visit_count=8 WHERE id=?", (member["id"],))
-    assert notes(client)[0]["member_id"] == member["id"]
+    assert notes(client)[0]["member_id"] == member["id"] and notes(client)[0]["grade"] == "단골"
 
 
 def test_ten_ordering_regulars_are_all_reported_without_preference_or_limit(client):
     """선호 메뉴가 없는 단골 10명이 주문해도 모두 안내하고 주문 없는 회원은 제외한다."""
     db = client.app.state.db
-    db.run("INSERT INTO menus (id, category_id, name, price) VALUES (?, ?, ?, ?)",
-           ("ten-menu", "anju", "오늘의 안주", 14000))
+    save_menu(client, "ten-menu", "오늘의 안주")
     expected = set()
     for index in range(11):
         member = client.app.state.members.upsert_login(f"ten-regular-{index}", f"단골 {index}")
@@ -320,8 +326,7 @@ def test_visit_greetings_change_with_visit_situation_without_a_preference(client
 def test_varied_menu_and_long_gap_greetings_follow_order_records(client):
     member = prepare(client, days=0, visits=8)
     db = client.app.state.db
-    db.run("INSERT INTO menus (id, category_id, name, price) VALUES (?, ?, ?, ?)",
-           ("note-pancake", "anju", "파전", 14000))
+    save_menu(client, "note-pancake", "파전")
     for days, menu_id, name in ((1, "note-fish", "먹태구이"), (2, "note-egg", "계란말이"),
                                 (3, "note-pancake", "파전")):
         add_order(client, member["id"], days, menu_id, name)
@@ -343,7 +348,7 @@ def test_remove_examples_keeps_actual_customers_and_orders_and_is_repeatable(cli
 
     db = client.app.state.db
     for menu_id in ("a1", "a2", "a4", "a8"):
-        db.run("INSERT INTO menus (id, category_id, name, price) VALUES (?, ?, ?, ?)", (menu_id, "anju", menu_id, 14000))
+        save_menu(client, menu_id, menu_id)
     actual = client.app.state.members.upsert_login("actual-regular", "실제 단골")
     add_order(client, actual["id"], 0, "a1", "a1")
     before_members = client.app.state.members.all()

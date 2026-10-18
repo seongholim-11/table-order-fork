@@ -101,7 +101,7 @@
 |---|---|---|---|---|---|
 | 1-2. 주문 화면 (카테고리 · 메뉴 · 장바구니 · 주문 확인) | GET | `/api/v1/categories` | 카테고리 목록 | 더미 | `B/routers/menus.py`(신규) `B/stores/shop_menus.py` `U/menu_data.py` `U/state/menu_groups.py` |
 | 1-2. 주문 화면 (카테고리 · 메뉴 · 장바구니 · 주문 확인) | GET | `/api/v1/menus` | 메뉴 목록(품절 여부·매운맛 단계 포함) | 구현(테스트 미실행) | `B/routers/menus.py` `B/stores/shop_menus.py` `B/seed/menu.json` `U/views/order.py` `U/menu_images.py` |
-| 2-3. 메뉴 관리 | GET | `/api/v1/owner/menus` | 관리자용 메뉴 목록(비공개·품절 포함) | 더미 | `B/routers/admin/menus.py` `B/stores/shop_menus.py` `A/views/menu.py` |
+| 2-3. 메뉴 관리 | GET | `/api/v1/owner/menus` | 관리자용 메뉴 목록(비공개·품절 포함) | 구현(테스트 미실행) | `B/routers/admin/menus.py` `B/stores/shop_menus.py` `A/views/menu.py` |
 | 2-3. 메뉴 관리 | POST | `/api/v1/owner/menus` | 메뉴 등록(이름·가격·설명·이미지·매운맛·가중치·세트 가능) | 더미 | `B/routers/admin/menus.py` `B/stores/shop_menus.py` |
 | 2-3. 메뉴 관리 | PATCH | `/api/v1/owner/menus/{menuId}` | 메뉴 수정(가격·설명·판매 여부·매운맛 등) | 더미 | `B/routers/admin/menus.py` `B/stores/shop_menus.py` |
 | 2-3. 메뉴 관리 | DELETE | `/api/v1/owner/menus/{menuId}` | 메뉴 삭제 | 더미 | `B/routers/admin/menus.py` `B/stores/shop_menus.py` |

@@ -81,5 +81,9 @@ def put(path: str, token: str | None = None, **kw):
     return request("PUT", path, token, **kw)
 
 
+def patch(path: str, token: str | None = None, **kw):
+    return request("PATCH", path, token, **kw)
+
+
 def delete(path: str, token: str | None = None, **kw):
     return request("DELETE", path, token, **kw)

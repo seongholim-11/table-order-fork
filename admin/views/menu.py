@@ -120,14 +120,18 @@ def render_menu_editor(repo, category):
         st.caption("아직 등록된 메뉴가 없어요. ‘메뉴 등록’ 탭에서 첫 메뉴를 등록해 보세요.")
         return
     with st.container(key="menu_table"):  # 표 높이는 화면 높이에 맞춰 CSS 가 정한다
-        edited = _menu_editor(old, category)
+        # 삭제 대상을 고를 수 있도록 표에 체크란을 추가한다.
+        edited = _menu_editor(old.assign(선택=False), category)
     save_menu_changes(repo, category, old, edited)
 
 
 def _menu_editor(old, category):
     return st.data_editor(
-        old, hide_index=True, width="stretch", num_rows="dynamic", disabled=["id"], height="stretch",
+        # 행 삭제는 별도 선택 삭제 버튼에서 확인받으므로 표에서는 행 추가만 허용한다.
+        old, hide_index=True, width="stretch", num_rows="add", disabled=["id"], height="stretch",
         key=f"menu_editor_{category['id']}_{ss['menu_editor_v']}",
+        # 삭제 선택란을 실제 데이터 열보다 앞에 보여 빠르게 찾게 한다.
+        column_order=["선택", "메뉴명", "가격", "설명", "이미지 URL", "판매 여부", "매운 정도", "추천 가중치", "세트 가능"],
         column_config={
             "id": None, "카테고리": None,
             "메뉴명": st.column_config.TextColumn(required=True),
@@ -137,20 +141,28 @@ def _menu_editor(old, category):
             "이미지 URL": st.column_config.LinkColumn(),
             "판매 여부": st.column_config.CheckboxColumn(),
             "세트 가능": st.column_config.CheckboxColumn(),
+            "선택": st.column_config.CheckboxColumn(help="삭제할 메뉴를 선택하세요."),
         })
 
 
 def save_menu_changes(repo, category, old, edited):
-    st.caption("표에서 직접 고치거나 행을 추가·삭제한 뒤 저장하세요.")
-    new = edited.reset_index(drop=True)
+    st.caption("표에서 메뉴 정보를 수정하고, 삭제할 메뉴는 선택란에 체크하세요.")
+    edited = edited.reset_index(drop=True)
+    selected = edited["선택"].fillna(False).astype(bool)
+    selected_rows = edited.loc[selected]
+    # 체크란은 화면에서만 사용하고 메뉴 저장 데이터에서는 뺀다.
+    new = edited.loc[:, old.columns].reset_index(drop=True)
     dirty = not new.equals(old)
-    c_save, c_undo, _ = st.columns([1, 1.3, 5])
+    c_save, c_delete, c_undo, _ = st.columns([1, 1.2, 1.3, 3.8])
     undo = c_undo.button("↩ 되돌리기", key="menu_undo", width="stretch", disabled=not dirty,
                          help="저장하기 전의 수정·추가·삭제를 모두 취소하고 저장된 상태로 돌립니다")
     if undo:
         ss["menu_editor_v"] += 1  # 편집 표를 새로 만들어 저장된 값으로 되돌린다
         st.toast("저장하지 않은 변경을 되돌렸어요.", icon="↩️")
         st.rerun()
+    if c_delete.button("🗑 선택 삭제", key="menu_delete", width="stretch", disabled=selected_rows.empty):
+        # 확인 UI는 별도로 보여 주되, 확정하면 수정과 삭제를 같은 요청으로 보낸다.
+        _confirm_menu_delete(repo, old, new.loc[~selected].reset_index(drop=True), selected_rows)
     if c_save.button("변경 저장", type="primary", key="menu_save", width="stretch"):
         new["카테고리"] = category["name"]  # 표에서 새로 추가한 행도 이 카테고리에 들어간다
         try:
@@ -161,6 +173,26 @@ def save_menu_changes(repo, category, old, edited):
             ss["menu_editor_v"] += 1
             st.toast(f"저장했습니다. (수정 {r['saved']}개, 삭제 {r['deleted']}개)", icon="✅")
             st.rerun()
+
+
+@st.dialog("메뉴 삭제 확인")
+def _confirm_menu_delete(repo, old, remaining, selected_rows):
+    names = selected_rows["메뉴명"].fillna("이름 없는 메뉴").tolist()
+    st.warning("다음 메뉴를 삭제할까요? 삭제하면 복구할 수 없습니다.")
+    st.write("\n".join(f"- {name}" for name in names))
+    st.caption("체크한 메뉴를 삭제하고, 표에 입력한 나머지 변경 사항도 함께 저장합니다.")
+    confirm, cancel = st.columns(2)
+    if confirm.button("삭제 확정", type="primary", key="menu_delete_confirm", width="stretch"):
+        try:
+            result = repo.save_menus(remaining, old)
+        except Exception as e:  # noqa: BLE001 - 서버 오류 메시지를 화면에 표시한다
+            st.error(f"삭제하지 못했습니다: {e}")
+        else:
+            ss["menu_editor_v"] += 1
+            st.toast(f"선택한 메뉴 {result['deleted']}개를 삭제했어요.", icon="🗑️")
+            st.rerun()
+    if cancel.button("취소", key="menu_delete_cancel", width="stretch"):
+        st.rerun()
 
 
 def page_menu(repo):

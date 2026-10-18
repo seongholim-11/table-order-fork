@@ -12,15 +12,15 @@ GROWTH_URL = "/admin/api/marketing/growth-performance"
 def test_empty_data_returns_one_guide_card_and_requires_admin(client):
     assert client.get(URL).status_code == 401
     result = client.get(URL, headers=ADMIN).json()
-    assert result == {
-        "items": [{
+    assert [{key: card[key] for key in ("title", "why", "action")} for card in result["items"]] == [{
             "title": "데이터를 더 모아 볼까요?",
             "why": "아직 주문·회원 데이터가 적어 추천할 근거가 부족해요.",
             "action": "주문이 쌓이면 이곳에 맞춤 마케팅 방법이 나타나요.",
-        }],
-        "page": 1,
-        "pages": 1,
-    }
+        }]
+    assert result["page"] == result["pages"] == 1
+    assert result["summary"]["members"]["total"] == 0
+    assert result["summary"]["orders"] == {
+        "count": 0, "revenue": 0, "avg": 0, "peak_hours": [], "top_items": []}
     assert client.get(f"{URL}?round=-1", headers=ADMIN).status_code == 422
 
 
@@ -64,8 +64,30 @@ def test_cards_use_db_facts_and_round_cycles_four_at_a_time(client):
 
     assert first["pages"] >= 2 and len(first["items"]) == len(second["items"]) == 4
     assert first["items"] != second["items"] and wrapped["items"] == first["items"]
-    assert all(set(card) == {"title", "why", "action"} for card in first["items"] + second["items"])
-    assert any("휴면 고객 1명" in card["title"] for card in first["items"] + second["items"])
+    assert all({"title", "why", "action", "action_type", "target_grades", "member_ids", "sms_body"} <= set(card)
+               for card in first["items"] + second["items"])
+    assert any("휴면" in card["title"] and "1명" in card["title"] for card in first["items"] + second["items"])
+    assert first["summary"]["members"]["total"] == 3
+    assert first["summary"]["members"]["sendable"] == 2
+    assert first["summary"]["orders"]["revenue"] == 18000
+
+
+def test_summary_reflects_one_thousand_db_members_and_real_sendable_rule(client):
+    """DB에 대량 회원이 추가돼도 전체·발송 가능 숫자를 누락 없이 다시 집계한다."""
+    db = client.app.state.db
+    for index in range(1000):
+        # 절반만 전화번호가 있으므로 수신 동의가 모두 true여도 발송 가능은 500명이어야 한다.
+        now = datetime.now(KST).isoformat()
+        db.run(
+            "INSERT INTO members (kakao_id, nickname, phone, marketing_consent, visit_count, last_visit_at, created_at) "
+            "VALUES (?, ?, ?, 1, 1, ?, ?)",
+            (f"bulk-{index}", f"대량고객{index}", "01000000000" if index % 2 == 0 else None, now, now),
+        )
+
+    summary = client.get(URL, headers=ADMIN).json()["summary"]
+    assert summary["members"]["total"] == 1000
+    assert summary["members"]["sendable"] == 500
+    assert summary["orders"]["count"] == summary["orders"]["revenue"] == 0
 
 
 def test_growth_performance_uses_db_and_one_month_formula(client):

@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS table_logins (
     played_at        TEXT,
     UNIQUE (table_no, member_id, login_day)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS table_logins_one_play_per_day
+    ON table_logins (member_id, login_day) WHERE played_at IS NOT NULL;
 """
 
 
@@ -55,12 +57,40 @@ class TabletLoginStore:
                            (table_no, self._cutoff()))
         return [{**r, "eligible": bool(r["eligible"])} for r in rows]
 
+    def first_valid_login_at(self, table_no: int) -> str | None:
+        """주문 누적의 기준이 되는, 현재 유효한 로그인 중 가장 이른 시각을 돌려준다."""
+        row = self.db.one("SELECT MIN(logged_in_at) AS since FROM table_logins "
+                          "WHERE table_no=? AND logged_in_at>=?", (table_no, self._cutoff()))
+        return row["since"] if row else None
+
     def set_prize(self, table_no: int, member_id: int, prize: str, prize_id: int | None = None) -> int | None:
-        """룰렛 결과를 기록한다. 이미 돌린 회원이면 덮어쓰지 않는다 (회원당 1회). [뼈대]
+        """룰렛 결과를 기록하고 기록한 로그인 행의 id를 돌려준다.
 
         prize_id: 당첨된 룰렛 칸(roulette_prizes.id). 모르면 None (prize_text 만 저장).
+        """
 
-        TODO: 이 태블릿(table_no)의 가장 최근 로그인 기록(_cutoff 이후)을 찾아 prize_text 가 비어 있을 때만
-              prize_text·prize_id·played_at 을 채우고, 기록했으면 그 table_logins 행의 id 를 돌려준다
-              (coupons.issue 의 table_login_id 로 쓴다). 없거나 이미 다른 값이면 None."""
-        raise NotImplementedError
+        row = self.db.one(
+            "SELECT id FROM table_logins WHERE table_no=? AND member_id=? AND logged_in_at>=? "
+            "AND roulette_eligible=? AND prize_text IS NULL AND played_at IS NULL "
+            "ORDER BY id DESC LIMIT 1",
+            (table_no, member_id, self._cutoff(), True),
+        )
+        if not row:
+            return None
+
+        played_at = _iso(datetime.now(timezone.utc))
+        try:
+            self.db.run(
+                "UPDATE table_logins SET prize_text=?, prize_id=?, played_at=? "
+                "WHERE id=? AND prize_text IS NULL AND played_at IS NULL",
+                (prize, prize_id, played_at, row["id"]),
+            )
+        except Exception as exc:
+            # 동시에 다른 테이블에서 돌리면 부분 유니크 인덱스가 막는다.
+            # DB 예외를 라우터까지 내보내지 않고 '이미 처리됨'으로 통일한다.
+            if "unique" not in str(exc).lower() and "duplicate" not in str(exc).lower():
+                raise
+            return None
+
+        saved = self.db.one("SELECT id FROM table_logins WHERE id=? AND played_at IS NOT NULL", (row["id"],))
+        return saved["id"] if saved else None

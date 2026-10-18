@@ -45,7 +45,6 @@ _reload_if_changed(admin_dummy_data, marketing_recommendations, marketing_ai, re
                    growth_performance_view, marketing_view, customers_view)
 
 from admin.views.customers import page_customers  # noqa: E402
-from admin.views.calls import page_calls  # noqa: E402
 from admin.views.events import page_events  # noqa: E402
 from admin.views.dashboard import page_dashboard  # noqa: E402
 from admin.views.login import login  # noqa: E402
@@ -66,7 +65,7 @@ SUBPAGES = {
     "마케팅": ["AI 챗봇", "AI 추천", "AI 문자", "F&B그로스 성과"],
 }
 SUBPAGE_ICON = {"대시보드": "📊", "고객 등급": "👥", "주문 이력": "🧾", "마케팅": "💬"}
-TOP_PAGES = ["직원 호출", "메뉴 관리", "추천 가중치", "이벤트"]
+TOP_PAGES = ["메뉴 관리", "추천 가중치", "이벤트"]
 PAGES = [*TOP_PAGES, *SUBPAGES]
 DEFAULT_PAGE = "대시보드"  # 처음 들어오면 보여 줄 화면 (하위 메뉴의 첫 항목이 열린다)
 NAV_KEYS = ["nav_top", *(f"nav_sub_{p}" for p in SUBPAGES)]  # 메뉴 묶음마다 라디오 하나 (한 번에 하나만 선택된다)
@@ -170,7 +169,7 @@ if page in SUBPAGES:
     {"대시보드": page_dashboard, "고객 등급": page_customers, "주문 이력": page_orders,
      "마케팅": page_marketing}[page](repo, sub)
 else:
-    {"직원 호출": page_calls, "메뉴 관리": page_menu, "추천 가중치": page_weights, "이벤트": page_events}[page](repo)
+    {"메뉴 관리": page_menu, "추천 가중치": page_weights, "이벤트": page_events}[page](repo)
 
 # 메뉴 관리에서 고른 카테고리도 URL에 남겨 새로고침 후 복원한다 (페이지 실행 후의 최종 선택값 기준).
 if page == "메뉴 관리" and ss["menu_cat"]:

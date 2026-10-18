@@ -41,13 +41,13 @@ def test_server_matches_original_screen_calculation(guest_only):
 def test_api_dashboard_ignores_dummy_orders_and_refreshes(server, monkeypatch):
     from app import dummy
 
-    # 주문 목록 API는 아직 더미여도 3번의 그래프는 DB 주문만 읽어야 한다.
+    # 주문 목록과 3번의 그래프가 모두 실제 DB 주문을 읽어야 한다.
     monkeypatch.setattr(dummy, "orders", lambda: [])
     now = datetime.now(timezone.utc)
     server.app.state.db.run("INSERT INTO orders (table_no, total, created_at) VALUES (?, ?, ?)",
                             (7, 12345, now.isoformat()))
     repo = ar.AdminRepository(ar.ApiBackend("admin-secret"))
-    assert repo.orders().empty and repo.sales_insights()["revenue"] == 12345
+    assert len(repo.orders()) == 1 and repo.sales_insights()["revenue"] == 12345
     screen = open_dashboard(monkeypatch)
     html = "\n".join(element.value for element in screen.get("html"))
     assert '오늘 매출</div><div class="v">12,345' in html
@@ -65,8 +65,8 @@ def test_api_dashboard_ignores_dummy_orders_and_refreshes(server, monkeypatch):
 
 
 @pytest.mark.parametrize("days_ago", [1, 30])
-def test_demo_sales_cards_keep_last_order_day_values_after_date_changes(server, monkeypatch, days_ago):
-    # 시연 후 하루·한 달이 지나도 세 카드는 준비한 마지막 주문일의 값을 유지한다.
+def test_today_cards_do_not_reuse_old_db_sales(server, monkeypatch, days_ago):
+    # 실제 DB 조회에서는 과거 매출을 오늘로 표시하지 않고 마지막 영업일 카드에만 유지한다.
     demo_day = datetime.now(timezone.utc) - timedelta(days=days_ago)
     for amount in (10000, 31000):
         server.app.state.db.run("INSERT INTO orders (table_no, total, created_at) VALUES (?, ?, ?)",
@@ -80,9 +80,9 @@ def test_demo_sales_cards_keep_last_order_day_values_after_date_changes(server, 
         screen.sidebar.radio(key="nav_sub_대시보드").set_value(tab).run()
         assert not screen.exception
         html = "\n".join(element.value for element in screen.get("html"))
-        assert '오늘 주문</div><div class="v">2' in html
-        assert '평균 주문금액</div><div class="v">20,500' in html
-        assert '오늘 매출</div><div class="v">41,000' in html
+        assert '오늘 주문</div><div class="v">0' in html
+        assert '평균 주문금액</div><div class="v">-' in html
+        assert '오늘 매출</div><div class="v">0' in html
         assert '마지막 영업일 매출</div><div class="v">41,000' in html
     assert server.app.state.db.all("SELECT * FROM orders ORDER BY id") == before
 

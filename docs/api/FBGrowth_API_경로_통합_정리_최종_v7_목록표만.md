@@ -13,7 +13,7 @@
 > **v6 이후 바뀐 점**: 쿠폰함 추가(1-6) / 룰렛 회원당 하루 1회 / 저장소를 새 Supabase 스키마에 맞춤 / 정보 조회(GET)를 더미로 전환(QR 로그인·문자 발송·고객 목록은 제외) / 주문 상태 기능 제거 / **쓰기 API와 통계 계산도 더미로 되돌림(QR 로그인·문자 발송·고객 목록·수신거부 제외)**.
 > 되돌림 범위 기준: 문서에서 "구현"·"부분 구현"이던 항목 중 QR 로그인(`/api/auth/*`, `/api/members/me`, `/api/tables/{n}/logins`)과 문자 발송(`/admin/api/marketing/sms/*`)은 유지. 고객 목록·수신거부는 문자 발송 대상과 회원 id를 같이 쓰므로 유지. 쿠폰함·룰렛 하루 1회는 문서에 구현/부분 구현으로 올라 있어 되돌림 대상에 포함(QR 로그인이 쓰는 `coupons.issued_today`만 남김). 새 Supabase 스키마 맞춤은 별도 엔드포인트가 아니라 저장소 코드의 변경이라, 되돌린 저장소는 스키마 정의(SCHEMA)만 남기고 QR·문자 쪽 저장소는 그대로 둠. 이전 코드는 git 기록(`a8b3d14` 이전)에 남아 있어 필요하면 되살릴 수 있음.
 > 실제 구현 경로는 `/api/...`(손님), `/admin/api/...`(관리자)이며 v6의 `/api/v1/...`·`/api/admin/...`과 다릅니다. 마지막 열에 실제 경로를 적었습니다. 관리자 인증은 모든 개발 후 마지막에 진행합니다.
-> 2026-10-18 갱신: 손님 메뉴 목록(`GET /api/menus`)이 `menus` 테이블 조회로 구현되었습니다. 테스트 실행은 아직 확인되지 않았습니다.
+> 2026-10-18 갱신: 손님 메뉴 목록(`GET /api/menus`)과 관리자 메뉴·카테고리 목록(`GET /admin/api/menus`)이 DB 조회로 구현되었습니다. 테스트 실행은 아직 확인되지 않았습니다.
 
 ## 구현 현황 집계 (아래 표의 행 기준, 같은 경로가 여러 화면에 나오면 각각 셈)
 
@@ -122,10 +122,10 @@
 
 | 채택 | 메서드 | 경로 | 설명 | 성공 응답 | 구분 | 구현 현황 | 실제 경로 · 비고 |
 |---|---|---|---|---|---|---|---|
-| ☐ | GET | `/api/v1/owner/menus` | 관리자용 메뉴 목록(비공개·품절 포함) | 200 | 추가(화면 있음) | 더미 | `GET /admin/api/menus` (더미 목록) |
-| ☐ | POST | `/api/v1/owner/menus` | 메뉴 등록(이름·가격·설명·이미지·매운맛·가중치·세트 가능) | 201 | 유지 | 더미 | `PUT /admin/api/menus/{id}` · 저장 제거, 보낸 값을 반영한 메뉴를 돌려줌(dummy.menu_saved) |
-| ☐ | PATCH | `/api/v1/owner/menus/{menuId}` | 메뉴 수정(가격·설명·판매 여부·매운맛 등) | 200 | 유지 | 더미 | `PUT /admin/api/menus/{id}` · 저장 제거, 응답만 더미 |
-| ☐ | DELETE | `/api/v1/owner/menus/{menuId}` | 메뉴 삭제 | 204 | 유지 | 더미 | `DELETE /admin/api/menus/{id}` · 아무것도 지우지 않고 204 |
+| ☐ | GET | `/api/v1/owner/menus` | 관리자용 메뉴 목록(비공개·품절 포함) | 200 | 추가(화면 있음) | 구현(테스트 미실행) | `GET /admin/api/menus` · 메뉴 DB 조회, 카테고리는 Postgres DB 조회·SQLite는 `seed/content.json` |
+| ☐ | POST | `/api/v1/owner/menus` | 메뉴 등록(이름·가격·설명·이미지·매운맛·가중치·세트 가능) | 201 | 유지 | 구현(테스트 미실행) | `PUT /admin/api/menus/{id}` · 신규 메뉴를 DB에 저장 |
+| ☐ | PATCH | `/api/v1/owner/menus/{menuId}` | 메뉴 수정(가격·설명·판매 여부·매운맛 등) | 200 | 유지 | 구현(테스트 미실행) | `PUT /admin/api/menus/{id}` · 전달된 필드만 DB에 저장 |
+| ☐ | DELETE | `/api/v1/owner/menus/{menuId}` | 메뉴 삭제 | 204 | 유지 | 구현(테스트 미실행) | `DELETE /admin/api/menus/{id}` · 메뉴를 DB에서 삭제 |
 | ☐ | GET | `/api/v1/categories` | 카테고리 목록(메뉴 개수 포함) | 200 | 유지 | 더미 | `GET /api/content/categories` (메뉴 개수는 없음) |
 | ☐ | POST | `/api/v1/owner/categories` | 카테고리 추가(이름·아이콘·색상) | 201 | 추가(화면 있음) | 더미 | `PUT /admin/api/content/categories` 로 목록 통째 교체 · 저장 제거, 받은 값을 그대로 돌려줌 |
 | ☐ | PATCH | `/api/v1/owner/categories/{categoryId}` | 카테고리 수정 | 200 | 추가(화면 있음) | 더미 | `PUT /admin/api/content/categories` 로 목록 통째 교체 · 저장 제거 |

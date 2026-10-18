@@ -100,7 +100,7 @@ def test_real_send_via_solapi_and_failure_logged():
         assert req.headers["authorization"].startswith("HMAC-SHA256 ApiKey=ak, Date=")
         import json
         m = json.loads(req.content)["messages"][0]
-        assert m["to"] == "01011112222" and m["from"] == "01099998888" and m["type"] == "SMS"
+        assert m["to"] == "01099998888" and m["from"] == "01099998888" and m["type"] == "SMS"
         assert m["text"].startswith("(광고)") and "080-111-2222" in m["text"]
         bad = c.post("/admin/api/marketing/sms/send", headers=ADMIN, json=body())
         assert bad.status_code == 409 and "SenderIdNotFound" in bad.json()["detail"]["problems"][0]
@@ -217,3 +217,22 @@ def test_balance_unavailable_without_key_and_reads_solapi_when_configured():
     with TestClient(create_app(cfg, sms_clock=at(14), sms_http=fake)) as c:
         r = c.get("/admin/api/marketing/sms/balance", headers=ADMIN).json()
         assert r == {"available": True, "balance": 12300, "point": 500}
+
+
+def test_over_free_quota_allowed_when_solapi_balance_enough():
+    """무료 한도를 넘어도 솔라피 잔액이 충분하면 발송 가능(안내만), 부족하면 막는다."""
+    def make(balance):
+        fake = httpx.Client(transport=httpx.MockTransport(
+            lambda request: httpx.Response(200, json={"balance": balance, "point": 0})))
+        cfg = settings(sms_monthly_limit=1, lms_monthly_limit=1, solapi_api_key="ak", solapi_api_secret="sk")
+        return TestClient(create_app(cfg, sms_clock=at(14), sms_http=fake))
+
+    with make(10000) as c:
+        member(c, "가"); member(c, "나")
+        p = c.post("/admin/api/marketing/sms/preview", headers=ADMIN, json=body()).json()
+        assert p["ok"] and p["notices"] and not p["problems"]
+        assert c.post("/admin/api/marketing/sms/send", headers=ADMIN, json=body()).status_code == 200
+    with make(0) as c:
+        member(c, "가"); member(c, "나")
+        p = c.post("/admin/api/marketing/sms/preview", headers=ADMIN, json=body()).json()
+        assert not p["ok"] and "잔액이 부족" in p["problems"][0]

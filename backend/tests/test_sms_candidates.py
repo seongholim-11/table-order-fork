@@ -145,7 +145,7 @@ def test_ai_prompt_has_only_keyword_facts(monkeypatch):
         c.post(CANDIDATES, headers=ADMIN)
         by_kw = {p.split("키워드: ")[1].split("\n")[0]: p for p in sent}
         assert "'포개진 지도'" in by_kw["행사"] and "날씨" not in by_kw["행사"].split("키워드")[1]
-        assert " - " in by_kw["가중치, 주문"] and "원 " not in "".join(sent)
+        assert " - " in by_kw["추천 메뉴, 주문"] and "원 " not in "".join(sent)
         assert "포개진 지도" not in by_kw["주문"]
 
 

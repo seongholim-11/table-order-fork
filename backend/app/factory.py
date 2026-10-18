@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.settings import Settings, get_settings
 from app.routers import admin, ai, auth, content, coupons, dev, menus, orders, roulette, roulette_prizes, staff_calls, store, user
+from app.routers.admin.categories import guest_router as guest_categories_router
 from app.services.external_info import ExternalInfoService
 from app.services.kakao import KakaoClient
 from app.services.supabase_auth import SupabaseAuthClient
@@ -15,6 +16,7 @@ from app.stores.db import Database
 from app.stores.dev_test import DevTestStore
 from app.stores.external_context import ExternalContextStore
 from app.stores.grade_rules import GradeRuleStore
+from app.stores.ai_content import AiContentStore
 from app.stores.login_sessions import LoginSessionStore
 from app.stores.members import MemberStore
 from app.stores.roulette_prizes import RoulettePrizeStore
@@ -47,6 +49,7 @@ def create_app(settings: Settings | None = None, sms_clock=None, sms_http=None) 
     app.state.coupons = CouponStore(db)
     app.state.tablet_logins = TabletLoginStore(db, settings.jwt_expire_minutes)
     app.state.store_info = StoreInfoStore(db, settings)
+    app.state.ai_content = AiContentStore(db)
     app.state.shop = ShopStore(db)
     app.state.roulette_prizes = RoulettePrizeStore(db)
     app.state.sms_logs = SmsLogStore(db)
@@ -61,6 +64,7 @@ def create_app(settings: Settings | None = None, sms_clock=None, sms_http=None) 
     # 손님 API 는 기능별 파일로 나뉘어 있다. 새 기능 라우터는 해당 파일에 추가하므로 여기는 고치지 않는다.
     for module in (user, store, content, menus, orders, coupons, roulette, roulette_prizes, staff_calls, ai, dev):
         app.include_router(module.router)
+    app.include_router(guest_categories_router)  # 손님용 카테고리 조회
     app.include_router(admin.router)
 
     @app.get("/health", tags=["서버"])

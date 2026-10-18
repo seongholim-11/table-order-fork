@@ -93,21 +93,24 @@ def _performance_charts(result: dict) -> None:
         st.info("AI 도입 전·후 월평균을 비교하려면 최초 AI 추천 주문일 이전의 매출 데이터가 필요합니다.")
         return
 
-    # 도입 전·후 평균선은 일평균 값으로 표시하고, 빨간 세로선으로 최초 AI 주문일을 구분한다.
-    averages = pd.DataFrame([
-        {"일자": timeline["일자"].min(), "평균 매출": baseline / 30, "구간": "도입 전 평균"},
-        {"일자": adoption - pd.Timedelta(days=1), "평균 매출": baseline / 30, "구간": "도입 전 평균"},
-        {"일자": adoption, "평균 매출": performance / 30, "구간": "도입 후 평균"},
-        {"일자": timeline["일자"].max(), "평균 매출": performance / 30, "구간": "도입 후 평균"},
-    ])
-    line = alt.Chart(timeline).mark_line(point=True, color="#f97316", strokeWidth=3).encode(
+    # 과거 일평균을 전체 날짜에 반복해 AI 도입 이후에도 비교 기준선이 이어지게 한다.
+    # 월환산 지표와 같은 기준을 쓰되 일 매출 그래프이므로 30으로 나눈다.
+    baseline_line = timeline[["일자"]].assign(매출=baseline / 30, 구간="AI 도입 전 일평균 매출")
+    post_line = timeline[timeline["일자"] >= adoption].assign(구간="AI 도입 이후 실제 일 매출")
+    comparison = pd.concat([baseline_line, post_line], ignore_index=True)
+    # 두 선에 같은 색상 척도를 사용해 범례와 실제 선의 색상을 일치시킨다.
+    line = alt.Chart(comparison).mark_line(strokeWidth=3).encode(
         x=alt.X("일자:T", title="주문일"), y=alt.Y("매출:Q", title="일 매출(원)"),
-        tooltip=[alt.Tooltip("일자:T", title="주문일"), alt.Tooltip("매출:Q", title="매출", format=",")],
+        color=alt.Color(
+            "구간:N",
+            scale=alt.Scale(domain=["AI 도입 전 일평균 매출", "AI 도입 이후 실제 일 매출"],
+                            range=["#2563eb", "#f97316"]),
+            legend=alt.Legend(title=None),
+        ),
+        detail="구간:N",
+        tooltip=[alt.Tooltip("일자:T", title="주문일"), alt.Tooltip("매출:Q", title="매출", format=","),
+                 alt.Tooltip("구간:N", title="구분")],
     )
-    average_lines = alt.Chart(averages).mark_line(strokeDash=[6, 4], strokeWidth=2).encode(
-        x="일자:T", y="평균 매출:Q", color=alt.Color(
-            "구간:N", scale=alt.Scale(domain=["도입 전 평균", "도입 후 평균"], range=["#64748b", "#dc2626"]),
-            legend=alt.Legend(title=None)), detail="구간:N")
     rule_data = pd.DataFrame({"일자": [adoption], "표시": [f"AI 마케팅 도입 {adoption:%Y-%m-%d}"]})
     rule = alt.Chart(rule_data).mark_rule(color="#dc2626", strokeWidth=2).encode(x="일자:T")
     rule_label = alt.Chart(rule_data).mark_text(color="#dc2626", align="left", dx=6,
@@ -134,7 +137,8 @@ def _performance_charts(result: dict) -> None:
                                             y="매출:Q", text=alt.Text("매출:Q", format=","))
     left, right = st.columns([3, 2], gap="large")
     left.subheader("AI 마케팅 도입 전·후 매출 추세")
-    left.altair_chart((line + average_lines + rule + rule_label).properties(height=360), use_container_width=True)
+    left.altair_chart((line + rule + rule_label).properties(height=360), use_container_width=True)
+    left.caption("파란선: AI 도입 전 일평균을 전체 기간에 적용한 비교 기준 · 주황선: 도입 이후 실제 일 매출")
     right.subheader("월평균 매출 증가")
     right.altair_chart((bars + labels).properties(height=360), use_container_width=True)
 
@@ -160,6 +164,12 @@ def _growth_section(result: dict) -> None:
     if result["empty"]:
         st.info("주문 데이터가 쌓이면 고객 전환과 매출 성과가 표시됩니다.")
         return
+
+    # DB와 더미가 모두 마지막 주문일까지 집계하므로, 실제 오늘 기준으로 오해하지 않게 기간을 밝힌다.
+    recent_start = pd.Timestamp(result["post_end"]) - pd.Timedelta(days=29)
+    st.caption(f"최근 30일 지표: {recent_start:%Y-%m-%d} ~ {result['post_end']} (마지막 주문일 기준). "
+               f"도입 전후 비교: {result['pre_start']} ~ {result['post_end']}. "
+               "AI 도입일은 최초 AI 추천 조합 주문일이며, 주문 기록이 없는 날은 0원으로 계산합니다.")
 
     kpi_row(
         kpi("AI 추천 사용 주문", result["ai_orders"], "건", accent=True,
@@ -210,6 +220,8 @@ def _growth_section(result: dict) -> None:
 def page_growth_performance(repo) -> None:
     """기존 대시보드·고객 데이터와 AI 성과를 순서대로 조립한다."""
     page_head("F&B그로스 성과", "AI 추천을 통한 고객 전환과 매출 성장을 한눈에 확인하세요")
+    # 버튼 클릭 시 Streamlit이 화면을 다시 실행하므로 저장소에서 최신 DB 값을 다시 조회한다.
+    st.button("🔄 최신 데이터 반영", key="growth_refresh")
     # DB 연동 경로 1: backend/app/routers/admin/stats.py → backend/app/stores/stats.py
     # DB 테이블: orders, order_items, order_item_components, members, recommendation_events
     stats = repo.stats(st.session_state["grade_rule"])

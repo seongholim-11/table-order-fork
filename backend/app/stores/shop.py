@@ -5,14 +5,14 @@
 [뼈대] 지금은 각 메서드가 NotImplementedError 이고 라우터는 dummy/ 응답을 돌려준다.
 """
 
-from app.stores import shop_calls, shop_menus, shop_orders, shop_recommendations
+from app.stores import categories, shop_calls, shop_menus, shop_orders, shop_recommendations
 from app.stores.db import Database
 from app.stores.shop_calls import CallMixin
 from app.stores.shop_menus import MenuMixin
 from app.stores.shop_orders import OrderMixin
 from app.stores.shop_recommendations import RecommendationMixin
 
-SCHEMAS = (shop_menus.SCHEMA, shop_orders.SCHEMA, shop_calls.SCHEMA, shop_recommendations.SCHEMA)
+SCHEMAS = (categories.SCHEMA, shop_menus.SCHEMA, shop_orders.SCHEMA, shop_calls.SCHEMA, shop_recommendations.SCHEMA)
 
 
 class ShopStore(MenuMixin, OrderMixin, CallMixin, RecommendationMixin):
@@ -20,5 +20,7 @@ class ShopStore(MenuMixin, OrderMixin, CallMixin, RecommendationMixin):
         self.db = db
         for schema in SCHEMAS:
             db.script(schema)
+        self.categories = categories.CategoryStore(db)  # 카테고리 저장소(서준 TODO 3)
 
         self.seed_menus()
+        self.seed_call_items()

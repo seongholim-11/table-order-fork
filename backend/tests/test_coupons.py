@@ -17,7 +17,6 @@ def _spin(client, headers, table_no=1, **prize):
     return client.put(f"/api/tables/{table_no}/logins/prize", headers=headers, json=body)
 
 
-@pytest.mark.skip(reason="로직을 지우고 더미 응답만 돌려주는 상태라 저장·검증이 일어나지 않음 - 해당 엔드포인트를 DB 로 구현하면 이 skip 을 지운다")
 def test_roulette_win_goes_into_coupon_box_and_is_listed(client):
     h = login(client, "가")
     r = _spin(client, h)
@@ -28,7 +27,6 @@ def test_roulette_win_goes_into_coupon_box_and_is_listed(client):
     assert [c["nickname"] for c in client.app.state.coupons.for_members([mid])] == ["가"]
 
 
-@pytest.mark.skip(reason="로직을 지우고 더미 응답만 돌려주는 상태라 저장·검증이 일어나지 않음 - 해당 엔드포인트를 DB 로 구현하면 이 skip 을 지운다")
 def test_free_coupon_needs_item_and_discount_coupon_needs_percent(client):
     h = login(client, "가")
     assert _spin(client, h, kind="free", percent=None).status_code == 422  # item_id 없음
@@ -36,7 +34,6 @@ def test_free_coupon_needs_item_and_discount_coupon_needs_percent(client):
     assert _box(client, _my_id(client, h)) == []                           # 실패한 시도는 쿠폰을 만들지 않는다
 
 
-@pytest.mark.skip(reason="로직을 지우고 더미 응답만 돌려주는 상태라 저장·검증이 일어나지 않음 - 해당 엔드포인트를 DB 로 구현하면 이 skip 을 지운다")
 def test_one_spin_per_member_per_day_even_at_another_table(client):
     h = login(client, "가")
     assert _spin(client, h).status_code == 200
@@ -49,7 +46,6 @@ def test_one_spin_per_member_per_day_even_at_another_table(client):
     assert _spin(client, h, table_no=2).status_code == 409
 
 
-@pytest.mark.skip(reason="로직을 지우고 더미 응답만 돌려주는 상태라 저장·검증이 일어나지 않음 - 해당 엔드포인트를 DB 로 구현하면 이 skip 을 지운다")
 def test_next_day_member_can_spin_again(client):
     h = login(client, "가")
     assert _spin(client, h).status_code == 200
@@ -62,7 +58,6 @@ def test_next_day_member_can_spin_again(client):
     assert len(_box(client, mid)) == 2
 
 
-@pytest.mark.skip(reason="로직을 지우고 더미 응답만 돌려주는 상태라 저장·검증이 일어나지 않음 - 해당 엔드포인트를 DB 로 구현하면 이 skip 을 지운다")
 def test_order_marks_coupon_used_only_for_tablet_members(client):
     a, b = login(client, "가"), login(client, "나")
     cid = _spin(client, a).json()["coupon"]["id"]

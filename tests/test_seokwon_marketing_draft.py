@@ -11,8 +11,9 @@ from admin.marketing.revenue_data import summarize_revenue
 
 def test_consumer_revenue_and_menu_data_are_summarized_separately():
     members = pd.DataFrame([
-        {"등급": "휴면", "마케팅 수신 동의": True, "수신거부": False},
-        {"등급": "단골", "마케팅 수신 동의": True, "수신거부": True},
+        {"등급": "휴면", "전화번호 보유": True, "마케팅 수신 동의": True, "수신거부": False},
+        {"등급": "단골", "전화번호 보유": True, "마케팅 수신 동의": True, "수신거부": True},
+        {"등급": "신규", "전화번호 보유": False, "마케팅 수신 동의": True, "수신거부": False},
     ])
     orders = pd.DataFrame([{
         "주문 내역": "할맥 x2, 감자튀김 x1", "주문 시각": pd.Timestamp("2026-10-16 19:00"), "금액": 21000,
@@ -27,6 +28,7 @@ def test_consumer_revenue_and_menu_data_are_summarized_separately():
     revenue_summary, quantities = summarize_revenue(orders)
     menu_summary = summarize_menus(menus, quantities)
 
+    assert consumer_summary["total"] == 3
     assert consumer_summary["sendable"] == 1 and consumer_summary["opted_out"] == 1
     assert revenue_summary["revenue"] == 21000 and revenue_summary["top_items"][0] == ("할맥", 2)
     assert menu_summary["unsold"] == ["떡볶이"] and menu_summary["soldout"] == ["감자튀김"]
@@ -50,5 +52,6 @@ def test_recommendation_pages_wrap_to_the_first_page():
 
     assert (first_page, second_page, pages) == (1, 2, 2)
     assert [card["title"] for card in first] == ["0", "1", "2", "3"]
-    assert [card["title"] for card in second] == ["4", "5", "6", "0"]
+    assert [card["title"] for card in second] == ["4", "5", "6"]
+    assert not ({card["title"] for card in first} & {card["title"] for card in second})
     assert pick_recommendations(cards, 2)[0] == first

@@ -19,10 +19,10 @@
 | 순서 | 할 일 | API | 상태 |
 |---|---|---|---|
 | 0 | 0. 개발 흐름 확인 (테스트 버튼) | `POST /api/dev/db-test` (개발 전용) | 확인 전 |
-| 1 | 1. 매장 정보 | `GET /api/v1/store` | 더미 (가장 쉬움, 연습용) |
-| 2 | 2. 주문 저장 · 테이블 누적 · 주문 이력 | `POST /api/v1/orders`, `GET /api/v1/tables/{id}/orders`, `GET /api/v1/owner/orders` | 더미 / 미구현 |
-| 3 | 3. 룰렛 · 쿠폰함 | `roulette/status·plays`, `tables/{n}/logins/prize`, `coupons`, `tables/{n}/coupons`, `POST /api/orders`(쿠폰 사용) | 부분 / 더미 |
-| 4 | 4. AI 질문 · 추천 · 날씨 · 규칙 | `ai/questions`, `ai/recommendations`, `weather/current`, `ai/recommendation-rules` | 더미 |
+| 1 | 1. 매장 정보 | `GET /api/v1/store` | 완료 |
+| 2 | 2. 주문 저장 · 테이블 누적 · 주문 이력 | `POST /api/v1/orders`, `GET /api/v1/tables/{id}/orders`, `GET /api/v1/owner/orders` | 완료 |
+| 3 | 3. 룰렛 · 쿠폰함 | `roulette/status·plays`, `tables/{n}/logins/prize`, `coupons`, `tables/{n}/coupons`, `POST /api/orders`(쿠폰 사용) | 완료 |
+| 4 | 4. AI 질문 · 추천 · 날씨 · 규칙 | `ai/questions`, `ai/recommendations`, `weather/current`, `ai/recommendation-rules` | 완료(4-3 선택 제외) |
 
 **다른 팀원과 겹치는 지점**
 
@@ -75,13 +75,13 @@ UI(스플래시 매장명) → U/user_repository.py _fetch_content → GET /api/
 
 **상세 설명 / TODO**
 
-- [ ] 더미 주석처리: `B/routers/store.py`의 `dummy.store()` 줄, `B/dummy/store_data.py`의 `store()`와 `ENDPOINTS`의 `"GET /api/store, /api/v1/store"` 줄.
-- [ ] 라우터에서 `request.app.state.store_info.get()`을 돌려준다(`StoreInfoStore.get`은 이미 구현돼 있음).
-- [ ] `BT/test_dummy_get.py`의 `test_user_get_dummies`에서 store 줄을 빼고, `BT/test_store_endpoint.py`로 대체됐는지 확인.
+- [x] 더미 주석처리: `B/routers/store.py`의 `dummy.store()` 줄, `B/dummy/store_data.py`의 `store()`와 `ENDPOINTS`의 `"GET /api/store, /api/v1/store"` 줄.
+- [x] 라우터에서 `request.app.state.store_info.get()`을 돌려준다(`StoreInfoStore.get`은 이미 구현돼 있음).
+- [x] `BT/test_dummy_get.py`의 `test_user_get_dummies`에서 store 줄을 빼고, `BT/test_store_endpoint.py`로 대체됐는지 확인.
 
 ---
 
-## 2. 주문 (더미 / 미구현)
+## 2. 주문 (완료)
 
 ### 2-1. `POST /api/v1/orders` (= `POST /api/orders`)
 
@@ -115,13 +115,13 @@ UI(주문 확인 다이얼로그 · 주문하기) → U/ui/dialogs.py → ctx.RE
 
 **상세 설명 / TODO**
 
-- [ ] 더미 주석처리: `create_order`의 `dummy.order_created(...)` 줄, `B/dummy/order_data.py`의 `order_created`와 `"POST /api/orders"` 줄.
-- [ ] `B/stores/shop_orders.py`의 `add_order`, `order`, `orders` 구현(파일 안 TODO 주석 그대로). `menus`에 있는 id만 `menu_id`로 연결, 없으면 null.
-- [ ] 라우터 TODO대로 `shop.add_order(table_no, lines, total, member_id)` 호출.
-- [ ] 주의: `ShopStore`가 메뉴를 쓰려면 서준의 `seed_menus()`가 필요하다. 서준 작업 전에는 `menu_id`를 null로 두고 테스트한다.
-- [ ] 화면 변경은 필요 없다(응답 `{no, ai_combo, used_coupon_ids}` 모양 유지).
+- [x] 더미 주석처리: `create_order`의 `dummy.order_created(...)` 줄, `B/dummy/order_data.py`의 `order_created`와 `"POST /api/orders"` 줄.
+- [x] `B/stores/shop_orders.py`의 `add_order`, `order`, `orders` 구현(파일 안 TODO 주석 그대로). `menus`에 있는 id만 `menu_id`로 연결, 없으면 null.
+- [x] 라우터 TODO대로 `shop.add_order(table_no, lines, total, member_id)` 호출.
+- [x] 주의: `ShopStore`가 메뉴를 쓰려면 서준의 `seed_menus()`가 필요하다. 서준 작업 전에는 `menu_id`를 null로 두고 테스트한다.
+- [x] 화면 변경은 필요 없다(응답 `{no, ai_combo, used_coupon_ids}` 모양 유지).
 
-### 2-2. `GET /api/v1/tables/{tableId}/orders` (미구현)
+### 2-2. `GET /api/v1/tables/{tableId}/orders` (완료)
 
 **목표**: 주문내역 다이얼로그에 "이 테이블에서 지금까지 시킨 것"을 합계와 함께 보여준다. **`table_logins`의 로그인 시각 이후 주문만** 합산한다 (손님이 바뀌면 이전 손님 주문이 안 섞이게. `table_sessions` 테이블은 만들지 않는다).
 
@@ -138,10 +138,10 @@ UI(🧾 주문내역 버튼) → U/ui/dialogs.py → (새) server.table_orders �
 
 **상세 설명 / TODO**
 
-- [ ] `B/stores/shop_orders.py`에 `table_orders(table_no, since)` 추가, `B/stores/tablet_logins.py`에 기준 시각 조회 함수 추가(둘 다 재현 파일).
-- [ ] 화면: 지금 주문내역은 세션(`ss.orders`)에서 그린다. 서버 값으로 바꿀 때 `U/user_repository.py`에는 새 메서드만 추가한다.
+- [x] `B/stores/shop_orders.py`에 `table_orders(table_no, since)` 추가, `B/stores/tablet_logins.py`에 기준 시각 조회 함수 추가(둘 다 재현 파일).
+- [x] 화면: 지금 주문내역은 세션(`ss.orders`)에서 그린다. 서버 값으로 바꿀 때 `U/user_repository.py`에는 새 메서드만 추가한다.
 
-### 2-3. `GET /api/v1/owner/orders` (더미 · 관리자 주문 이력)
+### 2-3. `GET /api/v1/owner/orders` (관리자 주문 이력)
 
 **목표**: 관리자 > 주문 이력의 전체 주문·고객별 주문을 DB에서 읽는다. `member_id` 필터를 지원한다. 기간·테이블·금액·AI 사용 필터는 현재처럼 화면(`A/order_filters.py`)에서 처리한다.
 
@@ -158,12 +158,12 @@ UI(주문 이력 탭) → A/views/orders.py → repo.orders() (A/admin_repositor
 
 **상세 설명 / TODO**
 
-- [ ] 더미 주석처리: `B/routers/admin/orders.py`의 `dummy.orders()`/`dummy.members()` 사용부, `B/dummy/order_data.py`의 `orders`·`members`(수용의 통계 더미가 `members`를 쓰므로 수용과 순서를 맞춘다)와 `"GET /admin/api/orders"` 줄.
-- [ ] 응답 모양은 `dummy.orders()`와 같게 유지(키: `id, table_no, member_id, total, roulette_discount_percent, ai_combo, recommendation_event_id, ts, lines`).
+- [x] 더미 주석처리: `B/routers/admin/orders.py`의 `dummy.orders()`/`dummy.members()` 사용부, `B/dummy/order_data.py`의 `orders`·`members`(수용의 통계 더미가 `members`를 쓰므로 수용과 순서를 맞춘다)와 `"GET /admin/api/orders"` 줄.
+- [x] 응답 모양은 `dummy.orders()`와 같게 유지(키: `id, table_no, member_id, total, roulette_discount_percent, ai_combo, recommendation_event_id, ts, lines`).
 
 ---
 
-## 3. 룰렛 · 쿠폰함 (부분 구현 / 더미)
+## 3. 룰렛 · 쿠폰함 (완료)
 
 **규칙(바꾸지 말 것)**: 룰렛은 회원당 하루 1회(KST). 같은 날 다른 테이블에서도 불가, 다음 날은 가능. 당첨은 즉시 적용하지 않고 `coupons`(쿠폰함)에 넣고, 주문 화면 쿠폰함에서 사용/취소하며 주문 시 `used_at`을 기록한다. 유효기간은 미정(`expires_at` null).
 
@@ -184,7 +184,7 @@ UI(주문 이력 탭) → A/views/orders.py → repo.orders() (A/admin_repositor
 
 **흐름**
 ```
-UI(룰렛 돌리기) → U/ui/roulette.py → U/state/roulette.py spin_roulette → U/server.py save_prize
+UI(룰렛 돌리기) → U/ui/roulette.py → U/state/roulette.py spin_roulette → U/server.py play_roulette
  → PUT /api/tables/{n}/logins/prize {member_id, prize, kind, percent|item_id}
  → B/routers/roulette.py tablet_login_prize → (검사) B/stores/coupons.py issued_today → B/stores/tablet_logins.py set_prize
  → B/stores/coupons.py issue → DB(table_logins UPDATE, coupons INSERT) → {ok, coupon}
@@ -193,10 +193,10 @@ UI(룰렛 돌리기) → U/ui/roulette.py → U/state/roulette.py spin_roulette 
 
 **상세 설명 / TODO**
 
-- [ ] 더미 주석처리: `tablet_login_prize`의 `dummy.prize_saved(...)`, `B/dummy/coupon_data.py`의 `prize_saved`·`"PUT /api/tables/{table_no}/logins/prize"` 줄.
-- [ ] `tablet_logins.set_prize`, `coupons.issue`, `coupons.get` 구현(파일 안 TODO). 라우터 TODO 1~5 순서대로.
-- [ ] **쿠폰과 룰렛 칸 연결**: 뼈대에 자리를 이미 넣었다. `set_prize(table_no, member_id, prize, prize_id=None)`는 기록한 `table_logins` 행의 id를 돌려주고, `coupons.issue(..., prize_id=None, table_login_id=None)`에 그 값을 넣는다. `coupons.table_login_id`가 UNIQUE라 "룰렛 1번 = 쿠폰 1장"을 DB가 보장한다. 요청 `PrizeIn.prize_id`는 선택이라, 석원의 `roulette_prizes.list()`가 칸 `id`를 내려주기 전에는 화면이 보내지 않아도 동작한다(그 경우 `prize_id`는 null). 칸 `id`를 내려줄지는 석원과 합의한다.
-- [ ] `coupons.issued_today`와 `tablet_logins.record/list`는 성호의 QR 로그인이 쓰므로 이름·동작을 바꾸지 않는다.
+- [x] 더미 주석처리: `tablet_login_prize`의 `dummy.prize_saved(...)`, `B/dummy/coupon_data.py`의 `prize_saved`·`"PUT /api/tables/{table_no}/logins/prize"` 줄.
+- [x] `tablet_logins.set_prize`, `coupons.issue`, `coupons.get` 구현(파일 안 TODO). 라우터 TODO 1~5 순서대로.
+- [x] **쿠폰과 룰렛 칸 연결**: `set_prize`가 기록한 `table_logins` 행 id를 `coupons.issue`의 `table_login_id`로 연결하고, `prize_id`도 선택적으로 저장한다. 부분 유니크 인덱스로 룰렛 1회당 쿠폰 1장을 보장한다.
+- [x] `coupons.issued_today`와 `tablet_logins.record/list`의 기존 QR 로그인 연동을 유지한다.
 
 ### 3-2. `GET /api/v1/roulette/status`, `POST /api/v1/roulette/plays`
 
@@ -217,10 +217,10 @@ UI(룰렛 돌리기 버튼) → U/state/roulette.py spin_roulette → (새) serv
 
 **상세 설명 / TODO**
 
-- [ ] 3-1을 먼저 끝낸다. `plays`는 3-1의 검사·저장 코드를 함수로 빼서 재사용한다(복붙 금지).
-- [ ] `status` 응답: 이 태블릿 로그인 회원별 `{id, nickname, eligible, prize}` + 남은 기회 수. (`tablet_logins.list`를 재사용 가능)
-- [ ] 화면 변경은 `U/state/roulette.py`·`U/server.py`·`U/ui/roulette.py`의 룰렛 부분만. 서버가 안 닿을 때의 로컬 추첨은 대체 경로로 남긴다.
-- [ ] 석원이 `roulette_prizes.list()`를 만들기 전에는 `U/menu_data.py`의 칸 구성을 임시로 쓰고 TODO 주석으로 표시한다.
+- [x] 3-1을 먼저 끝낸다. `plays`는 3-1의 검사·저장 코드를 `_save_prize`로 재사용한다.
+- [x] `status` 응답: 이 태블릿 로그인 회원별 `{id, nickname, eligible, prize}`와 `spins_left`·`remaining`을 반환한다.
+- [x] 화면은 서버가 결정한 결과로 회전하고, 서버가 안 닿을 때만 로컬 추첨을 대체 경로로 사용한다.
+- [x] `roulette_prizes.list()`의 서버 설정을 추첨에 사용한다.
 
 ### 3-3. `GET /api/v1/coupons`, `GET /api/tables/{tableNo}/coupons`
 
@@ -240,8 +240,8 @@ UI(🎟️ 쿠폰함 팝업) → U/ui/coupons.py → U/state/coupons.py load_cou
 
 **상세 설명 / TODO**
 
-- [ ] 더미 주석처리: `my_coupons`, `table_coupons`의 `dummy.*` 줄과 `B/dummy/coupon_data.py`의 `member_coupons`·`table_coupons`·`_coupons`·`_MEMBER_NAMES`, `coupon_data.py`의 `ENDPOINTS` 두 줄.
-- [ ] `coupons.for_member`, `coupons.for_members` 구현. 두 라우트의 별칭(`/v1/coupons`, `/coupons`)은 그대로 둔다.
+- [x] 더미 주석처리: `my_coupons`, `table_coupons`의 `dummy.*` 줄과 `B/dummy/coupon_data.py`의 관련 함수·`ENDPOINTS` 줄.
+- [x] `coupons.for_member`, `coupons.for_members` 구현. 두 라우트의 별칭(`/v1/coupons`, `/coupons`)은 그대로 둔다.
 
 ### 3-4. `POST /api/orders` 쿠폰 사용 (`coupon_ids`)
 
@@ -260,14 +260,14 @@ UI(주문하기) → U/state/coupons.py pending_coupon_ids → create_order(coup
 
 **상세 설명 / TODO**
 
-- [ ] `coupons.use` 구현 후 2-1의 `create_order`에서 호출. 같은 id가 중복으로 와도 한 번만 처리한다.
-- [ ] `BT/test_dummy_get.py::test_user_write_dummies`에서 본인 기능 줄(주문·쿠폰·prize)을 빼고 새 테스트로 대체.
+- [x] `coupons.use` 구현 후 2-1의 `create_order`에서 호출. 같은 id가 중복으로 와도 한 번만 처리한다.
+- [x] `BT/test_dummy_get.py::test_user_write_dummies`에서 본인 기능 줄(주문·쿠폰·prize)을 빼고 실제 DB 테스트로 대체했다.
 
 ---
 
-## 4. AI 질문 · 추천 · 날씨 · 규칙 (더미)
+## 4. AI 질문 · 추천 · 날씨 · 규칙
 
-현재 구조: 질문·날씨·규칙은 `GET /api/content`(JSON 파일 `B/seed/content.json`)에서 한 번에 받고, **추천 조합 계산은 화면 코드**(`U/recommendations.py recommend_combos`)가 한다. 서버는 노출 기록만 받는다(`POST /api/recommendations`, 더미).
+현재 구조: 질문·날씨·규칙은 DB 기반의 개별 API에서 받고, **추천 조합 계산은 화면 코드**(`U/recommendations.py recommend_combos`)가 한다. 서버는 노출 기록을 `recommendation_events`에 저장한다(`POST /api/v1/ai/recommendations`, 기존 경로 별칭 유지).
 
 **단계로 나눠 진행한다**: ① 읽기 API 3개 ② 노출 기록 저장 ③ (선택) 추천 계산을 서버로.
 
@@ -275,7 +275,7 @@ UI(주문하기) → U/state/coupons.py pending_coupon_ids → create_order(coup
 
 **목표**: 질문(단계별 선택지), 현재 날씨, 추천 규칙을 DB 테이블(`quiz_questions`+`quiz_options`, `weather_types`+`weather_current`, `recommendation_rules`)에서 읽어 지금 화면이 받는 모양과 **똑같이** 돌려준다.
 
-**테스트 방법**: 새 `BT/test_ai_content.py` — 응답이 `B/seed/content.json`의 `quiz_questions`·`weather`·`rules`와 같은 키를 가진다 / 질문은 `sort_order` 순 / 옵션이 질문 아래로 묶임 / 날씨는 `{current, types:{코드:{label, icon}}}`. 화면: `python -m pytest user/test_ai_quiz.py user/test_recommendations.py -q` 통과.
+**테스트 방법**: 새 `BT/test_ai_content.py` — 응답이 `U/ai_quiz_data.py`·`U/recommendation_data.py`와 같은 모양이다 / 질문은 `sort_order` 순 / 옵션이 질문 아래로 묶임 / 날씨는 `{current, types:{코드:{label, icon}}}`. 화면: `python -m pytest user/test_ai_quiz.py user/test_recommendations.py -q` 통과.
 
 **중요 이론**
 
@@ -297,13 +297,13 @@ UI(AI 질문 시작) → U/views/ai.py → ctx.QUESTIONS/WEATHER/RULES ← U/use
 
 **상세 설명 / TODO**
 
-- [ ] 더미 주석처리: `/content`의 `quiz_questions`·`weather`·`rules` 항목은 `/api/content`에서 나오므로, 새 API로 옮긴 뒤 `B/seed/content.json`에서 **본인 키(`quiz_questions`, `weather`, `rules`)만** 지운다(다른 키는 서준·석원이 지움).
-- [ ] 초기 데이터: `U/ai_quiz_data.py`, `U/recommendation_data.py`와 `docs/db/`의 시드를 보고 테이블에 채우는 시드 코드를 `B/stores/ai_content.py`에 둔다(비어 있을 때만 채움).
-- [ ] 질문(`quiz_questions`)과 추천 규칙(`recommendation_rules`)의 **내용은 담당자가 직접 정한다.** 아래 4-4에서 방식을 먼저 고르고, 시드는 고른 방식에 필요한 질문·규칙 키만 채운다(지금 DB에는 질문 5개, 규칙 3키만 있고 `pairings` 등은 없음).
-- [ ] `B/services/weather.py`(신규): 외부 날씨 API 연동 전에는 `weather_current`의 값을 읽기만 한다. 성호가 이 함수를 가져다 쓰니 `current_weather() -> {code, label, icon}` 같은 단순한 이름으로 정하고 성호에게 알린다.
-- [ ] `U/user_repository.py`: `ENDPOINTS`·`_fetch_content`에서 본인 항목만 새 경로로 바꾼다. 서준(메뉴)·석원(룰렛·직원호출)도 같은 함수를 고치므로 **각자 자기 줄만** 바꾸고 PR을 작게 올린다.
+- [x] 더미 주석처리: `/content`의 `quiz_questions`·`weather`·`rules` 항목은 `/api/content`에서 나오므로, 새 API로 옮긴 뒤 `B/seed/content.json`에서 **본인 키(`quiz_questions`, `weather`, `rules`)만** 지운다(다른 키는 서준·석원이 지움).
+- [x] 초기 데이터: `U/ai_quiz_data.py`, `U/recommendation_data.py`를 시드 원본으로 읽어 테이블에 채우는 시드 코드를 `B/stores/ai_content.py`에 두었다(비어 있을 때만 채움).
+- [x] 질문(`quiz_questions`)과 추천 규칙(`recommendation_rules`)의 **내용은 담당자가 직접 정한다.** 4-4에서 A(규칙 기반 점수) 방식을 선택하고, 현재 화면의 8개 질문과 전체 추천 규칙을 시드했다.
+- [x] `B/services/weather.py`(신규): 외부 날씨 API 연동 전에는 `weather_current`의 값을 읽기만 하도록 `current_weather(store) -> {code, label, icon}`을 추가했다.
+- [x] `U/user_repository.py`: 질문·날씨·규칙·추천 기록만 새 `/api/v1/...` 경로로 바꾸고, 메뉴·룰렛·직원 호출 경로는 건드리지 않았다.
 
-### 4-2. `POST /api/v1/ai/recommendations` (추천 기록 저장 · 더미)
+### 4-2. `POST /api/v1/ai/recommendations` (추천 기록 저장)
 
 **목표**: 손님에게 추천 조합이 노출된 사실을 `recommendation_events`에 저장한다(관리자 AI 적중률의 분모). 지금 화면은 `POST /api/recommendations`로 이미 호출 중이다.
 
@@ -320,8 +320,8 @@ UI(추천 조합 카드 표시) → U/views/ai.py log_recommendation → ctx.REP
 
 **상세 설명 / TODO**
 
-- [ ] 더미 주석처리: `log_recommendation`의 `dummy.recommendation_logged()`, `B/dummy/recommend_data.py`의 `recommendation_logged`·`"POST /api/recommendations"` 줄.
-- [ ] `add_recommendation`, `recommendation_count` 구현(파일 안 TODO). 새 경로 `/api/v1/ai/recommendations`는 `B/routers/ai.py`에 같은 함수를 연결한다(기존 경로 별칭 유지).
+- [x] 더미 주석처리: `log_recommendation`의 `dummy.recommendation_logged()`, `B/dummy/recommend_data.py`의 `recommendation_logged`·`"POST /api/recommendations"` 줄.
+- [x] `add_recommendation`, `recommendation_count` 구현(파일 안 TODO). 새 경로 `/api/v1/ai/recommendations`를 `B/routers/ai.py`에 연결하고 기존 경로 별칭도 유지했다.
 - [ ] `orders.recommendation_event_id`로 주문과 추천을 연결하는 부분은 4-3에서.
 
 ### 4-3. (선택) 추천 조합 계산을 서버로
@@ -349,6 +349,6 @@ UI(추천 조합 카드 표시) → U/views/ai.py log_recommendation → ctx.REP
 
 **고르는 기준(제안)**: 시연 안정성이 최우선이면 B에서 시작해 A로 확장하고, C는 A·B 위에 "추천 이유 문구"만 붙이는 선택 기능으로 둔다.
 
-- [ ] 담당자가 방식(A/B/C 중)을 정해 PR 설명에 적는다.
-- [ ] 고른 방식에 필요한 질문과 규칙 키를 정하고, 시드와 `U/ai_quiz_data.py`·`U/recommendation_data.py`를 같은 내용으로 맞춘다. 규칙이 가리키는 메뉴 id는 `menus` 테이블에 실제로 있는 id만 쓴다.
-- [ ] 질문 수를 줄이면(예: 8단계 → 3~5단계) `U/ai_quiz_data.py`의 질문 목록, 화면의 단계 표시, `user/test_ai_quiz.py`를 함께 맞춘다.
+- [x] 담당자가 방식 A(규칙 기반 점수)를 선택했다.
+- [x] 고른 방식에 필요한 질문과 규칙 키를 정하고, 시드와 `U/ai_quiz_data.py`·`U/recommendation_data.py`를 같은 내용으로 맞췄다. 규칙이 가리키는 메뉴 id는 기존 `menus` 시드의 id를 사용한다.
+- [x] 질문 수는 기존 8단계를 유지해 화면의 단계 표시와 `user/test_ai_quiz.py`를 변경하지 않았다.

@@ -15,6 +15,7 @@ from app.core.settings import Settings
 from app.services.external_info import ExternalInfoService
 from app.services.grades import GRADES, grade_of
 from app.services.sms import SmsService
+from app.stores.stats import StatsStore
 
 # 키워드마다 문자를 받을 등급. 발송 API 가 '등급'으로 수신자를 정하므로 키워드도 등급으로 푼다.
 # 복합 키워드는 등급의 교집합이고, 비는 조합은 만들지 않는다.
@@ -35,9 +36,11 @@ PROMPT = (
     "당신은 호프집 사장님을 돕는 문자 카피라이터입니다. 손님 입장에서 '오늘 이 가게에 가고 싶다'는 마음이 들게 "
     "문자 본문 한 개만 쓰세요. 키워드마다 손님이 끌릴 포인트를 하나씩만 담고, 키워드에 없는 정보는 넣지 마세요. "
     "행사는 주어진 행사명 하나만 따옴표 그대로 짧게 말하고, 메뉴는 주어진 이름과 짧은 특징으로 말하세요. "
-    "혜택은 주어진 것만 쓰고 가격·할인을 지어내지 마세요. "
+    "'가중치' 같은 내부 용어는 절대 쓰지 말고 '추천 메뉴'라고만 말하세요. 혜택은 주어진 것만 쓰고 가격·할인을 지어내지 마세요. "
     "2~3문장, 90자 이내, 한국어 존댓말, 친근하고 자연스러운 말투, 이모지 없이. '한잔', '어때요' 같은 말을 반복하지 마세요. "
     "(광고) 표기와 수신거부 안내는 시스템이 붙이니 쓰지 마세요. 설명 없이 문구만 출력하세요.")
+# 가중치는 관리자만 아는 내부 용어라 AI 에는 "추천 메뉴"로 바꿔 알린다(문자 본문에 '가중치'가 새지 않게).
+AI_KEYWORD_LABEL = {"가중치": "추천 메뉴"}
 # 휴면·단골 키워드에서 주는 혜택. 템플릿과 AI 가 같은 혜택만 말하도록 한곳에 둔다.
 OFFERS = {"휴면": "이번 주 방문하시면 안주 10% 할인", "단골": "방문하시면 음료 1잔 서비스"}
 
@@ -69,9 +72,16 @@ class SmsCandidateService:
         high_weight = [{"name": m["name"], "price": m.get("price"), "desc": m.get("desc", "")} for m in best]
         try:
             sold = Counter()
-            for order in self.shop.orders():
-                for line in order["lines"]:
+            if getattr(self.shop, "db", None) is not None:
+                # DB 연동: 실제 주문·조합 구성품 판매량을 통계 저장소에서 직접 읽는다.
+                # 미구현 상태인 ShopStore.orders()의 더미/뼈대에 의존하지 않는다.
+                for line in StatsStore(self.shop.db).menu_sales():
                     sold[line["name"]] += line["qty"]
+            else:
+                # 단위 테스트에서 주입하는 작은 가짜 저장소는 기존 orders 계약을 지원한다.
+                for order in self.shop.orders():
+                    for line in order["lines"]:
+                        sold[line["name"]] += line["qty"]
             top_items = [name for name, _ in sold.most_common(3)]
         except NotImplementedError:
             top_items = []
@@ -140,7 +150,7 @@ class SmsCandidateService:
             "휴면": f"오랜만에 오는 손님 혜택: {OFFERS['휴면']}",
             "단골": f"단골 손님 혜택: {OFFERS['단골']}",
         }
-        user = (f"매장: {self.s.store_name} {self.s.store_branch}\n키워드: {', '.join(keywords)}\n"
+        user = (f"매장: {self.s.store_name} {self.s.store_branch}\n키워드: {', '.join(AI_KEYWORD_LABEL.get(k, k) for k in keywords)}\n"
                 + "\n".join(facts[k] for k in keywords))
         r = httpx.post(
             f"https://generativelanguage.googleapis.com/v1beta/models/{self.s.gemini_model}:generateContent",

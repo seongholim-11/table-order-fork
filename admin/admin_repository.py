@@ -30,9 +30,9 @@ from shared import api  # noqa: E402
 
 ENDPOINTS = {
     "store": "/api/v1/store",
-    "menus": "/admin/api/menus",              # GET {categories, menus} / PUT·DELETE /{id}
+    "menus": "/admin/api/menus",              # GET {categories, menus} / PUT 한 건·목록 / DELETE /{id}
     "roulette": "/api/v1/roulette/prizes",  # GET 칸 목록 / PUT 관리자 경로로 전체 교체
-    "categories": "/api/content/categories",  # GET 전체 목록(가상 카테고리 포함) / PUT /admin/api/content/categories 통째로 교체
+    "categories": "/admin/api/categories",    # 관리자 목록(가상 포함·메뉴 개수 포함)
     "members": "/admin/api/members",          # GET ?repeat&regular&dormant
     "orders": "/admin/api/orders",
     "stats": "/admin/api/stats",
@@ -76,10 +76,24 @@ class ApiBackend:
         return api.get(ENDPOINTS["menus"], self.token)
 
     def categories_full(self):
-        return api.get(ENDPOINTS["categories"])
+        return api.get(ENDPOINTS["categories"], self.token)
+
+    def category_list(self):
+        """실제 메뉴 카테고리와 메뉴 개수를 API에서 그대로 가져온다."""
+        return [category for category in self.categories_full() if category["id"] not in VIRTUAL_CATEGORIES]
 
     def save_categories(self, categories):
+        # 구형 전체 교체 호출은 새 개별 API로 옮긴 뒤에도 호환용으로 남겨 둔다.
         return api.put("/admin/api/content/categories", self.token, json=categories)
+
+    def add_category(self, category):
+        return api.post(ENDPOINTS["categories"], self.token, json=category)
+
+    def update_category(self, category_id, fields):
+        return api.patch(f"{ENDPOINTS['categories']}/{category_id}", self.token, json=fields)
+
+    def delete_category(self, category_id):
+        return api.delete(f"{ENDPOINTS['categories']}/{category_id}", self.token)
 
     def roulette_prizes(self):
         return api.get(ENDPOINTS["roulette"])
@@ -89,6 +103,10 @@ class ApiBackend:
 
     def save_menu(self, menu_id, fields):
         return api.put(f"{ENDPOINTS['menus']}/{menu_id}", self.token, json=fields)
+
+    def save_menus(self, items):
+        # 목록 첫 메뉴 ID를 기존 PUT 경로에 넣고, 여러 메뉴 변경을 한 요청으로 보낸다.
+        return api.put(f"{ENDPOINTS['menus']}/{items[0]['id']}", self.token, json=items)
 
     def delete_menu(self, menu_id):
         return api.delete(f"{ENDPOINTS['menus']}/{menu_id}", self.token)
@@ -251,6 +269,8 @@ class AdminRepository:
     # ---- 카테고리 CRUD (왼쪽 패널) ----
     def category_list(self) -> list[dict]:
         """메뉴를 넣을 수 있는 카테고리(가상 카테고리 제외): id, icon, name, colors, menu_count."""
+        if hasattr(self.backend, "category_list"):
+            return self.backend.category_list()
         counts: dict[str, int] = {}
         for m in self.backend.menus()["menus"]:
             counts[m["cat"]] = counts.get(m["cat"], 0) + 1
@@ -258,7 +278,7 @@ class AdminRepository:
                 if c["id"] not in VIRTUAL_CATEGORIES]
 
     def _save_categories(self, mutate) -> None:
-        """전체 목록(가상 카테고리 포함)을 읽어 고친 뒤 통째로 저장한다. 가상 카테고리는 건드리지 않는다."""
+        """더미 백엔드의 기존 인터페이스를 위해 전체 목록 교체를 유지한다."""
         full = self.backend.categories_full()
         mutate(full)
         self.backend.save_categories(full)
@@ -276,13 +296,28 @@ class AdminRepository:
         """새 카테고리를 만들고 id 를 돌려준다."""
         new_id = f"cat{uuid.uuid4().hex[:6]}"
 
-        def add(full):
-            full.append({"id": new_id, "icon": (icon or "").strip() or ICON_DEFAULT,
-                         "name": self._clean_name(name, full), "colors": COLOR_PRESETS.get(color, COLOR_PRESETS["보라"])})
-        self._save_categories(add)
+        clean_name = self._clean_name(name, self.backend.categories_full())
+        category = {"id": new_id, "icon": (icon or "").strip() or ICON_DEFAULT,
+                    "name": clean_name, "colors": COLOR_PRESETS.get(color, COLOR_PRESETS["보라"])}
+        if hasattr(self.backend, "add_category"):
+            self._call_category_api(self.backend.add_category, category)
+        else:
+            self._save_categories(lambda full: full.append(category))
         return new_id
 
     def update_category(self, category_id: str, name: str, icon: str, color: str | None = None) -> None:
+        full = self.backend.categories_full()
+        target = next((c for c in full if c["id"] == category_id), None)
+        if target is None:
+            raise CategoryError("없는 카테고리예요.")
+        fields = {"name": self._clean_name(name, [c for c in full if c is not target]),
+                  "icon": (icon or "").strip() or ICON_DEFAULT}
+        if color:
+            fields["colors"] = COLOR_PRESETS.get(color, target["colors"])
+        if hasattr(self.backend, "update_category"):
+            self._call_category_api(self.backend.update_category, category_id, fields)
+            return
+
         def edit(full):
             target = next((c for c in full if c["id"] == category_id), None)
             if target is None:
@@ -299,9 +334,21 @@ class AdminRepository:
         if used:
             raise CategoryError(f"메뉴 {used}개가 남아 있어요. 메뉴를 먼저 옮기거나 삭제해 주세요.")
 
+        if hasattr(self.backend, "delete_category"):
+            self._call_category_api(self.backend.delete_category, category_id)
+            return
+
         def remove(full):
             full[:] = [c for c in full if c["id"] != category_id]
         self._save_categories(remove)
+
+    @staticmethod
+    def _call_category_api(method, *args):
+        """서버 검증 메시지를 화면의 기존 CategoryError로 이어 준다."""
+        try:
+            return method(*args)
+        except api.ApiError as error:
+            raise CategoryError(error.detail) from error
 
     # ---- 메뉴 등록 (선택한 카테고리에) ----
     def add_menu(self, category_id: str, name: str, price: int, desc: str = "", image_url: str = "",
@@ -319,22 +366,28 @@ class AdminRepository:
         """표에서 바뀐 행만 저장하고, 지워진 행은 삭제한다. {'saved': n, 'deleted': n}"""
         ids = {c["name"]: c["id"] for c in self.categories()}
         old_by_id = {r["id"]: r for r in old.to_dict("records")}
-        saved, seen = 0, set()
+        changed, seen = [], set()
         for row in new.to_dict("records"):
             menu_id = row["id"] if isinstance(row["id"], str) and row["id"] else f"m{uuid.uuid4().hex[:6]}"
             seen.add(menu_id)
             if old_by_id.get(menu_id) == {**row, "id": menu_id}:
                 continue  # 바뀌지 않은 행
-            self.backend.save_menu(menu_id, {
+            changed.append({
+                "id": menu_id,
                 "name": row["메뉴명"], "cat": ids[row["카테고리"]], "price": int(row["가격"]), "desc": _text(row["설명"]),
                 "image_url": _text(row["이미지 URL"]), "soldout": not bool(row["판매 여부"]),
                 "spicy": SPICY_VALUES.get(row["매운 정도"], 0), "weight": int(row["추천 가중치"]),
                 "set_ok": bool(row["세트 가능"])})
-            saved += 1
         deleted = [i for i in old_by_id if i not in seen]
-        for menu_id in deleted:
-            self.backend.delete_menu(menu_id)
-        return {"saved": saved, "deleted": len(deleted)}
+        # 체크 삭제와 나머지 행 수정도 같은 목록에 넣어 한 트랜잭션으로 보낸다.
+        batch = changed + [{"id": menu_id, "delete": True} for menu_id in deleted]
+        if batch:
+            self.backend.save_menus(batch)
+        return {"saved": len(changed), "deleted": len(deleted)}
+
+    def save_menu_batch(self, items: list[dict]) -> dict:
+        """같은 메뉴 PUT API로 여러 행의 일부 필드를 한 번에 저장한다."""
+        return self.backend.save_menus(items)
 
     # ---- 이벤트: 룰렛 ----
     def roulette_menu_choices(self) -> list[dict]:
@@ -413,10 +466,11 @@ class AdminRepository:
 
     # ---- 고객 / 주문 / 통계 ----
     def regular_preferences(self) -> list[dict]:
-        """마케팅 AI 추천에서 쓸 실제 DB의 오늘 주문한 단골 정보를 읽는다."""
-        # 더미 화면에서 실제 손님의 취향을 알고 있는 것처럼 꾸며 보여주지 않는다.
+        """마케팅 AI 추천에서 쓸 실제 DB의 오늘 주문한 2회 이상 방문 고객을 읽는다."""
+        # 더미는 admin_dummy_data의 1,000명 주문으로 시연하고, API 모드는 아래 DB 경로를 그대로 읽는다.
+        # 실제 DB 연결: backend/app/stores/customer_notes.py -> members/orders/order_items/menus
         if self.source != "api":
-            return []
+            return self.backend.regular_preferences()
         return api.get("/admin/api/marketing/regular-preferences", self.backend.token)["preferences"]
 
     def customer_grades(self, rule: dict | None = None) -> dict:
@@ -437,9 +491,12 @@ class AdminRepository:
         rows = self.backend.members(rule if rule is not None else self.customer_grade_rules())["members"]
         return pd.DataFrame([{
             "customer_id": m["id"], "닉네임": m["nickname"], "성별": m["gender"], "연령대": m["age_group"],
-            "방문 횟수": m["visit_count"], "마지막 방문일": _kst_date(m["last_visit_at"]),
-            "마케팅 수신 동의": m["marketing_consent"], "수신거부": m["opted_out"], "등급": m["grade"]} for m in rows],
-            columns=["customer_id", "닉네임", "성별", "연령대", "방문 횟수", "마지막 방문일", "마케팅 수신 동의", "수신거부", "등급"])
+            "생일": m.get("birthday"), "방문 횟수": m["visit_count"], "마지막 방문일": _kst_date(m["last_visit_at"]),
+            # 문자 발송 가능 수는 동의 여부뿐 아니라 실제 전화번호 보유 여부까지 확인해야 한다.
+            "전화번호 보유": m.get("has_phone", False), "마케팅 수신 동의": m["marketing_consent"],
+            "수신거부": m["opted_out"], "등급": m["grade"]} for m in rows],
+            columns=["customer_id", "닉네임", "성별", "연령대", "생일", "방문 횟수", "마지막 방문일", "전화번호 보유",
+                     "마케팅 수신 동의", "수신거부", "등급"])
 
     def orders(self) -> pd.DataFrame:
         rows = self.backend.orders()

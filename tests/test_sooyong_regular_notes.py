@@ -6,6 +6,13 @@ from test_sooyong_today_orders import open_dashboard, server
 from app.services.grades import KST
 
 
+def save_menu(server, menu_id, name, category="anju", price=14000):
+    """테스트 메뉴도 메뉴 저장소를 통해 저장한다."""
+    return server.app.state.shop.save_menu(
+        menu_id, {"cat": category, "name": name, "price": price}
+    )
+
+
 def html_of(screen):
     return "\n".join(element.value for element in screen.get("html"))
 
@@ -30,8 +37,7 @@ def prepare_history(server):
     member = server.app.state.members.upsert_login("regular-screen", "주문 기억 손님")
     db.run("UPDATE members SET visit_count=5 WHERE id=?", (member["id"],))
     for menu_id, name in (("screen-fish", "DB 먹태"), ("screen-egg", "DB 계란말이")):
-        db.run("INSERT INTO menus (id, category_id, name, price) VALUES (?, ?, ?, ?)",
-               (menu_id, "anju", name, 14000))
+        save_menu(server, menu_id, name)
     for days in range(6):
         is_fish = days in (1, 2, 3, 4)
         at = datetime.now(timezone.utc) - timedelta(days=days)
@@ -84,12 +90,9 @@ def test_empty_db_keeps_customer_screen_working(server, monkeypatch):
     assert "단골 손님 대화 메모" not in [title.value for title in screen.subheader]
     screen.sidebar.radio(key="nav_sub_마케팅").set_value("AI 추천").run()
     assert not screen.exception and "주문율 80%" not in html_of(screen)
-    addition = next(element.value for element in screen.get("html") if 'class="recs regular-preferences"' in element.value)
-    assert "AI가 이런 인사를 추천할 예정" in addition
-    assert addition.count('class="rec"') == 2
-    assert addition.count("80%") == 1
-    assert "또 찾아주셔서 감사합니다" in addition
-    assert any("문구는 달라질 수 있어요" in element.value for element in screen.caption)
+    # 실제 DB가 비어 있으면 시연용 손님 대신 빈 상태를 알려야 한다.
+    assert 'class="recs regular-preferences"' not in html_of(screen)
+    assert any("오늘 주문이 확인된 재방문 고객이 아직 없습니다" in element.value for element in screen.info)
     assert server.app.state.members.all() == []
     assert server.app.state.db.all("SELECT * FROM orders") == []
 
@@ -112,7 +115,7 @@ def test_three_db_examples_are_recommendation_cards(server, monkeypatch):
 
     db = server.app.state.db
     for menu_id, name in (("a1", "예시 먹태"), ("a2", "예시 골뱅이"), ("a4", "예시 계란말이"), ("a8", "예시 파전")):
-        db.run("INSERT INTO menus (id, category_id, name, price) VALUES (?, ?, ?, ?)", (menu_id, "anju", name, 14000))
+        save_menu(server, menu_id, name)
     seed_regular_examples(db, datetime.now(KST).date())
     screen = open_recommendations(monkeypatch)
     html = html_of(screen)
@@ -141,8 +144,9 @@ def test_below_eighty_percent_still_shows_regular_without_claiming_preference(se
     ctx["regular_preferences"] = [{"nickname": "조건 미달", "preference_rate": .79}]
     assert marketing_ai.recommend(ctx) == original
     assert regular_preference_cards(ctx["regular_preferences"]) == []
-    # 더미 모드에서는 실제 DB의 손님처럼 꾸민 개인 추천을 만들지 않는다.
-    assert repo.regular_preferences() == []
+    # 더미 모드도 1,000명 시연 주문에서 근거를 찾고, API 모드와 같은 응답 구조를 유지한다.
+    dummy_preferences = repo.regular_preferences()
+    assert dummy_preferences and all(row["previous_visit"] and row["today_table"] for row in dummy_preferences)
     member = prepare_history(server)
     db = server.app.state.db
     # 테스트 메모리 DB의 과거 주문을 분산시켜 특정 취향을 단정할 수 없는 상황을 만든다.
@@ -159,16 +163,16 @@ def test_original_cards_and_pagination_are_preserved_above_added_preferences(ser
     prepare_history(server)
     screen = open_recommendations(monkeypatch)
     sections = [element.value for element in screen.get("html")]
-    original = next(html for html in sections if html.startswith('<div class="recs">'))
+    original = [html for html in sections if 'class="rec recommendation-card"' in html]
     addition = next(html for html in sections if 'class="recs regular-preferences"' in html)
-    assert original.count('class="rec"') == 4
-    assert "주문 기억 손님" not in original
+    assert len(original) == 4
+    assert all("주문 기억 손님" not in html for html in original)
     assert "주문 기억 손님" in addition and "80% 이상" in addition
-    assert sections.index(original) < sections.index(addition)
+    assert sections.index(original[0]) < sections.index(addition)
     screen.button(key="mk_rerecommend").click().run()
     assert not screen.exception
     sections = [element.value for element in screen.get("html")]
-    after = next(html for html in sections if html.startswith('<div class="recs">'))
+    after = [html for html in sections if 'class="rec recommendation-card"' in html]
     assert after != original
     assert next(html for html in sections if 'class="recs regular-preferences"' in html) == addition
 
@@ -178,7 +182,8 @@ def test_preference_api_failure_does_not_break_original_recommendations(server, 
     from pathlib import Path
 
     screen = open_recommendations(monkeypatch)
-    original = next(element.value for element in screen.get("html") if element.value.startswith('<div class="recs">'))
+    original = [element.value for element in screen.get("html")
+                if 'class="rec recommendation-card"' in element.value]
     ar._loaded_mtime = Path(ar.__file__).stat().st_mtime
 
     def unavailable(self):
@@ -187,15 +192,15 @@ def test_preference_api_failure_does_not_break_original_recommendations(server, 
     monkeypatch.setattr(ar.AdminRepository, "regular_preferences", unavailable)
     screen.run()
     assert not screen.exception
-    assert next(element.value for element in screen.get("html") if element.value.startswith('<div class="recs">')) == original
+    assert [element.value for element in screen.get("html")
+            if 'class="rec recommendation-card"' in element.value] == original
     assert any("단골 손님 정보를 불러오지 못했어요" in element.value for element in screen.info)
 
 
 def test_ten_ordering_regulars_are_all_visible_without_truncating(server, monkeypatch):
     """방문 횟수만 확인되는 단골도 빠뜨리지 않고 열 팀 모두 표시하는지 확인한다."""
     db = server.app.state.db
-    db.run("INSERT INTO menus (id, category_id, name, price) VALUES (?, ?, ?, ?)",
-           ("ten-screen", "anju", "단골의 오늘 메뉴", 14000))
+    save_menu(server, "ten-screen", "단골의 오늘 메뉴")
     for index in range(10):
         member = server.app.state.members.upsert_login(f"screen-ten-{index}", f"열 팀 단골 {index}")
         db.run("UPDATE members SET visit_count=? WHERE id=?", (5 + index, member["id"]))
@@ -220,8 +225,7 @@ def test_varied_regulars_and_one_preference_suggestion_use_separate_cards(server
 
     db = server.app.state.db
     for menu_id, name in (("a1", "먹태"), ("a2", "골뱅이"), ("a4", "계란말이"), ("a8", "파전")):
-        db.run("INSERT INTO menus (id, category_id, name, price) VALUES (?, ?, ?, ?)",
-               (menu_id, "anju", name, 14000))
+        save_menu(server, menu_id, name)
     seed_regular_examples(db, datetime.now(KST).date())
     member = server.app.state.members.upsert_login("varied-screen", "여러 메뉴 단골")
     db.run("UPDATE members SET visit_count=8 WHERE id=?", (member["id"],))
@@ -253,7 +257,8 @@ def test_varied_regulars_and_one_preference_suggestion_use_separate_cards(server
 def test_preview_is_replaced_by_real_regular_greeting_and_changes_with_order(server, monkeypatch):
     """발표용 예정 문구에서 실제 단골 주문에 맞는 응대로 전환되는 흐름을 확인한다."""
     screen = open_recommendations(monkeypatch)
-    assert "AI가 이런 인사를 추천할 예정" in html_of(screen)
+    # 실제 DB(API 모드)에 대상이 없으면 예시 대신 안내만 보여 준다.
+    assert any("재방문 고객이 아직 없습니다" in e.value for e in screen.info)
     member = prepare_history(server)
     screen.button(key="mk_rerecommend").click().run()
     assert not screen.exception
@@ -291,4 +296,4 @@ def test_running_app_reloads_old_marketing_modules_for_preview(server, monkeypat
     monkeypatch.setattr(marketing, "_render_regular_preferences", lambda repo: None)
     screen = open_recommendations(monkeypatch)
     assert not screen.exception
-    assert "AI가 이런 인사를 추천할 예정" in html_of(screen)
+    assert any("재방문 고객이 아직 없습니다" in e.value for e in screen.info)

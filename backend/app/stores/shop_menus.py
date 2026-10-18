@@ -41,12 +41,61 @@ class MenuMixin:
         names = {"category_id": "cat", "description": "desc", "is_soldout": "soldout"}
         return {names.get(key, key): value for key, value in fields.items()}
 
+    def _seed_categories(self) -> None:
+        """카테고리 테이블이 있으면 메뉴 시드에 필요한 기본 카테고리를 추가한다."""
+        if not self.db.columns("categories"):
+            return
+
+        seed_path = Path(__file__).resolve().parent.parent / "seed" / "content.json"
+        with open(seed_path, mode="r", encoding="utf-8") as f:
+            categories = json.load(f)["categories"]
+
+        for sort, category in enumerate(categories):
+            colors = category.get("colors", ["#a29bfe", "#4b3f9e"])
+            # 기존 카테고리는 관리자 설정을 보존하고, 없는 카테고리만 메뉴 FK 전에 추가한다.
+            self.db.run(
+                "INSERT INTO categories "
+                "(id, name, icon, color_from, color_to, is_virtual, sort_order) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING",
+                (
+                    category["id"], category["name"], category.get("icon", "🍽️"),
+                    colors[0], colors[1], category["id"] in ("ai", "best"), sort,
+                ),
+            )
+
+    def menu_categories(self) -> list[dict]:
+        """메뉴를 넣을 수 있는 카테고리를 DB 표시 순서로 돌려준다."""
+        # 관리자 메뉴 화면은 각 카테고리에 속한 메뉴 수를 함께 보여준다.
+        category_store = getattr(self, "categories", None)
+        if category_store is not None:
+            return [
+                {"id": category["id"], "name": category["name"]}
+                for category in category_store.list(include_count=True)
+                if not category["is_virtual"]
+            ]
+        if not self.db.columns("categories"):
+            # SQLite 개발 DB에는 categories 테이블이 아직 없어서 기존 콘텐츠를 사용한다.
+            seed_path = Path(__file__).resolve().parent.parent / "seed" / "content.json"
+            with open(seed_path, mode="r", encoding="utf-8") as f:
+                categories = json.load(f)["categories"]
+            return [
+                {"id": category["id"], "name": category["name"]}
+                for category in categories
+                if category["id"] not in ("ai", "best")
+            ]
+
+        return self.db.all(
+            "SELECT id, name FROM categories WHERE is_virtual = ? ORDER BY sort_order, id",
+            (False,),
+        )
 
     def seed_menus(self) -> None:
         """메뉴 테이블이 비어 있을 때만 seed/menu.json 을 넣는다.
 
         TODO: menus 가 비어 있으면 seed/menu.json 을 읽어 save_menu(id, menu, sort=순번) 로 넣는다."""
         if not self.menus():
+            # Postgres의 menus.category_id 외래 키가 있으므로 카테고리를 먼저 준비한다.
+            self._seed_categories()
             seed_path = Path(__file__).resolve().parent.parent / "seed" / "menu.json"
             with open(seed_path, mode="r", encoding="utf-8") as f:
                 menus = json.load(f)
@@ -88,48 +137,70 @@ class MenuMixin:
         menu["set_ok"] = bool(menu["set_ok"])
         return menu
 
-    def save_menu(self, menu_id: str, fields: dict, sort: int | None = None) -> dict:
-        """있으면 주어진 필드(MENU_FIELDS)만 수정, 없으면 기본값을 채워 새로 만든다.
+    def save_menu(self, menu_id: str, fields: dict | list[dict], sort: int | None = None):
+        """한 메뉴 또는 여러 메뉴를 만들거나 수정하고, 변경 전체를 한 트랜잭션으로 저장한다."""
+        is_batch = isinstance(fields, list)
+        items = fields if is_batch else [{"id": menu_id, **fields}]
+        ids = [item.get("id") for item in items]
+        if not items or any(not isinstance(item_id, str) or not item_id.strip() for item_id in ids):
+            raise ValueError("저장할 메뉴마다 ID가 필요합니다.")
+        if len(ids) != len(set(ids)):
+            raise ValueError("같은 메뉴 ID를 한 요청에서 여러 번 저장할 수 없습니다.")
 
-        TODO: INSERT ... ON CONFLICT(id) DO UPDATE. sort 가 없으면 기존 sort_order, 새 메뉴면 MAX(sort_order)+1.
-        TODO: 저장한 메뉴를 menu() 로 읽어 반환."""
+        next_order = self.db.one("SELECT COALESCE(MAX(sort_order) + 1, 0) AS next_order FROM menus")["next_order"]
+        statements = []
+        saved_ids, deleted_ids = [], []
+        for item in items:
+            item_id = item["id"]
+            if item.get("delete") is True:
+                if set(item) - {"id", "delete"}:
+                    raise ValueError("삭제 항목에는 ID와 delete만 보낼 수 있습니다.")
+                if self.db.one("SELECT id FROM menus WHERE id=?", (item_id,)) is None:
+                    raise ValueError(f"메뉴를 찾을 수 없습니다: {item_id}")
+                statements.append(("DELETE FROM menus WHERE id=?", (item_id,)))
+                deleted_ids.append(item_id)
+                continue
 
-        # 새 메뉴에서 생략된 필드는 기본값으로 채운다.
-        values = {
-            "category_id": "side", "name": "새 메뉴", "price": 0,
-            "description": "", "image_url": "", "is_soldout": False,
-            "spicy": 0, "weight": 50, "set_ok": False, "emoji": "🍽️", "tags": [],
-        }
-        # 기존 메뉴는 요청에 포함된 필드만 바꾸고, 허용된 이름만 DB 컬럼으로 바꾼다.
-        db_fields = self._to_db_fields({key: value for key, value in fields.items() if key in MENU_FIELDS})
-        values.update(db_fields)
-        values["tags"] = self.db.to_list(values["tags"])
+            # 새 메뉴는 기본값을 채우고, 기존 메뉴는 전달받은 필드만 바꾼다.
+            values = {
+                "category_id": "side", "name": "새 메뉴", "price": 0,
+                "description": "", "image_url": "", "is_soldout": False,
+                "spicy": 0, "weight": 50, "set_ok": False, "emoji": "🍽️", "tags": [],
+            }
+            db_fields = self._to_db_fields({key: value for key, value in item.items() if key in MENU_FIELDS})
+            values.update(db_fields)
+            values["tags"] = self.db.to_list(values["tags"])
 
-        existing = self.db.one("SELECT sort_order FROM menus WHERE id=?", (menu_id,))
-        if sort is not None:
-            sort_order = sort
-        elif existing is not None:
-            sort_order = existing["sort_order"]
-        else:
-            next_order = self.db.one("SELECT COALESCE(MAX(sort_order) + 1, 0) AS next_order FROM menus")
-            sort_order = next_order["next_order"]
+            existing = self.db.one("SELECT sort_order FROM menus WHERE id=?", (item_id,))
+            if not is_batch and sort is not None:
+                sort_order = sort
+            elif existing is not None:
+                sort_order = existing["sort_order"]
+            else:
+                sort_order = next_order
+                next_order += 1
 
-        columns = tuple(values)
-        insert_columns = ("id", *columns, "sort_order")
-        update_fields = [f"{column}=excluded.{column}" for column in db_fields]
-        update_fields.append("sort_order=excluded.sort_order")
-        sql = (
-            f"INSERT INTO menus ({', '.join(insert_columns)}) "
-            f"VALUES ({', '.join(['?'] * len(insert_columns))}) "
-            f"ON CONFLICT(id) DO UPDATE SET {', '.join(update_fields)}"
-        )
-        params = (menu_id, *(values[column] for column in columns), sort_order)
-        self.db.run(sql, params)
+            columns = tuple(values)
+            insert_columns = ("id", *columns, "sort_order")
+            update_fields = [f"{column}=excluded.{column}" for column in db_fields]
+            update_fields.append("sort_order=excluded.sort_order")
+            sql = (
+                f"INSERT INTO menus ({', '.join(insert_columns)}) "
+                f"VALUES ({', '.join(['?'] * len(insert_columns))}) "
+                f"ON CONFLICT(id) DO UPDATE SET {', '.join(update_fields)}"
+            )
+            params = (item_id, *(values[column] for column in columns), sort_order)
+            statements.append((sql, params))
+            saved_ids.append(item_id)
 
-        saved_menu = self.menu(menu_id)
-        if saved_menu is None:
+        # 수정과 삭제 SQL을 한 번에 실행해 중간 오류 때 전체를 롤백한다.
+        self.db.atomic(statements)
+        saved = [self.menu(item_id) for item_id in saved_ids]
+        if any(menu is None for menu in saved):
             raise RuntimeError("저장한 메뉴를 다시 조회하지 못했습니다.")
-        return saved_menu
+        if is_batch:
+            return {"saved": len(saved), "deleted": len(deleted_ids), "menus": saved}
+        return saved[0]
 
     def delete_menu(self, menu_id: str) -> bool:
         """메뉴를 지우고, 삭제 대상이 있었으면 True를 돌려준다."""

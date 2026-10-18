@@ -47,6 +47,11 @@ def confirm_dialog():
 @st.dialog("주문내역", width="large")
 def orders_dialog():
     orders = st.session_state.orders
+    result = None
+    if ctx.REPO.source == "api":
+        result = ctx.REPO.table_orders(st.session_state.table, st.session_state.access_token)
+        if result is not None:
+            orders = [_display_order(row) for row in result["orders"]]
     if not orders:
         st.html('<div class="cart-empty">아직 주문 내역이 없어요</div>')
         return
@@ -57,7 +62,14 @@ def orders_dialog():
         st.html(f'<div class="order-box"><div class="order-head"><span>주문 #{o["no"]} · {o["time"]}</span>'
                     f'</div>{rows}'
                     f'<div class="order-item" style="margin-top:6px;font-weight:800;color:#ffb703"><span>소계</span><span>{won(o["total"])}</span></div></div>')
-    st.html(f'<div class="total-row"><span>누적 주문금액</span><b>{won(sum(o["total"] for o in orders))}</b></div>')
+    total = result["total"] if ctx.REPO.source == "api" and result is not None else sum(o["total"] for o in orders)
+    st.html(f'<div class="total-row"><span>누적 주문금액</span><b>{won(total)}</b></div>')
+
+
+def _display_order(row):
+    """서버 주문(ts·id)을 기존 다이얼로그가 쓰는 no·time 모양으로 바꾼다."""
+    at = datetime.fromisoformat(row["ts"]).astimezone(KST)
+    return {"no": row["id"], "time": at.strftime("%H:%M"), "lines": row["lines"], "total": row["total"]}
 
 
 @st.dialog("직원 호출", width="medium")

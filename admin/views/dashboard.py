@@ -23,13 +23,16 @@ def render_sales_insights(s, x, title="매출", subtitle="오늘 · 최근 7일 
                     "원" if s["today_orders"] else ""))
         st.html('<div class="empty">아직 주문이 없어요.</div>')
         return
-    # 세 카드는 준비된 주문의 마지막 날짜를 시연의 오늘로 삼아 날짜가 지나도 값을 유지한다.
-    demo_orders = x.get("last_day_orders", s["today_orders"])
-    demo_average = x["last_day_revenue"] // demo_orders if demo_orders else 0
+    # API가 계산한 실제 오늘 값을 사용한다. 오늘 주문이 없으면 마지막 영업일과 구분해 0으로 표시한다.
+    # 더미 통계에는 today_revenue가 없으므로 그때만 기존 시연 기준일 값을 사용한다.
+    today_orders = s["today_orders"]
+    today_average = s["avg_order_amount"]
+    if x.get("last_order_date"):
+        st.caption(f"최근 7·14·30일 분석 기준일: 마지막 주문일 {x['last_order_date']} · 오늘 지표는 한국 날짜 기준")
     kpi_row(
-        kpi("오늘 주문", demo_orders, "건", accent=True),
-        kpi("평균 주문금액", f"{demo_average:,}" if demo_orders else "-", "원" if demo_orders else ""),
-        kpi("오늘 매출", f"{x['last_day_revenue']:,}", "원", sub="시연 기준일 주문 합계"),
+        kpi("오늘 주문", today_orders, "건", accent=True),
+        kpi("평균 주문금액", f"{today_average:,}" if today_orders else "-", "원" if today_orders else ""),
+        kpi("오늘 매출", f"{x.get('today_revenue', x['last_day_revenue']):,}", "원", sub="오늘 주문 합계"),
         kpi("마지막 영업일 매출", f"{x['last_day_revenue']:,}", "원", sub=delta_text(x["last_day_change"], "지난주 같은 요일"), sub_change=x["last_day_change"]),
         kpi("최근 매출 (7일)", f"{x['week_revenue']:,}", "원", sub=delta_text(x["week_change"], "지난 7일"), sub_change=x["week_change"]),
         kpi("최근 매출 (30일)", f"{x['revenue']:,}", "원", sub=f"하루 평균 {x['daily_revenue']:,}원"),
@@ -137,8 +140,7 @@ def _render_dashboard(repo, sub):
     x = repo.sales_insights(ss["grade_rule"])
     page_head("대시보드", "오늘 매장 현황을 한눈에 확인하세요")
     if not x["empty"] and x.get("last_order_date"):
-        # 화면의 오늘 주문·매출도 준비된 시연 데이터의 날짜를 기준으로 안내한다.
-        st.caption(f"시연 기준일은 마지막 주문일 {x['last_order_date']}이며, 주문·매출 카드와 최근 30일 통계에 같은 기준을 사용해요.")
+        st.caption(f"마지막 주문일: {x['last_order_date']} · 최근 기간 분석은 이 날짜를 기준으로 계산해요.")
     st.button("🔄 최신 주문 반영", key="dashboard_refresh", help="현재까지 들어온 주문으로 대시보드 전체를 다시 계산해요")
     if sub == "한눈에 보기":
         render_today_sales(s, x)

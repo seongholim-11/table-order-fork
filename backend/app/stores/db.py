@@ -8,6 +8,7 @@ import json
 import re
 import sqlite3
 import threading
+from contextlib import contextmanager
 from datetime import date, datetime, timezone
 
 SERIAL_TABLES = {"members", "orders", "order_items", "order_item_components", "staff_calls", "recommendation_events", "sms_logs", "coupons",
@@ -107,6 +108,21 @@ class Database:
             try:
                 for sql, params in statements:
                     self._conn.execute(sql, params)
+                self._conn.commit()
+            except Exception:
+                self._conn.rollback()
+                raise
+
+    @contextmanager
+    def transaction(self):
+        """저장소가 여러 INSERT를 하나의 트랜잭션으로 실행할 때 쓰는 문맥 관리자."""
+        with self._lock:
+            if self.pg:
+                with self._conn.transaction():
+                    yield
+                return
+            try:
+                yield
                 self._conn.commit()
             except Exception:
                 self._conn.rollback()

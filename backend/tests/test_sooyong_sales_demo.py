@@ -19,18 +19,20 @@ def _empty_menus(client):
 TODAY = date(2026, 10, 17)
 
 
-def prepare_menu(db):
-    """안주·주류·음료에 주문을 나눌 수 있도록 실제 단가를 가진 메뉴들을 준비한다."""
+pytestmark = pytest.mark.usefixtures("empty_menu_catalog")
+
+
+def prepare_menu(client):
+    """안주·주류·음료에 주문을 나눌 테스트 메뉴를 준비한다."""
     for menu_id, category, price in (("fish", "anju", 14000), ("egg", "anju", 16000),
                                       ("soup", "soup", 12000), ("beer", "beer", 5000),
                                       ("soju", "soju", 5000), ("cola", "drink", 3000)):
-        db.run("INSERT INTO menus (id, category_id, name, price) VALUES (?, ?, ?, ?)",
-               (menu_id, category, menu_id, price))
+        client.app.state.shop.save_menu(menu_id, {"cat": category, "name": menu_id, "price": price})
 
 
 def test_preview_apply_and_repeat_match_actual_api(client):
     db = client.app.state.db
-    prepare_menu(db)
+    prepare_menu(client)
     for stamp, total in (("2026-10-17T10:00:00+09:00", 40000),
                          ("2026-10-10T10:00:00+09:00", 80000),
                          ("2026-10-09T10:00:00+09:00", 100000)):
@@ -64,7 +66,7 @@ def test_preview_apply_and_repeat_match_actual_api(client):
 @pytest.mark.parametrize("has_latest_order", [False, True])
 def test_missing_comparison_day_stops_without_inventing_reference_orders(client, has_latest_order):
     db = client.app.state.db
-    prepare_menu(db)
+    prepare_menu(client)
     if has_latest_order:
         db.run("INSERT INTO orders (table_no, total, created_at) VALUES (?, ?, ?)",
                (1, 10000, "2026-10-17T00:30:00+09:00"))
@@ -78,7 +80,7 @@ def test_missing_comparison_day_stops_without_inventing_reference_orders(client,
 
 def test_item_failure_rolls_back_all_demo_orders(client, monkeypatch):
     db = client.app.state.db
-    prepare_menu(db)
+    prepare_menu(client)
     for stamp, total in (("2026-10-10T18:00:00+09:00", 80000), ("2026-10-09T18:00:00+09:00", 100000)):
         db.run("INSERT INTO orders (table_no, total, created_at) VALUES (?, ?, ?)", (1, total, stamp))
     legacy = db.run("INSERT INTO orders (table_no, total, created_at) VALUES (?, ?, ?)",
@@ -104,7 +106,7 @@ def test_item_failure_rolls_back_all_demo_orders(client, monkeypatch):
 
 def test_postgres_datetime_values_use_the_same_kst_day(client, monkeypatch):
     db = client.app.state.db
-    prepare_menu(db)
+    prepare_menu(client)
     execute = db._execute
 
     def postgres_timestamps(sql, params=()):
@@ -127,7 +129,7 @@ def test_postgres_datetime_values_use_the_same_kst_day(client, monkeypatch):
 
 def test_legacy_replacement_distributes_menus_and_keeps_weights(client):
     db = client.app.state.db
-    prepare_menu(db)
+    prepare_menu(client)
     for stamp, total in (("2026-10-10T18:00:00+09:00", 500000), ("2026-10-09T18:00:00+09:00", 600000)):
         db.run("INSERT INTO orders (table_no, total, created_at) VALUES (?, ?, ?)", (1, total, stamp))
     original = db.all("SELECT * FROM orders ORDER BY id")
@@ -151,7 +153,7 @@ def test_legacy_replacement_distributes_menus_and_keeps_weights(client):
 
 def test_changed_demo_is_not_deleted(client):
     db = client.app.state.db
-    prepare_menu(db)
+    prepare_menu(client)
     order = db.run("INSERT INTO orders (table_no, total, created_at) VALUES (?, ?, ?)",
                    (1, 14000, "2026-10-17T12:00:00+09:00"))
     db.run("INSERT INTO order_items (order_id, menu_id, name, qty, unit_price, option_label) VALUES (?, ?, ?, ?, ?, ?)",
@@ -165,7 +167,7 @@ def test_changed_demo_is_not_deleted(client):
 def prepare_table_orders(client):
     """매출과 메뉴 수량을 바꾸지 않고 나눌 수 있는 기존 시연 주문 20건을 만든다."""
     db = client.app.state.db
-    prepare_menu(db)
+    prepare_menu(client)
     db.run("INSERT INTO orders (table_no, total, created_at) VALUES (?, ?, ?)",
            (4, 100000, "2026-10-10T18:00:00+09:00"))
     for index in range(20):
