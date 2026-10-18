@@ -99,7 +99,7 @@ def test_content_endpoints_match_frontend_dummy_shape(client):
     assert content["categories"] == menu_data.CATEGORIES
     prizes = client.get("/api/v1/roulette/prizes").json()
     assert [{k: v for k, v in prize.items() if k != "weight"} for prize in prizes] == menu_data.ROULETTE_PRIZES
-    assert all(prize["weight"] == 1 for prize in prizes)
+    assert [prize["weight"] for prize in prizes] == [50, 10, 10, 10, 10, 10]
     assert content["staff_calls"] == menu_data.STAFF_CALLS
     assert content["quiz_questions"] == ai_quiz_data.QUESTIONS and content["weather"] == ai_quiz_data.WEATHER
     assert content["rules"] == recommendation_data.RULES

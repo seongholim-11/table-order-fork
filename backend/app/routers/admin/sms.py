@@ -37,6 +37,12 @@ async def sms_usage(request: Request):
     return _sms(request).usage()
 
 
+@router.get("/marketing/sms/balance")
+def sms_balance(request: Request):
+    """솔라피 충전 잔액·포인트. 외부 호출이 있어 동기 함수로 둔다."""
+    return _sms(request).balance()
+
+
 @router.post("/marketing/sms/preview")
 async def sms_preview(body: SmsIn, request: Request):
     _check_grades(body.grades)

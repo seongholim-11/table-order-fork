@@ -47,7 +47,7 @@ MENUS = [
 ]
 
 # 손님 화면과 같은 룰렛 칸에 관리자용 확률 가중치(weight)를 더한다.
-ROULETTE_PRIZES = [{**p, "weight": 1} for p in menu_data.ROULETTE_PRIZES]
+ROULETTE_PRIZES = [{**p, "weight": 50 if i == 0 else 10} for i, p in enumerate(menu_data.ROULETTE_PRIZES)]
 
 
 class Unsupported(Exception):
@@ -98,9 +98,11 @@ class DummyBackend:
             # 실제 매장처럼 로그인한 회원 주문과 로그인하지 않은 비회원 주문을 함께 만든다.
             # 고정 시드를 쓰므로 화면과 테스트에서는 매번 같은 약 75%의 회원 주문 비율이 나온다.
             member_id = r.choice(self.members_)["id"] if r.random() < 0.75 else None
+            # 성과 화면에서 도입 전후를 비교할 수 있도록 더미 AI 마케팅은 최근 14일부터 시작한 것으로 둔다.
+            ai_adopted = day >= TODAY - timedelta(days=14)
             self.orders_.append({"id": i, "ts": _iso(ts), "table_no": r.randint(1, 30), "member_id": member_id,
                                  "lines": lines, "total": sum(l["unit"] * l["qty"] for l in lines),
-                                 "ai_combo": r.random() < 0.45,
+                                 "ai_combo": ai_adopted and r.random() < 0.45,
                                  "roulette_discount_percent": 0, "recommendation_event_id": None})
         self.orders_.sort(key=lambda o: o["ts"], reverse=True)
         # 직원 호출 화면을 서버 없이 먼저 확인할 수 있도록 대기/완료 호출을 함께 준비한다.
@@ -213,6 +215,17 @@ class DummyBackend:
                 "popular_menus": [{"name": n, "qty": q} for n, q in sorted(counts.items(), key=lambda kv: -kv[1])[:10]],
                 "ai": {"recommendations": shown, "ai_orders": ai, "hit_rate": round(ai / shown, 3),
                        "definition": "AI 조합이 포함된 주문 수 / 추천이 노출된 횟수 (임시 기준)"}}
+
+    def opportunities(self, round_no: int = 0) -> dict:
+        """서버가 없어도 기존 화면 규칙으로 같은 추천 응답 모양을 만든다."""
+        # 실행 시점에 가져와 admin_repository와의 순환 import를 피한다.
+        from admin.marketing.context import build_marketing_context
+        from admin.marketing.recommendations import pick_recommendations, recommend
+        from admin_repository import AdminRepository
+
+        cards, page, pages = pick_recommendations(
+            recommend(build_marketing_context(AdminRepository(self), self.customer_grade_rules())), round_no)
+        return {"items": cards, "page": page, "pages": pages}
 
     # ---- 문자 발송: 서버 SmsService 와 같은 규칙·같은 JSON 으로 흉내만 낸다 (실제 전송 없음) ----------------------
     SMS_LIMIT = {"SMS": 100, "LMS": 20}

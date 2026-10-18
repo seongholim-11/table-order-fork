@@ -21,7 +21,7 @@
 | 0 | 0. 개발 흐름 확인 (테스트 버튼) | `POST /api/dev/db-test` (개발 전용) | 확인 전 |
 | 1 | 1. QR 로그인 · 2. 문자 발송 점검 | 구현됨 | 새 코드 없이 동작 확인만 |
 | 2 | 3. AI 문자 후보 · 외부 정보(날씨·행사) | 완료 | 날씨는 `B/services/external_info.py`(Open-Meteo)에서 직접 가져옴. 재현의 `weather.py`가 생기면 그쪽으로 바꿀 수 있음 |
-| 3 | 4. AI 챗봇 | 미구현 | 수용의 `B/services/stats.py`를 호출해 매출을 답함 |
+| 3 | 4. AI 챗봇 | 완료 | 기간별 매출·인기 메뉴·회원 수를 서버가 계산해 프롬프트에 붙여 제미나이가 답함(MCP·RAG 없음). 실제 Supabase에서는 `CHAT_OWNER_ID` 필요 |
 | 4 | 5. 관리자 로그인 | 미구현 | **모든 개발이 끝난 뒤 마지막에** (AGENTS.md 규칙) |
 | 선작업 | `B/dummy/`·`B/routers/` 분리 PR | 완료(PR 머지 후 시작) | `dummy.py`는 `B/dummy/*_data.py`로, `user.py`는 기능별 라우터로 나뉨. 마케팅 화면(`marketing*.py`)과 `admin_repository.py` 분리는 하지 않음 |
 
@@ -173,7 +173,7 @@ UI(AI 문구 생성 버튼) → A/views/marketing.py make_ai_candidates → repo
 
 ---
 
-## 4. AI 챗봇 (미구현)
+## 4. AI 챗봇
 
 ### 4-1. `POST·GET /api/admin/marketing/chat/sessions` · `GET·DELETE …/sessions/{sessionId}` · `POST …/sessions/{sessionId}/messages`
 
@@ -210,19 +210,19 @@ UI(챗봇 탭 · 질문 입력) → A/views/marketing.py marketing_chatbot_tab �
 
 **상세 설명 / TODO**
 
-- [ ] `B/core/settings.py`에 `gemini_api_key`와 `chat_owner_id`(임시 owner uuid) 추가, `backend/.env.example`에 `GEMINI_API_KEY=`, `CHAT_OWNER_ID=` 두 줄 추가.
-- [ ] `B/stores/chat.py`(신규): `create_session`, `list_sessions`, `get_session(메시지 포함)`, `add_message`, `delete_session`. 테이블은 `chat_sessions`, `chat_messages`.
-- [ ] **임시 owner (결정됨)**: `chat_sessions.owner_id`는 `auth.users`를 참조하는 NOT NULL이고 관리자 인증은 마지막(5번)에 하므로, 개발 중에는 Supabase `auth.users`에 이미 있는 계정 1개의 uuid를 `CHAT_OWNER_ID` 환경변수로 받아 모든 세션의 owner로 쓴다.
+- [x] `B/core/settings.py`에 `gemini_api_key`와 `chat_owner_id`(임시 owner uuid) 추가, `backend/.env.example`에 `GEMINI_API_KEY=`, `CHAT_OWNER_ID=` 두 줄 추가.
+- [x] `B/stores/chat.py`(신규): `create_session`, `list_sessions`, `get_session(메시지 포함)`, `add_message`, `delete_session`. 테이블은 `chat_sessions`, `chat_messages`.
+- [x] **임시 owner (결정됨)**: `chat_sessions.owner_id`는 `auth.users`를 참조하는 NOT NULL이고 관리자 인증은 마지막(5번)에 하므로, 개발 중에는 Supabase `auth.users`에 이미 있는 계정 1개의 uuid를 `CHAT_OWNER_ID` 환경변수로 받아 모든 세션의 owner로 쓴다.
   - uuid는 Supabase 대시보드 Authentication > Users에서 복사해 각자 `backend/.env`에만 넣는다(코드·커밋·화면·로그에 쓰지 않는다. DB 스키마는 바꾸지 않는다).
   - `B/stores/chat.py`의 `create_session`이 `settings.chat_owner_id`를 `owner_id`로 넣는다. 값이 비어 있으면 세션 생성은 "CHAT_OWNER_ID 설정이 필요합니다"라는 오류로 돌려주고 500을 내지 않는다.
   - 로컬 SQLite로 개발할 때는 `auth.users` FK가 없으므로 아무 uuid 문자열이어도 동작한다. Supabase에서는 실제 존재하는 uuid여야 한다.
   - `chat_sessions.id`는 uuid라 `SERIAL_TABLES`에 없다. `uuid.uuid4()`로 코드에서 만들어 넣고 그 값을 반환한다(`chat_messages`는 이미 `SERIAL_TABLES`에 들어 있음).
   - 5번(관리자 로그인)을 할 때 `require_admin`이 돌려주는 사용자 id로 교체하고 `CHAT_OWNER_ID`는 제거한다.
-- [ ] `B/routers/admin/chat.py`(신규) 5개 엔드포인트. 없는 세션이면 404.
-- [ ] `B/services/chat.py`(신규): 오늘 매출 등은 `B/services/stats.py`(수용)의 함수를 **호출만** 한다. 수용이 구현하기 전에는 주문 합계를 직접 간단히 계산하지 말고, 해당 요약 항목은 "아직 집계 전"으로 두고 진행한다.
-- [ ] 제미나이 호출은 `httpx`(이미 사용 중)로 하고 타임아웃(15초)과 예외 처리를 넣는다. 실패 시 "답변을 만들지 못했어요" 메시지를 저장하지 말고 오류로 돌려준다.
-- [ ] `A/views/marketing.py`의 `marketing_chatbot_tab`만 수정한다(같은 파일의 AI 추천 탭은 석원 담당). `A/admin_repository.py`의 `ApiBackend`에는 `chat_*` 메서드를 본인 구역에 추가.
-- [ ] 완료 후: 규칙 기반 `RuleBasedClient`는 `DATA_SOURCE=dummy` 대체용으로 남겨 둔다.
+- [x] `B/routers/admin/chat.py`(신규) 5개 엔드포인트. 없는 세션이면 404.
+- [x] `B/services/chat.py`(신규): 오늘 매출 등은 `B/services/stats.py`(수용)의 함수를 **호출만** 한다. 수용이 구현하기 전에는 주문 합계를 직접 간단히 계산하지 말고, 해당 요약 항목은 "아직 집계 전"으로 두고 진행한다.
+- [x] 제미나이 호출은 `httpx`(이미 사용 중)로 하고 타임아웃(15초)과 예외 처리를 넣는다. 실패 시 "답변을 만들지 못했어요" 메시지를 저장하지 말고 오류로 돌려준다.
+- [x] `A/views/marketing.py`의 `marketing_chatbot_tab`만 수정한다(같은 파일의 AI 추천 탭은 석원 담당). `A/admin_repository.py`의 `ApiBackend`에는 `chat_*` 메서드를 본인 구역에 추가.
+- [x] 완료 후: 규칙 기반 `RuleBasedClient`는 `DATA_SOURCE=dummy` 대체용으로 남겨 둔다.
 
 ---
 

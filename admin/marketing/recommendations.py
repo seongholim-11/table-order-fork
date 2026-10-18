@@ -44,6 +44,12 @@ def recommend(ctx: dict) -> list[dict]:
                       "why": f"주문 수량 {quantity}개로 1위예요. 사진과 문구로 먼저 보이게 하면 객단가가 올라가요.",
                       "action": f"‘{name}’을 세트 구성에 넣거나 추천 가중치를 올려 보세요."})
 
+    if menus["high_weight"]:
+        name = menus["high_weight"][0]
+        cards.append({"title": f"추천 메뉴 ‘{name}’ 집중 노출",
+                      "why": "현재 추천 가중치가 가장 높은 메뉴예요. 실제 주문 반응과 함께 확인할 수 있어요.",
+                      "action": "AI 추천 영역의 노출과 주문 반응을 확인하고 가중치를 조정해 보세요."})
+
     if menus["unsold"]:
         names = ", ".join(menus["unsold"][:3])
         cards.append({"title": "안 팔리는 메뉴 살리기",

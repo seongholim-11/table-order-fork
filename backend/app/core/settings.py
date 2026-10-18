@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     # AI 문자 후보 · 외부 정보 (docs/todo/TODO_성호.md 3번)
     gemini_api_key: str = ""  # 비어 있으면 AI 대신 템플릿 문구를 쓴다
     gemini_model: str = "gemini-2.5-flash"
+    # AI 챗봇 (docs/todo/TODO_성호.md 4번). 관리자 인증 전까지 모든 대화방의 주인(auth.users 의 uuid)으로 쓴다
+    chat_owner_id: str = ""
     seoul_openapi_key: str = ""  # 서울 열린데이터광장 인증키. 비어 있으면 행사 문구는 비워 둔다
     store_gu: str = "마포구"  # 행사를 찾을 자치구 (매장 위치)
     store_lat: float = 37.5563  # 날씨를 조회할 매장 위치 (홍대)

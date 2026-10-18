@@ -5,6 +5,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT), str(ROOT / "admin")]
 
+import copy
+
 import pytest
 from streamlit.testing.v1 import AppTest
 
@@ -73,7 +75,7 @@ def test_switching_tab_updates_url():
 
 def test_sidebar_sub_menus_are_collapsible_and_select_tabs():
     app = open_marketing("AI 추천")
-    assert app.sidebar.radio(key="nav_sub_마케팅").options == ["AI 챗봇", "AI 추천", "AI 문자"]
+    assert app.sidebar.radio(key="nav_sub_마케팅").options == ["AI 챗봇", "AI 추천", "AI 문자", "F&B그로스 성과"]
     assert app.sidebar.radio(key="nav_sub_주문 이력").options == ["전체 주문", "고객별 주문"]
     assert [e.label for e in app.sidebar.expander] == ["📊 대시보드", "👥 고객 등급", "🧾 주문 이력", "💬 마케팅"]
     assert [e.proto.expanded for e in app.sidebar.expander] == [False, False, False, True]  # 선택된 묶음만 펼쳐서 시작
@@ -184,3 +186,57 @@ def test_ai_candidates_error_is_shown_instead_of_crashing():
     marketing.ss["ai_candidates"] = ["old"]
     marketing.make_ai_candidates(BrokenRepo())
     assert marketing.ss["ai_candidates"] == [] and marketing.ss["ai_picked"] is None
+
+
+class FakeChatServer:
+    """서버 챗봇 API 흉내: 대화방을 메모리에 저장한다. (DummyBackend 를 서버 연결 상태로 속이는 데 쓴다)"""
+    def __init__(self):
+        self.sessions = {}
+
+    def chat_create(self):
+        sid = f"s{len(self.sessions) + 1}"
+        self.sessions[sid] = {"id": sid, "title": "새 대화", "updated_at": f"2026-10-18T0{len(self.sessions)}:00:00+00:00",
+                              "messages": [{"role": "assistant", "content": "인사"}]}
+        return copy.deepcopy(self.sessions[sid])  # 실제 서버처럼 JSON 사본을 돌려준다(화면 상태와 같은 리스트를 공유하지 않게)
+
+    def chat_sessions(self):
+        return sorted(copy.deepcopy(list(self.sessions.values())), key=lambda s: s["updated_at"], reverse=True)
+
+    def chat_get(self, sid):
+        return copy.deepcopy(self.sessions[sid])
+
+    def chat_send(self, sid, content):
+        s = self.sessions[sid]
+        new = [{"role": "user", "content": content}, {"role": "assistant", "content": f"답:{content}"}]
+        s["messages"] += new
+        s["title"] = content if s["title"] == "새 대화" else s["title"]
+        return new
+
+
+def test_server_chat_new_button_creates_room_and_list_switches(monkeypatch):
+    import admin_dummy_data
+    server = FakeChatServer()
+    monkeypatch.setattr(admin_dummy_data.DummyBackend, "source", "api", raising=False)
+    for name in ("chat_create", "chat_sessions", "chat_get", "chat_send"):
+        monkeypatch.setattr(admin_dummy_data.DummyBackend, name, lambda self, *a, _n=name: getattr(server, _n)(*a),
+                            raising=False)
+    app = open_marketing()
+    assert not app.exception
+    assert len(server.sessions) == 1  # 처음 들어오면 대화방 1개가 만들어진다
+    # 첫 질문을 하면 그 방 제목이 질문으로 바뀌고 목록에 보인다
+    app.chat_input[0].set_value("저번주 매출").run()
+    assert [m.markdown[0].value for m in app.chat_message] == ["인사", "저번주 매출", "답:저번주 매출"]
+    # 새 대화 버튼: 새 대화방이 열리고(빈 화면) 목록에 추가된다
+    new = next(b for b in app.button if b.key == "mk_chat_new")
+    new.click().run()
+    assert len(server.sessions) == 2
+    assert [m.markdown[0].value for m in app.chat_message] == ["인사"]
+    assert len(app.selectbox[0].options) == 2
+    # 빈 새 대화에서 또 누르면 빈 방이 더 만들어지지 않는다
+    next(b for b in app.button if b.key == "mk_chat_new").click().run()
+    assert len(server.sessions) == 2
+    # 목록에서 이전 대화를 고르면 그 대화가 열려 이어서 질문할 수 있다
+    app.selectbox[0].select("s1").run()
+    assert [m.markdown[0].value for m in app.chat_message] == ["인사", "저번주 매출", "답:저번주 매출"]
+    app.chat_input[0].set_value("그 전주는?").run()
+    assert server.sessions["s1"]["messages"][-1]["content"] == "답:그 전주는?"

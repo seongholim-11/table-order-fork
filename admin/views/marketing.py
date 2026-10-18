@@ -12,6 +12,7 @@ from admin.marketing.config import RECOMMENDATION_PAGE_SIZE
 from admin.marketing.recommendations import pick_recommendations as pick_recommendation_page
 from admin.marketing.recommendations import regular_preference_cards, regular_preference_preview_cards
 from admin.ui.widgets import kpi, page_head, sec_title
+from admin.views.growth_performance import page_growth_performance
 from admin_dummy_data import Unsupported
 from admin_repository import GRADES
 
@@ -65,13 +66,10 @@ def recipient_editor(pool, grades):
     return [int(i) for i in edited.loc[edited["발송"], "customer_id"]]
 
 
-def usage_card(label, used, limit):
-    pct = min(100, used / limit * 100) if limit else 0
-    tone = " hot" if pct >= 90 else ""
+def usage_card(label, used):
+    """이번 달 발송 건수만 보여 주는 카드 (한도·사용률은 표시하지 않는다)."""
     return (f'<div class="kpi"><div class="k">{escape(label)}</div>'
-            f'<div class="v">{used}<small>/ {limit}건</small></div>'
-            f'<div class="meter{tone}"><i style="width:{pct:.0f}%"></i></div>'
-            f'<div class="s">이번 달 무료 한도의 {pct:.0f}% 사용</div></div>')
+            f'<div class="v">{used}<small>건</small></div></div>')
 
 
 def phone_preview(plan, body_empty):
@@ -125,9 +123,16 @@ def marketing_dashboard(repo):
         return
     members = repo.members(ss["grade_rule"])
     pool = members[members["마케팅 수신 동의"] & ~members["수신거부"]]
+    # 솔라피 충전 잔액: 조회가 안 되면(키 없음·오류) 이유를 카드에 보여 준다. 더미 모드에는 없으므로 건너뛴다.
+    try:
+        bal = repo.sms_balance()
+    except (Unsupported, AttributeError, repo_mod.api.ApiError, repo_mod.api.ApiUnavailable):
+        bal = {"available": False, "reason": "서버에 연결되지 않았습니다."}
     st.html('<div class="kpis">'
-            + usage_card("이번 달 SMS", usage["used"]["SMS"], usage["limit"]["SMS"])
-            + usage_card("이번 달 LMS", usage["used"]["LMS"], usage["limit"]["LMS"])
+            + usage_card("이번 달 SMS", usage["used"]["SMS"])
+            + usage_card("이번 달 LMS", usage["used"]["LMS"])
+            + (kpi("솔라피 잔액", f'{int(bal["balance"]):,}', "원", sub=f'포인트 {int(bal["point"]):,}원')
+               if bal.get("available") else kpi("솔라피 잔액", "-", "", sub=bal.get("reason", "조회할 수 없습니다.")))
             + kpi("발송 가능 고객", len(pool), "명", sub=f"전체 회원 {len(members)}명 중 수신 동의", accent=True)
             + kpi("수신거부", int(members["수신거부"].sum()), "명", sub="발송 대상에서 자동 제외") + "</div>")
     # 한 화면에 들어오도록 작성 / 발송 내역 / 수신거부·안내를 탭으로 나눈다.
@@ -268,7 +273,15 @@ def marketing_recommend_tab(repo):
     c2.metric("문자 발송 가능", f"{consumers['sendable']:,}명")
     c3.metric("누적 매출", f"{orders['revenue']:,}원")
     c4.metric("평균 주문금액", f"{orders['avg']:,}원")
-    recs, page, pages = pick_recommendations(marketing_ai.recommend(ctx), ss.get("mk_rec_round", 0))
+    round_no = ss.get("mk_rec_round", 0)
+    try:
+        # API 모드에서는 서버가 DB를 읽어 계산하고, 더미 모드는 같은 응답 모양의 로컬 규칙을 사용한다.
+        result = repo.opportunities(round_no)
+        recs, page, pages = result["items"], result["page"], result["pages"]
+    except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable):
+        # 추천 API만 일시적으로 실패해도 이미 읽은 화면 데이터로 기존 추천을 계속 보여 준다.
+        st.info("서버 추천을 불러오지 못해 현재 화면 데이터로 추천했어요.")
+        recs, page, pages = pick_recommendations(marketing_ai.recommend(ctx), round_no)
     cards = "".join(f'<div class="rec"><div class="rt">{i}. {escape(r["title"])}</div>'
                     f'<div class="rw">{escape(r["why"])}</div><div class="ra">👉 {escape(r["action"])}</div></div>'
                     for i, r in enumerate(recs, 1))
@@ -282,16 +295,80 @@ def marketing_recommend_tab(repo):
     _render_regular_preferences(repo)
 
 
+def _open_chat(session: dict) -> None:
+    """서버가 준 대화방 한 개를 화면 상태에 올린다. 목록 선택 상자도 같은 대화로 맞춘다."""
+    ss["mk_chat_sid"], ss["mk_chat"], ss["mk_chat_pick"] = session["id"], session["messages"], session["id"]
+
+
+def _server_chat(repo) -> list[dict]:
+    """서버 챗봇 대화를 불러온다. 브라우저를 새로고침해도 서버(DB)에 저장된 가장 최근 대화를 이어서 보여 준다."""
+    if "mk_chat_sid" not in ss:
+        sessions = repo.chat_sessions()
+        _open_chat(repo.chat_get(sessions[0]["id"]) if sessions else repo.chat_create())
+    return ss["mk_chat"]
+
+
+def _new_chat(repo) -> None:
+    """[새 대화] 버튼: 새 대화방을 만들어 바로 열고 목록에 추가한다. 지금 대화가 비어 있으면 새로 만들지 않는다."""
+    if len(ss.get("mk_chat", [])) <= 1:  # 인사 메시지뿐이면 이미 새 대화다 (빈 대화방이 목록에 쌓이지 않게)
+        st.toast("이미 새 대화예요. 질문을 입력해 보세요.", icon="🆕")
+        return
+    try:
+        _open_chat(repo.chat_create())
+    except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable) as e:  # 콜백에서 예외가 나면 화면이 멈추므로 토스트로 알린다
+        st.toast(f"새 대화를 만들지 못했어요: {e}", icon="⚠️")
+
+
+def _switch_chat(repo) -> None:
+    """대화 목록에서 고른 이전 대화를 불러와 이어서 질문할 수 있게 한다."""
+    try:
+        _open_chat(repo.chat_get(ss["mk_chat_pick"]))
+    except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable) as e:
+        st.toast(f"대화를 불러오지 못했어요: {e}", icon="⚠️")
+
+
+def _chat_label(session: dict) -> str:
+    """목록에 보일 이름: 제목 + 마지막 대화 시각(한국 시간)."""
+    when = datetime.fromisoformat(session["updated_at"]).astimezone(timezone(timedelta(hours=9)))
+    return f"{session['title']} · {when:%m/%d %H:%M}"
+
+
 def marketing_chatbot_tab(repo):
-    ctx = marketing_ai.build_context(repo, ss["grade_rule"])
     sec_title("AI 챗봇", "궁금한 점을 물어보세요")
-    st.caption("🧪 지금은 규칙 기반 모의 응답이에요. 실제 AI(Claude API) 연동 지점은 `marketing_ai.py` 에 분리돼 있어요.")
-    chat = ss.setdefault("mk_chat", [{"role": "assistant", "content": marketing_ai.GREETING}])
+    server = repo.source == "api"
+    chat = None
+    if server:
+        try:
+            chat = _server_chat(repo)
+            sessions = repo.chat_sessions()
+        except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable) as e:
+            st.warning(f"서버 챗봇을 쓸 수 없어 모의 응답으로 대신해요: {e}")
+            server = False
+    if server:
+        st.caption("대화는 서버에 저장돼요. 목록에서 이전 대화를 골라 이어서 질문할 수 있어요.")
+        labels = {s["id"]: _chat_label(s) for s in sessions}
+        if ss["mk_chat_sid"] not in labels:  # 방금 만든 대화가 목록 조회보다 늦게 반영돼도 목록에 보이게 한다
+            labels = {ss["mk_chat_sid"]: "새 대화", **labels}
+        c_list, c_new = st.columns([4, 1], vertical_alignment="bottom")
+        c_list.selectbox("대화 목록", list(labels), format_func=labels.get, key="mk_chat_pick",
+                         on_change=_switch_chat, args=(repo,))
+        c_new.button("🆕 새 대화", key="mk_chat_new", on_click=_new_chat, args=(repo,), width="stretch")
+    else:
+        st.caption("🧪 서버에 연결되지 않아 규칙 기반 모의 응답이에요.")
+        chat = ss.setdefault("mk_chat_mock", [{"role": "assistant", "content": marketing_ai.GREETING}])
     # chat_input 을 컨테이너 안에 두면 화면 맨 아래에 고정되지 않고 패널 안에 놓인다(탭 전환 때 스크롤이 튀지 않는다).
     with st.container(border=True, key="mk_chat_panel"):
         box = st.container(height=380, border=False)
-        prompt = st.chat_input("예) 휴면 고객을 어떻게 다시 오게 할까?", key="mk_chat_input")
-        if prompt:
+        prompt = st.chat_input("예) 저번주 총 매출 알려줘", key="mk_chat_input")
+        if prompt and server:
+            try:
+                with st.spinner("답변을 만드는 중이에요..."):
+                    chat.extend(repo.chat_send(ss["mk_chat_sid"], prompt))
+                st.rerun()  # 첫 질문이면 대화방 제목이 바뀌므로 목록을 다시 불러온다 (ss 에 답변은 이미 들어 있다)
+            except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable) as e:
+                st.toast(f"답변을 받지 못했어요: {e}", icon="⚠️")
+        elif prompt:
+            ctx = marketing_ai.build_context(repo, ss["grade_rule"])
             chat.append({"role": "user", "content": prompt})
             chat.append({"role": "assistant", "content": marketing_ai.get_client().reply(prompt, ctx, chat[:-1])})
         for msg in chat:
@@ -299,6 +376,9 @@ def marketing_chatbot_tab(repo):
 
 
 def page_marketing(repo, tab="AI 챗봇"):
-    """AI 챗봇 / AI 추천 / AI 문자 탭은 사이드바 하위 메뉴에서 고른다 (admin/app.py 의 SUBPAGES)."""
+    """마케팅 기능은 사이드바 하위 메뉴에서 고른다 (admin/app.py 의 SUBPAGES)."""
+    if tab == "F&B그로스 성과":
+        page_growth_performance(repo)
+        return
     page_head("마케팅", "수신 동의한 회원에게 문자를 보내 재방문을 이끌어요")
     {"AI 챗봇": marketing_chatbot_tab, "AI 추천": marketing_recommend_tab, "AI 문자": marketing_dashboard}[tab](repo)

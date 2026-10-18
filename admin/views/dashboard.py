@@ -13,9 +13,9 @@ def _render_panel_grid(*cards):
     st.html('<div class="dashboard-panels">' + "".join(cards) + '</div>')
 
 
-def render_sales_insights(s, x):
+def render_sales_insights(s, x, title="매출", subtitle="오늘 · 최근 7일 · 최근 30일을 한 번에 비교해요"):
     """주문·매출 지표와 매출 그래프만 한 영역에 모아 보여 준다."""
-    sec_title("매출", "오늘 · 최근 7일 · 최근 30일을 한 번에 비교해요")
+    sec_title(title, subtitle)
     if x["empty"]:
         # 주문 목록이 비어 있어도 서버가 집계한 오늘 주문·평균 금액은 표시한다.
         kpi_row(kpi("오늘 주문", s["today_orders"], "건", accent=True),

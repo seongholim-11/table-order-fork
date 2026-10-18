@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS roulette_prizes (
 
 SEED_PATH = Path(__file__).resolve().parent.parent / "seed" / "roulette_prizes.json"
 MENU_SEED_PATH = Path(__file__).resolve().parent.parent / "seed" / "menu.json"
-SERVICE_MENU_IDS = {"a1", "a4", "a11", "d7", "d8"}
+SERVICE_MENU_IDS = {"a1", "a4", "a11", "d7", "d8", "d1", "j1", "b1"}
 
 
 class RoulettePrizeStore:
@@ -48,7 +48,7 @@ class RoulettePrizeStore:
 
     @staticmethod
     def _service_allowed(menu: dict) -> bool:
-        """사장님이 정한 다섯 가지 맛보기·간식 메뉴만 서비스 경품으로 허용한다."""
+        """사장님이 정한 맛보기·간식·음료 메뉴만 서비스 경품으로 허용한다."""
         return menu["id"] in SERVICE_MENU_IDS
 
     def service_menu_exists(self, menu_id: str) -> bool:

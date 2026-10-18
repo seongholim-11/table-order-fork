@@ -30,6 +30,16 @@ class StatsStore:
             "JOIN order_items i ON i.id=c.order_item_id JOIN orders o ON o.id=i.order_id "
             "WHERE i.kind='combo'")
 
+    def dated_menu_sales(self) -> list[dict]:
+        """메뉴별 판매 수량을 주문 시각(ts)과 함께 읽는다. 챗봇이 기간·메뉴별 판매량을 계산할 때 쓴다."""
+        # menu_sales 와 같은 규칙: 조합 줄은 빼고 구성 메뉴 수량(구성 수량 x 조합 수량)으로 센다.
+        return self.db.all(
+            "SELECT o.created_at AS ts, i.name, i.qty FROM order_items i JOIN orders o ON o.id=i.order_id "
+            "WHERE i.kind <> 'combo' UNION ALL "
+            "SELECT o.created_at AS ts, c.name, c.qty*i.qty AS qty FROM order_item_components c "
+            "JOIN order_items i ON i.id=c.order_item_id JOIN orders o ON o.id=i.order_id "
+            "WHERE i.kind='combo'")
+
     def orders(self) -> list[dict]:
         """주문 저장 담당 파일을 수정하지 않고 통계에 필요한 기록을 묶어 읽는다."""
         orders = self.db.all("SELECT id, member_id, total, ai_combo, created_at AS ts FROM orders ORDER BY id")

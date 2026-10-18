@@ -199,3 +199,21 @@ def test_member_ids_narrow_targets_but_never_widen():
         assert every["targets"] == 2
         r = c.post("/admin/api/marketing/sms/send", headers=ADMIN, json={**body(), "member_ids": ids[:1]})
         assert r.json()["count"] == 1
+
+
+def test_balance_unavailable_without_key_and_reads_solapi_when_configured():
+    # 키가 없으면 외부 호출 없이 available=False
+    with TestClient(create_app(settings(), sms_clock=at(14))) as c:
+        r = c.get("/admin/api/marketing/sms/balance", headers=ADMIN).json()
+        assert r["available"] is False
+
+    # 키가 있으면 솔라피 /cash/v1/balance 응답의 잔액·포인트를 그대로 돌려준다
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/cash/v1/balance"
+        return httpx.Response(200, json={"balance": 12300, "point": 500})
+
+    fake = httpx.Client(transport=httpx.MockTransport(handler))
+    cfg = settings(solapi_api_key="ak", solapi_api_secret="sk")
+    with TestClient(create_app(cfg, sms_clock=at(14), sms_http=fake)) as c:
+        r = c.get("/admin/api/marketing/sms/balance", headers=ADMIN).json()
+        assert r == {"available": True, "balance": 12300, "point": 500}

@@ -22,6 +22,7 @@ import order_filters  # noqa: E402
 from admin.marketing import recommendations as marketing_recommendations  # noqa: E402
 from admin.views import dashboard as dashboard_view  # noqa: E402
 from admin.views import marketing as marketing_view  # noqa: E402
+from admin.views import growth_performance as growth_performance_view  # noqa: E402
 from admin.views import customers as customers_view  # noqa: E402
 
 # 배포 서버가 재시작 없이 새 코드를 받으면 예전 모듈이 메모리에 남아 ImportError 가 난다.
@@ -40,7 +41,8 @@ def _reload_if_changed(*modules) -> None:
 
 
 # 추천 함수부터 화면 순서로 갱신해, 켜 둔 서버에서도 바뀐 단골 안내가 즉시 반영되게 한다.
-_reload_if_changed(admin_dummy_data, marketing_recommendations, marketing_ai, repo_mod, dashboard_view, marketing_view, customers_view)
+_reload_if_changed(admin_dummy_data, marketing_recommendations, marketing_ai, repo_mod, dashboard_view,
+                   growth_performance_view, marketing_view, customers_view)
 
 from admin.views.customers import page_customers  # noqa: E402
 from admin.views.calls import page_calls  # noqa: E402
@@ -61,7 +63,7 @@ SUBPAGES = {
     "대시보드": ["한눈에 보기", "오늘 · 매출", "매출 추이", "고객 분석", "메뉴"],
     "고객 등급": ["고객 목록", "등급 분류 기준"],
     "주문 이력": ["전체 주문", "고객별 주문"],
-    "마케팅": ["AI 챗봇", "AI 추천", "AI 문자"],
+    "마케팅": ["AI 챗봇", "AI 추천", "AI 문자", "F&B그로스 성과"],
 }
 SUBPAGE_ICON = {"대시보드": "📊", "고객 등급": "👥", "주문 이력": "🧾", "마케팅": "💬"}
 TOP_PAGES = ["직원 호출", "메뉴 관리", "추천 가중치", "이벤트"]

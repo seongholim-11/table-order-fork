@@ -46,27 +46,32 @@ def render_roulette_panel(repo):
     menu_names = [choice["label"] for choice in menu_choices]
     menu_emojis = {choice["label"]: choice["emoji"] for choice in menu_choices}
     st.html(f'<div class="mmenu-head"><b>🎰 행운의 룰렛</b><span>칸 {len(old)}개</span></div>')
-    c_edit, c_prev = st.columns([3, 2], gap="medium")
-    with c_edit:
-        sec_title("칸 구성과 당첨 확률", "손님이 로그인하면 회원당 1회 돌릴 수 있어요")
-        with st.container(key="events_table"):
-            edited = _roulette_editor(old, menu_names)
-        st.caption(f"칸은 {ROULETTE_MIN_SLOTS}~{ROULETTE_MAX_SLOTS}개. 메뉴와 종류는 한 번 눌러 목록에서 고를 수 있어요.")
+    # 편집 영역을 미리보기와 좌우로 나누면 선택 상자가 너무 좁아진다.
+    # 전체 너비로 옵션을 먼저 보여 주고 미리보기는 아래에 배치해 각 문구가 잘리지 않게 한다.
+    sec_title("칸 구성과 당첨 확률", "손님이 로그인하면 회원당 1회 돌릴 수 있어요")
+    with st.container(key="events_table"):
+        edited = _roulette_editor(old, menu_names)
+    st.caption(f"칸은 {ROULETTE_MIN_SLOTS}~{ROULETTE_MAX_SLOTS}개. 메뉴와 종류는 한 번 눌러 목록에서 고를 수 있어요.")
     new = edited.reset_index(drop=True)
     new["확률 가중치"] = pd.to_numeric(new["확률 가중치"], errors="coerce")
-    with c_prev:
-        sec_title("미리보기", "저장 전 표의 값 기준")
-        shown = new.dropna(subset=["확률 가중치"]).copy()
-        service_rows = shown["종류"] == ROULETTE_KINDS["free"]
-        shown["이모지"] = "🎟️"
-        shown.loc[service_rows, "이모지"] = shown.loc[service_rows, "서비스 메뉴"].map(menu_emojis).fillna("🍴")
-        shown["표시 문구"] = shown["할인율(%)"].map(lambda value: f"{int(value)}% 할인")
-        shown.loc[service_rows, "표시 문구"] = shown.loc[service_rows, "서비스 메뉴"].fillna("메뉴 선택").map(
-            lambda value: value.split("] ", 1)[-1])
-        if shown.empty:
-            st.caption("칸을 추가해 주세요.")
-        else:
-            st.html(wheel_preview(shown, repo.roulette_odds(shown)))
+    probability_total = int(new["확률 가중치"].fillna(0).sum())
+    if probability_total == 100:
+        st.success("확률 합계 100%")
+    else:
+        st.warning(f"확률 합계 {probability_total}% · 저장하려면 100%로 맞춰 주세요.")
+
+    sec_title("미리보기", "저장 전 선택값 기준")
+    shown = new.dropna(subset=["확률 가중치"]).copy()
+    service_rows = shown["종류"] == ROULETTE_KINDS["free"]
+    shown["이모지"] = "🎟️"
+    shown.loc[service_rows, "이모지"] = shown.loc[service_rows, "서비스 메뉴"].map(menu_emojis).fillna("🍴")
+    shown["표시 문구"] = shown["할인율(%)"].map(lambda value: f"{int(value)}% 할인")
+    shown.loc[service_rows, "표시 문구"] = shown.loc[service_rows, "서비스 메뉴"].fillna("메뉴 선택").map(
+        lambda value: value.split("] ", 1)[-1])
+    if shown.empty:
+        st.caption("칸을 추가해 주세요.")
+    else:
+        st.html(wheel_preview(shown, repo.roulette_odds(shown)))
     _roulette_buttons(repo, new)
 
 
@@ -81,7 +86,7 @@ def _roulette_editor(old, menu_names):
     for row in ss[draft_key]:
         row_id = row["_id"]
         with st.container(border=True):
-            menu_col, kind_col, rate_col, weight_col, color_col, delete_col = st.columns([2.5, 1, 1, 1, 1, .6])
+            menu_col, kind_col, rate_col, weight_col, color_col, delete_col = st.columns([3, 1.4, 1.4, 1.4, 1, 1.2])
             menu_index = menu_names.index(row["서비스 메뉴"]) if row.get("서비스 메뉴") in menu_names else None
             menu = menu_col.selectbox("서비스 메뉴", menu_names, index=menu_index, placeholder="메뉴 선택",
                                       key=f"roulette_menu_{row_id}")
@@ -119,8 +124,8 @@ def _roulette_editor(old, menu_names):
 
 
 def _roulette_buttons(repo, new):
-    # 현재는 DummyBackend에서 관리자 화면 세션에만 저장한다. 손님 Frontend와 공유하는 방식은
-    # 팀 협의 후 같은 repository 메서드의 실제 API 연결로 교체할 수 있도록 화면에서는 저장소만 호출한다.
+    # DummyBackend에서는 관리자 화면 세션에만 저장한다. 손님 Frontend에 자동 반영하는 시점·캐시 정책은
+    # 팀 협의 후 같은 repository 메서드의 실제 API 연결부에서 결정할 수 있도록 화면에서는 저장소만 호출한다.
     if st.button("저장하기", type="primary", key="roulette_save", use_container_width=True):
         try:
             repo.save_roulette(new)
@@ -131,7 +136,7 @@ def _roulette_buttons(repo, new):
         else:
             ss.pop(f"roulette_draft_{ss['roulette_editor_v']}", None)
             ss["roulette_editor_v"] += 1
-            st.toast("룰렛 설정을 저장했습니다. 손님 화면에는 잠시 뒤 반영돼요.", icon="✅")
+            st.toast("룰렛 더미 설정을 저장했습니다.", icon="✅")
             st.rerun()
 
 

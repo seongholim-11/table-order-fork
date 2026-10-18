@@ -80,6 +80,24 @@ class SmsService:
         return {"month": month, "used": used,
                 "limit": {"SMS": self.s.sms_monthly_limit, "LMS": self.s.lms_monthly_limit}}
 
+    def balance(self) -> dict:
+        """솔라피에 충전된 잔액(원)과 포인트를 조회한다. 키가 없거나 호출이 실패해도 화면이 깨지지 않게 available=False 로 돌려준다."""
+        s = self.s
+        if not (s.solapi_api_key and s.solapi_api_secret):
+            return {"available": False, "reason": "솔라피 API 키가 설정되지 않았습니다."}
+        date = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        headers = {"Authorization": solapi_auth(s.solapi_api_key, s.solapi_api_secret, date, uuid.uuid4().hex)}
+        try:
+            client = self.http or httpx.Client(timeout=10)
+            r = client.get(SOLAPI_BASE + "/cash/v1/balance", headers=headers)
+            if r.status_code >= 400:
+                raise RuntimeError(f"HTTP {r.status_code}")
+            data = r.json()
+            # 응답의 balance(잔액)·point(포인트)는 원 단위 금액이다.
+            return {"available": True, "balance": data.get("balance", 0), "point": data.get("point", 0)}
+        except Exception as e:  # 네트워크·인증 오류 모두 화면에는 이유만 전달
+            return {"available": False, "reason": f"잔액 조회 실패: {e}"[:200]}
+
     def preview(self, grades: list[str], body: str, scheduled_at: datetime | None = None,
                 member_ids: list[int] | None = None) -> dict:
         text = self.build(body)

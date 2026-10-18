@@ -241,10 +241,12 @@ button:focus-visible { outline: 3px solid rgba(232,89,12,.4) !important; outline
 
 /* 표는 화면 높이에서 위쪽 영역을 뺀 만큼만 쓰고(표는 height="stretch"), 넘치면 표 안에서 스크롤한다 */
 @media (min-width: 901px) {
-  .st-key-orders_table, .st-key-orders_table_cust, .st-key-events_table, .st-key-menu_table, .st-key-weights_table, .st-key-customers_table { flex: 0 0 auto !important; }
+  .st-key-orders_table, .st-key-orders_table_cust, .st-key-menu_table, .st-key-weights_table, .st-key-customers_table { flex: 0 0 auto !important; }
   .st-key-orders_table { height: max(170px, calc(100dvh - 520px)) !important; }
   .st-key-orders_table_cust { height: max(130px, calc(100dvh - 610px)) !important; }
-  .st-key-events_table { height: max(180px, calc(100dvh - 400px)) !important; }
+  /* 룰렛 옵션은 칸 수만큼 자연스럽게 늘어나고 페이지 자체가 스크롤된다.
+     높이를 고정하면 내부 카드가 안내문·저장 버튼 아래로 넘쳐 서로 겹친다. */
+  .st-key-events_table { height: auto !important; overflow: visible !important; }
   .wheel-preview { display: flex; flex-direction: column; align-items: center; gap: 12px; }
   .wheel-preview .bars { width: 100%; max-height: calc(100dvh - 500px); min-height: 100px; overflow-y: auto; }
   .st-key-menu_table { height: max(150px, calc(100dvh - 360px)) !important; }
