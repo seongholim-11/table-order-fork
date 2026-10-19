@@ -56,7 +56,7 @@ def login():
                         ss["owner"], ss["repo"], ss["token"], ss["notice"] = True, result.repo, result.token, result.notice
                         ss["remember_token"] = True  # 다음 화면에서 쿠키에 저장한다(지금 바로 rerun 하면 스크립트가 실행되지 않는다)
                         st.rerun()
-            st.caption("사장님으로 등록된 계정만 들어올 수 있어요.")
+            st.caption("사장님으로 등록된 계정만 들어올 수 있어요. ex) owner@example.com")
             return
         with st.container(border=True):
             token = st.text_input("관리자 토큰", type="password", placeholder="토큰을 입력하세요")
