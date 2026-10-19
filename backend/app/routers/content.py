@@ -12,6 +12,8 @@ router = APIRouter(prefix="/api", tags=["사용자"])
 async def all_content(request: Request):
     """기존 화면용 묶음 경로를 유지하되 AI 항목은 새 DB 저장소에서 합친다."""
     data = dummy.content()
+    # 카테고리는 관리자가 DB에서 추가·수정·삭제하므로 더미 대신 DB 값을 내려 준다.
+    data["categories"] = request.app.state.shop.categories.list()
     data["quiz_questions"] = request.app.state.ai_content.questions()
     data["weather"] = request.app.state.ai_content.weather_shape()
     data["rules"] = request.app.state.ai_content.rules()
@@ -26,6 +28,8 @@ async def one_content(name: str, request: Request):
         return request.app.state.ai_content.weather_shape()
     if name == "rules":
         return request.app.state.ai_content.rules()
+    if name == "categories":
+        return request.app.state.shop.categories.list()  # 관리자가 바꾼 DB 값
     data = dummy.content_item(name)  # [더미]
     if data is None:
         raise HTTPException(404, "없는 콘텐츠입니다.")

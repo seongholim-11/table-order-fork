@@ -28,8 +28,8 @@ def opportunities(request: Request, round: int = Query(default=0, ge=0), refresh
     stats = stats_service.dashboard(orders, members, store.recommendation_count(), today, rule)
     result = opportunity_service.opportunities(
         orders, members, request.app.state.shop.menus(), stats, today, rule, round)
-    # 규칙 엔진이 고른 카드만 제미나이로 다듬는다 (키가 없거나 실패하면 규칙 문구 그대로)
-    return opportunity_service.refine_with_gemini(result, settings, refresh)
+    # 규칙 엔진이 고른 카드만 다듬는다: 문자는 기존 AI 문자 생성 로직, 기타는 묶음 호출 (키가 없거나 실패하면 규칙 문구 그대로)
+    return opportunity_service.refine_with_gemini(result, settings, refresh, request.app.state.sms_candidates)
 
 
 @router.get("/marketing/growth-performance")

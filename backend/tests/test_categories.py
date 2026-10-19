@@ -168,3 +168,17 @@ def test_category_patch_and_delete_return_not_found_for_unknown_id(client):
 
     assert updated.status_code == 404
     assert deleted.status_code == 404
+
+
+def test_guest_content_categories_follow_admin_changes(client):
+    """손님 화면이 읽는 /api/content 도 관리자가 추가·수정·삭제한 카테고리를 반영한다."""
+    created = _add_category(client, "반영 확인").json()
+    names = lambda: {c["id"]: c["name"] for c in client.get("/api/content").json()["categories"]}
+    assert names()[created["id"]] == "반영 확인"
+    assert [c["id"] for c in client.get("/api/content/categories").json()][-1] == created["id"]
+
+    client.patch(f"{ADMIN_API_PREFIX}/categories/{created['id']}", headers=ADMIN, json={"name": "이름 변경"})
+    assert names()[created["id"]] == "이름 변경"
+
+    client.delete(f"{ADMIN_API_PREFIX}/categories/{created['id']}", headers=ADMIN)
+    assert created["id"] not in names()

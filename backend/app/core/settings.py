@@ -50,7 +50,8 @@ class Settings(BaseSettings):
 
     # AI 문자 후보 · 외부 정보 (docs/todo/TODO_성호.md 3번)
     gemini_api_key: str = ""  # 비어 있으면 AI 대신 템플릿 문구를 쓴다
-    gemini_model: str = "gemini-2.5-flash"
+    # 신규 Gemini API 키에서도 사용할 수 있는 모델을 기본값으로 사용한다.
+    gemini_model: str = "gemini-3.5-flash-lite"
     # AI 챗봇 (docs/todo/TODO_성호.md 4번). 관리자 인증 전까지 모든 대화방의 주인(auth.users 의 uuid)으로 쓴다
     chat_owner_id: str = ""
     seoul_openapi_key: str = ""  # 서울 열린데이터광장 인증키. 비어 있으면 행사 문구는 비워 둔다

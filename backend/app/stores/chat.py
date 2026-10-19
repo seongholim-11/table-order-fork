@@ -1,7 +1,7 @@
 """AI 챗봇 대화방(chat_sessions)과 말풍선(chat_messages) 저장소. SQL 은 여기에만 둔다."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.stores.db import Database
 
@@ -40,9 +40,23 @@ class ChatStore:
         if not db.pg:  # Postgres 에는 테이블이 이미 있으므로 로컬 SQLite 일 때만 만든다
             db.script(SCHEMA)
 
+    def _next_timestamp(self, owner_id: str) -> str:
+        """같은 순간에 만들어진 대화방도 최근 대화방 순서가 유지되게 시각을 만든다."""
+        current = datetime.now(timezone.utc)
+        latest = self.db.one("SELECT MAX(updated_at) AS updated_at FROM chat_sessions WHERE owner_id=?", (owner_id,))
+        if latest and latest["updated_at"]:
+            try:
+                previous = datetime.fromisoformat(latest["updated_at"])
+                if current <= previous:
+                    current = previous + timedelta(microseconds=1)
+            except (TypeError, ValueError):
+                # 기존 데이터 형식이 다르면 현재 시각을 그대로 사용한다.
+                pass
+        return current.isoformat(timespec="microseconds")
+
     def create_session(self) -> str:
         """새 대화방을 만들고 id(uuid 문자열)를 돌려준다. uuid 는 DB 가 아니라 코드에서 만든다."""
-        session_id, now = str(uuid.uuid4()), now_iso()
+        session_id, now = str(uuid.uuid4()), self._next_timestamp(self.owner_id)
         self.db.run("INSERT INTO chat_sessions (id, owner_id, title, created_at, updated_at) VALUES (?,?,?,?,?)",
                     (session_id, self.owner_id, "새 대화", now, now))
         return session_id

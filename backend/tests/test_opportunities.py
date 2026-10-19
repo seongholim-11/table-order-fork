@@ -123,45 +123,68 @@ def _result():
     return {"items": [sms, guide], "groups": {"sms": {"items": [sms]}, "guide": {"items": [guide]}}}
 
 
-def test_refine_with_gemini_batches_once_caches_and_falls_back(monkeypatch):
-    """키가 없으면 규칙 문구 그대로, 있으면 한 번만 호출해 다듬고, 실패하면 규칙 문구로 돌아간다."""
+class _FakeSms:
+    """기존 AI 문자 생성 로직(SmsCandidateService)을 흉내 내는 가짜. generate 호출 기록을 남긴다."""
+
+    def __init__(self, answers, source="ai"):
+        self.s = type("S", (), {"gemini_api_key": "k"})()
+        self.external = type("E", (), {"today": lambda self: {"weather_text": "맑음", "event_text": "마포 축제"}})()
+        self.answers, self.source, self.calls = iter(answers), source, []
+
+    def summary(self):
+        return {"n": 1}
+
+    def _facts(self, summary, info):
+        return {"summary": summary, "weather": info["weather_text"], "event": info["event_text"]}
+
+    def generate(self, keywords, facts):
+        self.calls.append(keywords)
+        return next(self.answers), self.source
+
+
+def test_refine_with_gemini_uses_sms_logic_for_sms_and_batch_for_guide(monkeypatch):
+    """문자 본문은 AI 문자 생성 로직으로, 기타 카드 할 일은 묶음 호출로 만든다. 같은 입력은 캐시, 실패하면 규칙 문구."""
     from types import SimpleNamespace
     from app.services import opportunities as service
 
     service._REFINE_CACHE.clear()
-    calls = []
+    service._SMS_CACHE.clear()
+    batch = []
     monkeypatch.setattr(service, "_ask_gemini_batch",
-                        lambda settings, cards: calls.append(cards) or {0: "AI 문자", 1: "AI 할 일"})
-    # 키가 없으면 호출하지 않고 source 만 rule 로 붙는다.
-    plain = service.refine_with_gemini(_result(), SimpleNamespace(gemini_api_key="", gemini_model="m"))
-    assert not calls and plain["items"][0]["source"] == "rule" and plain["items"][0]["sms_body"] == "원래 문구"
-    # 키가 있으면 묶음 한 번으로 문자 본문·할 일이 바뀐다. 같은 입력을 다시 보내도 호출하지 않는다.
+                        lambda settings, cards: batch.append(cards) or {0: "AI 할 일"})
+    # 키가 없으면 아무것도 호출하지 않는다.
+    plain = service.refine_with_gemini(_result(), SimpleNamespace(gemini_api_key="", gemini_model="m"),
+                                       sms_service=_FakeSms(["x"]))
+    assert not batch and plain["items"][0]["source"] == "rule" and plain["items"][0]["sms_body"] == "원래 문구"
     settings = SimpleNamespace(gemini_api_key="k", gemini_model="m")
+    sms = _FakeSms(["AI 문자"])
     for _ in range(2):
-        refined = service.refine_with_gemini(_result(), settings)
-    assert len(calls) == 1
-    assert refined["items"][0]["sms_body"] == "AI 문자" and refined["items"][1]["action"] == "AI 할 일"
-    assert refined["items"][0]["source"] == "ai"
-    # 호출이 실패하면 규칙 문구를 그대로 쓴다.
-    service._REFINE_CACHE.clear()
-    monkeypatch.setattr(service, "_ask_gemini_batch", lambda s, c: (_ for _ in ()).throw(ValueError("x")))
-    failed = service.refine_with_gemini(_result(), settings)
-    assert failed["items"][0]["sms_body"] == "원래 문구" and failed["items"][0]["source"] == "rule"
+        refined = service.refine_with_gemini(_result(), settings, sms_service=sms)
+    # 문자는 생성 로직을 한 번만 부르고(휴면 키워드+날씨+행사), 묶음 호출에는 문자 카드가 들어가지 않는다.
+    assert sms.calls == [["휴면", "날씨", "행사"]] and len(batch) == 1 and [c["title"] for c in batch[0]] == ["인기 메뉴"]
+    assert refined["items"][0]["sms_body"] == "AI 문자" and refined["items"][0]["source"] == "ai"
+    assert refined["items"][1]["action"] == "AI 할 일"
+    # 생성 로직이 템플릿으로 떨어지면 규칙 문구를 유지한다.
+    service._SMS_CACHE.clear()
+    fallback = service.refine_with_gemini(_result(), settings, sms_service=_FakeSms(["템플릿"], source="template"))
+    assert fallback["items"][0]["sms_body"] == "원래 문구" and fallback["items"][0]["source"] == "rule"
 
 
-def test_refresh_regenerates_instead_of_using_cache(monkeypatch):
-    """재추천(refresh)이면 같은 입력이라도 제미나이를 다시 불러 새 문구를 받는다."""
+def test_refresh_regenerates_sms_instead_of_using_cache(monkeypatch):
+    """재추천(refresh)이면 같은 입력이라도 AI 문자 생성 로직을 다시 불러 새 문구를 받는다."""
     from types import SimpleNamespace
     from app.services import opportunities as service
 
     service._REFINE_CACHE.clear()
-    answers = iter([{0: "첫 문구", 1: "첫 할 일"}, {0: "새 문구", 1: "새 할 일"}])
-    monkeypatch.setattr(service, "_ask_gemini_batch", lambda settings, cards: next(answers))
+    service._SMS_CACHE.clear()
+    monkeypatch.setattr(service, "_ask_gemini_batch", lambda settings, cards: {0: "할 일"})
     settings = SimpleNamespace(gemini_api_key="k", gemini_model="m")
-    assert service.refine_with_gemini(_result(), settings)["items"][0]["sms_body"] == "첫 문구"
-    assert service.refine_with_gemini(_result(), settings)["items"][0]["sms_body"] == "첫 문구"  # 캐시
-    assert service.refine_with_gemini(_result(), settings, refresh=True)["items"][0]["sms_body"] == "새 문구"
-    assert service.refine_with_gemini(_result(), settings)["items"][0]["sms_body"] == "새 문구"  # 새 결과가 캐시됨
+    sms = _FakeSms(["첫 문구", "새 문구"])
+    body = lambda **kw: service.refine_with_gemini(_result(), settings, sms_service=sms, **kw)["items"][0]["sms_body"]
+    assert body() == "첫 문구"
+    assert body() == "첫 문구"  # 캐시
+    assert body(refresh=True) == "새 문구"
+    assert body() == "새 문구"  # 새 결과가 캐시됨
 
 
 def test_live_activity_changes_when_login_or_order_arrives(client):
