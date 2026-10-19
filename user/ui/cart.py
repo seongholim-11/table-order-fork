@@ -4,6 +4,7 @@
 import streamlit as st
 
 from user.state.cart import cart_change, cart_count, cart_discount, cart_remove, cart_total, roulette_discount
+from user.state.coupons import FREE_OPT, cancel_free_line
 from user.ui.common import won
 
 
@@ -19,10 +20,15 @@ def render_cart(dialog=False):
                             f'<div class="o">{l["opt"]}</div></div><div class="p">{won(l["unit"] * l["qty"])}</div></div>')
                 c1, c2, c3, c4 = st.columns(4, vertical_alignment="center", wrap=False)
                 prefix = "dialog_" if dialog else ""
-                c1.button("−", key=f"q_{prefix}dec_{key}", help=f"{l['name']} 수량 줄이기", width="stretch", on_click=cart_change, args=(key, -1))
+                # 서비스 쿠폰으로 담은 줄은 쿠폰 장수만큼만 있어야 하므로 +는 막고, −/삭제는 쿠폰 적용 취소로 처리한다
+                free = l["opt"] == FREE_OPT
+                c1.button("−", key=f"q_{prefix}dec_{key}", help=f"{l['name']} 수량 줄이기", width="stretch",
+                          on_click=cancel_free_line if free else cart_change, args=(key,) if free else (key, -1))
                 c2.html(f'<div class="quantity">{l["qty"]}</div>')
-                c3.button("+", key=f"q_{prefix}inc_{key}", help=f"{l['name']} 수량 늘리기", width="stretch", on_click=cart_change, args=(key, 1))
-                c4.button("🗑", key=f"q_{prefix}del_{key}", help=f"{l['name']} 삭제", width="stretch", on_click=cart_remove, args=(key,))
+                c3.button("+", key=f"q_{prefix}inc_{key}", help=f"{l['name']} 수량 늘리기", width="stretch", disabled=free,
+                          on_click=cart_change, args=(key, 1))
+                c4.button("🗑", key=f"q_{prefix}del_{key}", help=f"{l['name']} 삭제", width="stretch",
+                          on_click=cancel_free_line if free else cart_remove, args=(key,))
                 st.divider()
         if cart_discount():
             st.html(f'<div class="cart-savings">✨ AI 조합으로 {won(cart_discount())} 할인받았어요</div>')

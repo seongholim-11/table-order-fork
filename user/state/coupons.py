@@ -40,9 +40,15 @@ def load_coupons() -> None:
     if rows is None:
         return
     applied = set(ss.applied_coupons)
+    old = {c["key"]: c for c in ss.coupons}
     ss.coupons = [c for c in ss.coupons if c["id"] is None] + [
         {**_entry(r, r["nickname"]), "used": bool(r["used_at"])} for r in rows]
     ss.applied_coupons = [k for k in ss.applied_coupons if k in applied and any(c["key"] == k and not c["used"] for c in ss.coupons)]
+    # 다른 곳에서 이미 쓰인 쿠폰이라 적용이 풀렸다면, 장바구니에 담아 둔 서비스 메뉴 줄과 할인율도 함께 되돌린다
+    for k in applied - set(ss.applied_coupons):
+        if old.get(k, {}).get("kind") == "free":
+            cart_change(f"{old[k]['item_id']}|{FREE_OPT}", -1)
+    _sync_percent()
 
 
 def usable() -> list[dict]:
@@ -90,6 +96,17 @@ def cancel_coupon(key: str) -> None:
     if c and c["kind"] == "free":
         cart_change(f"{c['item_id']}|{FREE_OPT}", -1)
     _sync_percent()
+
+
+def cancel_free_line(cart_key: str) -> None:
+    """장바구니에서 서비스 쿠폰 줄을 줄이거나 지울 때 호출: 그 메뉴의 쿠폰 적용을 한 장 취소한다.
+    (줄만 지우고 쿠폰이 '적용 중'으로 남는 일을 막는다)"""
+    ss = st.session_state
+    for k in ss.applied_coupons:
+        c = _find(k)
+        if c and c["kind"] == "free" and f"{c['item_id']}|{FREE_OPT}" == cart_key:
+            cancel_coupon(k)
+            return
 
 
 def consume_applied() -> list[int]:

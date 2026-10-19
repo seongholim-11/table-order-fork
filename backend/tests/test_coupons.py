@@ -58,20 +58,49 @@ def test_next_day_member_can_spin_again(client):
     assert len(_box(client, mid)) == 2
 
 
+def _order(coupon_ids, total=9500, lines=None):
+    lines = lines or [{"id": "a1", "name": "치킨", "unit": 10000, "qty": 1}]
+    return {"table_no": 1, "lines": lines, "total": total, "coupon_ids": coupon_ids}
+
+
 def test_order_marks_coupon_used_only_for_tablet_members(client):
     a, b = login(client, "가"), login(client, "나")
     cid = _spin(client, a).json()["coupon"]["id"]
-    order = {"table_no": 1, "lines": [{"id": "a1", "name": "치킨", "unit": 10000, "qty": 1}], "total": 9500}
     # 쿠폰을 받은 회원이 아닌 같은 테이블 회원 b 가 주문에 써도 된다 (한 테이블에서 같이 쓰는 쿠폰함)
-    r = client.post("/api/orders", headers=b, json={**order, "coupon_ids": [cid, 9999]})
+    r = client.post("/api/orders", headers=b, json=_order([cid]))
     assert r.status_code == 201 and r.json()["used_coupon_ids"] == [cid]
     box = _box(client, _my_id(client, a))
     assert box[0]["used_at"] and box[0]["used_order_id"] == r.json()["no"]
+
+
+def test_order_rejects_unusable_coupons_without_saving_order(client):
+    a, b = login(client, "가"), login(client, "나")
+    cid = _spin(client, a).json()["coupon"]["id"]
+    assert client.post("/api/orders", headers=b, json=_order([cid, 9999])).status_code == 409  # 없는 쿠폰
+    assert client.post("/api/orders", headers=b, json=_order([cid, cid])).status_code == 409   # 같은 쿠폰 중복
+    assert client.post("/api/orders", json=_order([cid])).status_code == 409                   # 비회원
+    assert client.post("/api/orders", headers=b, json=_order([cid], total=10000)).status_code == 409  # 할인 안 뺀 합계
+    assert client.app.state.shop.orders() == []  # 거절된 주문은 저장되지 않는다
+    assert client.post("/api/orders", headers=b, json=_order([cid])).status_code == 201
     # 이미 쓴 쿠폰은 다시 쓸 수 없다
-    again = client.post("/api/orders", headers=b, json={**order, "coupon_ids": [cid]})
-    assert again.json()["used_coupon_ids"] == []
-    # 비회원 주문은 쿠폰을 쓸 수 없다
-    assert client.post("/api/orders", json={**order, "coupon_ids": [cid]}).json()["used_coupon_ids"] == []
+    assert client.post("/api/orders", headers=b, json=_order([cid])).status_code == 409
+
+
+def test_order_with_service_coupon_needs_free_line(client):
+    a = login(client, "가")
+    cid = _spin(client, a, kind="free", percent=None, item_id="a4", prize="서비스").json()["coupon"]["id"]
+    paid = [{"id": "a1", "name": "치킨", "unit": 10000, "qty": 1}]
+    free = {"id": "a4", "name": "서비스", "opt": "룰렛 서비스", "unit": 0, "qty": 1}
+    assert client.post("/api/orders", headers=a, json=_order([cid], 10000, paid)).status_code == 409  # 서비스 줄 없음
+    assert client.post("/api/orders", headers=a, json=_order([cid], 10000, paid + [free])).status_code == 201
+
+
+def test_only_one_discount_coupon_per_order(client):
+    a = login(client, "가")
+    c1 = _spin(client, a).json()["coupon"]["id"]
+    mid = _my_id(client, a)
+    c2 = client.app.state.coupons.issue(mid, 1, "discount", "전 메뉴 5% 할인", "🎟️", 5, None)["id"]
+    assert client.post("/api/orders", headers=a, json=_order([c1, c2])).status_code == 409
 
 
 def test_coupon_box_requires_login_and_tablet_membership(client):

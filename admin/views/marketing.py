@@ -395,6 +395,14 @@ def marketing_recommend_tab(repo):
         ("guide", "2. 기타 AI 추천", "취향에 맞춘 방문 응대와 메뉴·재고·매장 운영에 활용하세요"),
     ):
         sec_title(title, description)
+        if kind == "sms" and result.get("external"):
+            # 문자에 반영되는 오늘 날씨·행사를 보여 주고, 비어 있으면 그 이유를 알려 준다
+            ext = result["external"]
+            for label, key in (("🌤 날씨", "weather"), ("🎪 행사", "event")):
+                if ext.get(key):
+                    st.caption(f"{label}: {ext[key]} (문자에 반영돼요)")
+                else:
+                    st.caption(f"{label} 정보 없음: {ext.get(key + '_note') or '불러오지 못했어요'}")
         group = result["groups"][kind]
         recs = group["items"]
         if not recs:

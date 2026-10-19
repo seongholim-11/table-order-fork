@@ -27,7 +27,10 @@ def open_growth(monkeypatch):
     return app
 
 
-def test_growth_summary_uses_one_month_basis_for_every_revenue_metric():
+def test_growth_summary_uses_one_month_basis_for_every_revenue_metric(monkeypatch):
+    # 개발자 PC의 ADMIN_TOKEN·DATA_SOURCE 값이나 켜진 서버에 영향받지 않도록 더미 데이터와 기본 토큰으로 고정한다.
+    monkeypatch.setenv("DATA_SOURCE", "dummy")
+    monkeypatch.setenv("ADMIN_TOKEN", "change-me")
     repo = ar.connect("change-me").repo
     result = growth_summary(repo.orders(), repo.members())
     assert not result["empty"] and result["ai_orders"] > 0

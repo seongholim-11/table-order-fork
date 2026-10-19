@@ -203,3 +203,17 @@ def test_live_activity_changes_when_login_or_order_arrives(client):
     assert {event["kind"] for event in after["recent"]} == {"login", "order"}
     assert any(event["kind"] == "order" and event["table_no"] == 7 and event["nickname"] == "폴링손님"
                for event in after["recent"])
+
+
+def test_refine_attaches_external_info_with_reason(monkeypatch):
+    """추천 결과에 오늘 날씨·행사와 비어 있는 이유가 담겨 화면이 원인을 보여 줄 수 있다."""
+    from types import SimpleNamespace
+    from app.services import opportunities as service
+
+    sms = _FakeSms(["문자"])
+    sms.external = type("E", (), {"today": lambda self: {
+        "weather_text": "맑은 18도 날씨", "event_text": "", "weather_note": "",
+        "event_note": "서버에 SEOUL_OPENAPI_KEY 가 설정되지 않아 행사를 조회하지 않았습니다"}})()
+    monkeypatch.setattr(service, "_ask_gemini_batch", lambda settings, cards: {})
+    out = service.refine_with_gemini(_result(), SimpleNamespace(gemini_api_key="", gemini_model="m"), sms_service=sms)
+    assert out["external"]["weather"] == "맑은 18도 날씨" and "SEOUL_OPENAPI_KEY" in out["external"]["event_note"]

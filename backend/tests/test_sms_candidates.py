@@ -153,3 +153,18 @@ def test_candidate_routes_require_admin():
     with TestClient(create_app(settings())) as c:
         assert c.post(CANDIDATES).status_code in (401, 403)
         assert c.get(EXTERNAL).status_code in (401, 403)
+
+
+def test_today_retries_empty_part_and_explains_why(monkeypatch):
+    """날씨만 저장된 날에도 비어 있는 행사는 다시 조회하고, 비어 있는 이유(note)를 함께 돌려준다."""
+    with TestClient(create_app(settings(seoul_openapi_key=""), sms_clock=at(14))) as c:
+        ext = c.app.state.external
+        ext.fetch_weather = lambda: "맑은 18도 날씨"
+        first = ext.today()
+        assert first["weather_text"] and first["weather_note"] == ""
+        assert "SEOUL_OPENAPI_KEY" in first["event_note"]  # 키가 없어서 비었다는 이유
+        # 키를 넣으면 날씨가 이미 저장돼 있어도 행사를 다시 가져온다
+        ext.s.seoul_openapi_key = "KEY"
+        ext.fetch_events = lambda day: "'마포 공연'(10/30까지)"
+        second = ext.today()
+        assert second["event_text"] == "'마포 공연'(10/30까지)" and second["event_note"] == ""

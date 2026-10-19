@@ -18,7 +18,7 @@ def test_create_order_saves_guest_member_and_combo_rows(client):
     combo = {"id": "combo:classic", "name": "AI 조합", "unit": 30000, "qty": 1,
              "components": [{"id": "test-c1", "name": "통닭", "qty": 1}, {"id": "test-b1", "name": "생맥주", "qty": 2}]}
     saved = client.post("/api/orders", headers=member_headers,
-                        json={"table_no": 3, "lines": [combo], "total": 30000, "coupon_ids": [7]})
+                        json={"table_no": 3, "lines": [combo], "total": 30000})
     assert saved.status_code == 201 and saved.json()["ai_combo"] is True
     assert saved.json()["used_coupon_ids"] == []
 

@@ -27,20 +27,30 @@ class ExternalInfoService:
     def __init__(self, settings: Settings, store: ExternalContextStore, clock=None):
         self.s, self.store = settings, store
         self.clock = clock or (lambda: datetime.now(KST))
+        self.notes = {"weather": "", "event": ""}  # 값이 비었을 때의 이유 (today() 가 호출마다 새로 채운다)
 
     def today(self) -> dict:
-        """오늘(KST) 날씨·행사 문구. 저장된 게 있으면 그대로, 없으면 외부 API로 채워 저장한다."""
+        """오늘(KST) 날씨·행사 문구. 저장된 게 있으면 그대로 쓰고, 비어 있는 것만 외부 API로 다시 채워 저장한다.
+
+        weather_note / event_note 는 값이 비었을 때 그 이유(화면에 보여 주는 용도)이고, 값이 있으면 ''이다."""
         day = self.clock().strftime("%Y-%m-%d")
-        saved = self.store.get(day)
-        if saved and (saved["weather_text"] or saved["event_text"]):
-            return {"day": day, "weather_text": saved["weather_text"], "event_text": saved["event_text"]}
-        weather, event = self.fetch_weather(), self.fetch_events(day)
-        if weather or event:  # 둘 다 실패(빈 값)면 저장하지 않아 다음 호출 때 다시 시도한다
+        saved = self.store.get(day) or {"weather_text": "", "event_text": ""}
+        weather, event = saved["weather_text"], saved["event_text"]
+        self.notes = {"weather": "", "event": ""}
+        # 한쪽만 성공해 저장된 날에도 빈 쪽은 다시 시도한다(예전에는 한쪽만 있으면 하루 종일 다시 부르지 않았다)
+        if not weather:
+            weather = self.fetch_weather()
+        if not event:
+            event = self.fetch_events(day)
+        if (weather, event) != (saved["weather_text"], saved["event_text"]):  # 새로 얻은 값이 있을 때만 저장
             self.store.save(day, weather, event)
-        return {"day": day, "weather_text": weather, "event_text": event}
+        weather_note = "" if weather else (self.notes["weather"] or "날씨 정보를 가져오지 못했습니다")
+        event_note = "" if event else (self.notes["event"] or f"오늘 {self.s.store_gu} 행사가 없습니다")
+        return {"day": day, "weather_text": weather, "event_text": event,
+                "weather_note": weather_note, "event_note": event_note}
 
     def fetch_weather(self) -> str:
-        """매장 위치의 현재 날씨 한 줄. 실패하면 ''."""
+        """매장 위치의 현재 날씨 한 줄. 실패하면 ''(이유는 self.notes 에 남긴다)."""
         try:
             r = httpx.get("https://api.open-meteo.com/v1/forecast", timeout=5, params={
                 "latitude": self.s.store_lat, "longitude": self.s.store_lon,
@@ -49,24 +59,28 @@ class ExternalInfoService:
             cur = r.json()["current"]
             word = WEATHER_WORDS.get(int(cur["weather_code"]), "")
             return f"{word} {round(cur['temperature_2m'])}도 날씨".strip()
-        except (httpx.HTTPError, KeyError, ValueError, TypeError):
+        except (httpx.HTTPError, KeyError, ValueError, TypeError) as e:
+            self.notes["weather"] = f"날씨 조회 실패(Open-Meteo: {type(e).__name__})"
             return ""
 
     def fetch_events(self, day: str) -> str:
-        """매장 자치구에서 오늘 열리는 문화행사 하나를 짧은 한 줄로. 키가 없거나 실패하면 ''."""
+        """매장 자치구에서 오늘 열리는 문화행사 하나를 짧은 한 줄로. 키가 없거나 실패하면 ''(이유는 self.notes)."""
         if not self.s.seoul_openapi_key:
+            self.notes["event"] = "서버에 SEOUL_OPENAPI_KEY 가 설정되지 않아 행사를 조회하지 않았습니다"
             return ""
         try:
             r = httpx.get(EVENT_URL.format(key=self.s.seoul_openapi_key, day=day), timeout=8)
             r.raise_for_status()
             rows = r.json()["culturalEventInfo"]["row"]
-        except (httpx.HTTPError, KeyError, ValueError, TypeError):
+        except (httpx.HTTPError, KeyError, ValueError, TypeError) as e:
+            self.notes["event"] = f"행사 조회 실패(서울 열린데이터광장: {type(e).__name__}) - 인증키를 확인하세요"
             return ""
         # 요청 날짜 필터를 믿지 않고 한 번 더 거른다: 우리 자치구 + 오늘이 시작일~종료일 사이
         today = [row for row in rows
                  if row.get("GUNAME") == self.s.store_gu
                  and str(row.get("STRTDATE", ""))[:10] <= day <= str(row.get("END_DATE", ""))[:10]]
         if not today:
+            self.notes["event"] = f"오늘 {self.s.store_gu}에서 열리는 행사가 없습니다"
             return ""
         # 문자에는 행사 하나만 짧게 넣는다: 이름을 다듬었을 때 가장 짧은(읽기 쉬운) 행사를 고른다
         row = min(today, key=lambda r: len(self._short_title(r.get("TITLE", ""))))

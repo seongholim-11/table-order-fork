@@ -49,14 +49,14 @@ class QuizRecommendationTests(unittest.TestCase):
         self.assertIn(top["id"], ("seafood", "mussel", "soup"))
         self.assertIn("탕·국물 위주", top["reason"])
 
-    def test_hunger_adds_portions(self):
+    def test_hunger_does_not_duplicate_menus(self):
         food = lambda combos, cid: sum(x["qty"] for c in combos if c["id"] == cid for x in c["components"] if x["id"] != "b1")
         normal = recommend_combos(2, 150000, hunger="적당해요")
         hungry = recommend_combos(2, 150000, hunger="매우 배고파요")
         cid = normal[0]["id"]
         self.assertIn(cid, [c["id"] for c in hungry])
-        self.assertGreater(food(hungry, cid), food(normal, cid))
-        self.assertIn("한 접시 더", hungry[0]["reason"])
+        self.assertEqual(food(hungry, cid), food(normal, cid))  # 배고파도 같은 메뉴를 2개로 늘리지 않는다
+        self.assertTrue(all(x["qty"] == 1 for c in hungry for x in c["components"] if x["id"] != "b1"))
 
     def test_high_stress_prefers_hot_combos(self):
         top = recommend_combos(2, 100000, stress="높음")[0]

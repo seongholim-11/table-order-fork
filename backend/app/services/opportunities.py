@@ -100,7 +100,7 @@ def _keywords_for(grades: list[str], info: dict) -> list[str]:
     return keywords
 
 
-def _refine_sms_cards(cards: list[dict], sms_service, refresh: bool) -> None:
+def _refine_sms_cards(cards: list[dict], sms_service, refresh: bool, info: dict) -> None:
     """문자 카드의 본문을 기존 AI 문자 페이지의 생성 로직(SmsCandidateService.generate)으로 만든다.
 
     날씨·행사는 sms_service.external.today() 가 하루 한 번만 외부에서 가져와 저장해 둔 값을 쓴다.
@@ -110,8 +110,7 @@ def _refine_sms_cards(cards: list[dict], sms_service, refresh: bool) -> None:
     if not targets or not sms_service.s.gemini_api_key:
         return
     try:
-        summary, info = sms_service.summary(), sms_service.external.today()
-        facts = sms_service._facts(summary, info)
+        facts = sms_service._facts(sms_service.summary(), info)
     except Exception:  # 매장 데이터·외부 정보를 못 읽어도 추천 화면은 규칙 문구로 계속 보여 준다
         return
     fact_key = hashlib.sha256(json.dumps(facts, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
@@ -145,10 +144,19 @@ def refine_with_gemini(result: dict, settings, refresh: bool = False, sms_servic
     for card in cards:
         card["source"] = "rule"
     cards = [c for c in cards if c.get("why") and c["title"] != EMPTY_RECOMMENDATION["title"]]
+    info = None
+    if sms_service is not None and any(c.get("action_type") == "sms" for c in cards):
+        try:
+            # 오늘 날씨·행사와, 비어 있다면 그 이유를 화면에 알려 준다(키가 없어서인지 행사가 없어서인지 구분)
+            info = sms_service.external.today()
+            result["external"] = {"weather": info["weather_text"], "weather_note": info.get("weather_note", ""),
+                                  "event": info["event_text"], "event_note": info.get("event_note", "")}
+        except Exception:  # 외부 정보를 못 읽어도 추천 카드는 계속 보여 준다
+            info = None
     if not settings.gemini_api_key or not cards:
         return result
-    if sms_service is not None:
-        _refine_sms_cards(cards, sms_service, refresh)
+    if info is not None:
+        _refine_sms_cards(cards, sms_service, refresh, info)
     # 문자 본문이 있는 카드는 위에서 처리했으므로, 나머지 카드의 할 일만 묶음 호출로 다듬는다.
     cards = [c for c in cards if not (c.get("action_type") == "sms" and c.get("sms_body"))]
     if not cards:

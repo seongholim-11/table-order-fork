@@ -67,6 +67,7 @@ class AiRecommendationService:
             "손님용 메뉴 추천을 해 주세요. 아래 JSON은 서버 DB에서 읽은 최신 메뉴·재고·추천 규칙입니다.\n"
             "반드시 pairings의 id 중에서 1~3개만 골라 recommendations로 답하세요.\n"
             "이미 품절(soldout=true)이거나 set_ok=false인 메뉴가 들어간 조합은 고르지 마세요.\n"
+            "한 조합 안에 같은 메뉴가 2개 이상 들어가지 않도록 안주 수량은 서버가 메뉴당 1개로 맞추니, 수량을 늘린다는 이유는 쓰지 마세요.\n"
             "손님의 인원·예산·맵기·음료와 주문 내역을 우선 반영하고, 추천 이유는 제공된 사실만 사용해 자연스러운 한국어로 1~2문장 작성하세요.\n"
             "가격·수량·할인율은 직접 계산하지 말고 서버가 계산하므로 응답에 넣지 마세요.\n"
             '응답 형식은 반드시 {"recommendations":[{"combo_id":"pairing id", "reason":"추천 이유"}]} 입니다.\n\n'
@@ -126,7 +127,6 @@ class AiRecommendationService:
         budget = max(int(params.get("budget", 40000)), 1)
         spicy = params.get("spicy", "상관없어요")
         drink = params.get("drink", "맥주")
-        hunger = params.get("hunger", "적당해요")
         ids = tuple(pairing["menu_ids"])
         if spicy == "매콤하게":
             ids = tuple(f"{item_id}-hot" if item_id in ("a2", "a3") else item_id for item_id in ids)
@@ -144,11 +144,8 @@ class AiRecommendationService:
         if spicy == "맵지 않게" and (pairing["id"] in set(rules.get("hot_themed", [])) or spicy_items):
             return None
 
-        portions = 2 if people >= 4 else 1
-        if hunger == "매우 배고파요":
-            portions += 1
-        elif hunger == "출출해요" and people >= 3:
-            portions = max(portions, 2)
+        # 같은 메뉴가 한 조합에 2개 이상 들어가지 않도록 안주는 메뉴당 1개로 고정한다(음료만 인원수).
+        portions = 1
         components = []
         for item_id in selected_ids:
             item = menus_by_id[item_id]

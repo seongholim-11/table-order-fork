@@ -249,10 +249,58 @@ def test_using_coupon_applies_to_cart_and_server_marks_it_used_on_order(server):
     app.button(key=f"coupon_cancel_{coupon['key']}").click().run()  # 취소하면 되돌아간다
     assert ss(app)["applied_coupons"] == [] and ss(app)["roulette_percent"] == 0 and ss(app)["cart"] == {}
 
+    app.button(key="cat_chicken").click().run()
+    app.button(key="add_c1").click().run()  # 일반 메뉴를 하나 담는다
+    price = cart_subtotal_of(app)
     app.button(key="header_coupons").click().run()
     app.button(key=f"coupon_use_{coupon['key']}").click().run()
+    assert ss(app)["applied_coupons"] == [coupon["key"]]  # 적용한 쿠폰은 팝업에서 '사용' 대신 '취소'만 보인다(중복 적용 불가)
+    if coupon["kind"] == "discount":
+        expected = price - price * coupon["percent"] // 100 // 10 * 10
+    else:
+        expected = price
+        assert ss(app)["cart"][f"{coupon['item_id']}|룰렛 서비스"]["qty"] == 1
+        assert ss(app)["cart"][f"{coupon['item_id']}|룰렛 서비스"]["unit"] == 0  # 서비스 메뉴는 0원
+    # 주문 확인 창에서 주문하기: 합계에 쿠폰 할인이 반영되고, 쿠폰은 이때 비로소 사용 처리된다
     token = ss(app)["access_token"]
-    r = api.post("/api/orders", token, json={"table_no": ss(app)["table"], "coupon_ids": [coupon["id"]], "total": 0,
-                                             "lines": [{"id": "a1", "name": "치킨", "unit": 0, "qty": 1}]})
-    assert r["used_coupon_ids"] == [coupon["id"]]
+    assert not api.get("/api/v1/coupons", token)[0]["used_at"]  # 담기만 했을 땐 소진되지 않는다
+    app.button(key="order_btn").click().run()
+    app.session_state["confirm_order"] = True
+    next(b for b in app.get("button") if b.proto.label == "주문하기").click().run()
+    assert ss(app)["orders"][-1]["total"] == expected
+    assert api.get("/api/v1/tables/%s/orders" % ss(app)["table"])["orders"][-1]["total"] == expected  # 서버에 저장된 합계
     assert api.get("/api/v1/coupons", token)[0]["used_at"]
+    assert ss(app)["cart"] == {} and ss(app)["applied_coupons"] == [] and ss(app)["roulette_percent"] == 0
+    assert ss(app)["coupons"][0]["used"] and not usable_count(app)
+    # 쓴 쿠폰으로 다시 주문하면 서버가 거절한다
+    again = [{"id": "a1", "name": "치킨", "unit": 0, "qty": 1}]
+    with pytest.raises(api.ApiError) as err:
+        api.post("/api/orders", token, json={"table_no": ss(app)["table"], "coupon_ids": [coupon["id"]], "total": 0,
+                                             "lines": again})
+    assert err.value.status == 409
+
+
+def cart_subtotal_of(app):
+    """장바구니 줄의 (단가 × 수량) 합계."""
+    return sum(l["unit"] * l["qty"] for l in ss(app)["cart"].values())
+
+
+def usable_count(app):
+    return [c for c in ss(app)["coupons"] if not c["used"]]
+
+
+def test_service_coupon_line_in_cart_is_locked_to_coupon(server):
+    """서비스 쿠폰으로 담은 0원 줄은 +로 늘릴 수 없고, 지우면 쿠폰 적용도 함께 취소된다."""
+    app = AppTest.from_file(APP, default_timeout=30).run()
+    app.button(key="start_btn").click().run()
+    # 서버 없이 이 세션에만 있는 서비스 쿠폰을 하나 넣는다 (id=None)
+    ss(app)["members"] = [{"id": 1, "nickname": "가"}]  # 쿠폰함은 로그인한 회원이 있어야 열린다
+    ss(app)["coupons"] = [{"id": None, "n": 1, "key": "local-1", "member_id": 1, "nickname": "가", "kind": "free",
+                           "label": "서비스", "emoji": "🎁", "percent": None, "item_id": "a4", "used": False}]
+    app.button(key="header_coupons").click().run()
+    app.button(key="coupon_use_local-1").click().run()
+    line_key = "a4|룰렛 서비스"
+    assert ss(app)["cart"][line_key]["unit"] == 0 and ss(app)["applied_coupons"] == ["local-1"]
+    assert app.button(key=f"q_inc_{line_key}").disabled  # 수량을 늘려 공짜를 더 받을 수 없다
+    app.button(key=f"q_del_{line_key}").click().run()  # 줄을 지우면 쿠폰 적용도 취소된다
+    assert ss(app)["cart"] == {} and ss(app)["applied_coupons"] == []

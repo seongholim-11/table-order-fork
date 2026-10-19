@@ -11,6 +11,12 @@ def _benefit(c: dict) -> str:
     return f"전 메뉴 {c['percent']}% 할인" if c["kind"] == "discount" else f"{c['label']}"
 
 
+def _change(action, key: str) -> None:
+    """쿠폰 사용/취소를 처리하고, 팝업이 화면 전체 새로고침을 하도록 표시를 남긴다."""
+    action(key)
+    st.session_state.coupon_changed = True
+
+
 @st.dialog("쿠폰함", width="medium")
 def coupons_dialog():
     ss = st.session_state
@@ -33,6 +39,9 @@ def coupons_dialog():
             if c["used"]:
                 continue
             if applied:
-                st.button("취소", key=f"coupon_cancel_{c['key']}", on_click=cancel_coupon, args=(c["key"],))
+                st.button("취소", key=f"coupon_cancel_{c['key']}", on_click=_change, args=(cancel_coupon, c["key"]))
             else:
-                st.button("사용", key=f"coupon_use_{c['key']}", type="primary", on_click=apply_coupon, args=(c["key"],))
+                st.button("사용", key=f"coupon_use_{c['key']}", type="primary", on_click=_change, args=(apply_coupon, c["key"]))
+    # 팝업 안의 버튼은 팝업만 다시 그리므로, 쿠폰이 바뀌었으면 화면 전체를 다시 그려(st.rerun) 장바구니에 바로 반영한다
+    if ss.pop("coupon_changed", False):
+        st.rerun()

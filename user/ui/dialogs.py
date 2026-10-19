@@ -8,7 +8,7 @@ import streamlit as st
 
 from user.state import context as ctx
 from user.state.cart import cart_discount, cart_total, roulette_discount
-from user.state.coupons import consume_applied, pending_coupon_ids
+from user.state.coupons import consume_applied, load_coupons, pending_coupon_ids
 from user.ui.common import KST, won
 
 
@@ -32,12 +32,19 @@ def confirm_dialog():
         st.rerun()
     if c2.button("주문하기", type="primary", width="stretch"):
         no = len(st.session_state.orders) + 1
-        server_no = ctx.REPO.create_order(st.session_state.table, [dict(l) for l in cart.values()], cart_total(),
-                                      st.session_state.access_token, pending_coupon_ids())
+        coupon_ids = pending_coupon_ids()
+        total = cart_total()  # 쿠폰 할인이 빠진 합계. consume_applied() 가 할인율을 지우기 전에 한 번만 계산해 둔다
+        server_no = ctx.REPO.create_order(st.session_state.table, [dict(l) for l in cart.values()], total,
+                                      st.session_state.access_token, coupon_ids)
+        if coupon_ids and server_no is None and ctx.REPO.source == "api":
+            # 서버가 쿠폰을 받아들이지 않았다(이미 사용됨 등): 주문을 접수하지 않고 쿠폰함을 새로고침해 되돌린다
+            load_coupons()
+            st.toast("쿠폰을 사용할 수 없어 주문하지 못했어요. 쿠폰함을 확인하고 다시 주문해 주세요.", icon="⚠️")
+            st.rerun()
         consume_applied()  # 쿠폰함에서 적용한 쿠폰을 사용 처리 (룰렛 할인율도 함께 초기화)
         no = server_no or no  # 서버가 주문번호를 주면 그것을 쓴다
         st.session_state.orders.append({"no": no, "ts": time.time(), "time": datetime.now(KST).strftime("%H:%M"),
-                                        "lines": list(cart.values()), "total": cart_total(),
+                                        "lines": list(cart.values()), "total": total,
                                         "member": (st.session_state.member or {}).get("nickname")})
         st.session_state.cart = {}
         st.toast(f"주문이 접수되었습니다 (주문번호 #{no})", icon="✅")

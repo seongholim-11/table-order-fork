@@ -97,6 +97,38 @@ class CouponStore:
             tuple(member_ids),
         )
 
+    def check_usable(self, coupon_ids: list[int], member_ids: list[int], lines: list[dict], total: int) -> str | None:
+        """주문에 쓰려는 쿠폰이 정말 쓸 수 있는지 확인한다. 문제가 없으면 None, 있으면 이유(한국어)를 돌려준다.
+
+        확인하는 것: 중복 id / 없는 쿠폰 / 이 테이블 회원의 쿠폰이 아님 / 이미 사용함 /
+        할인 쿠폰은 주문당 1장 / 서비스 쿠폰은 해당 메뉴가 0원 줄로 담겨 있어야 함 / 합계가 할인과 맞는지.
+        """
+        if len(set(coupon_ids)) != len(coupon_ids):
+            return "같은 쿠폰이 중복으로 들어 있어요."
+        coupons = []
+        for coupon_id in coupon_ids:
+            row = self.get(coupon_id)
+            if not row or row["member_id"] not in member_ids:
+                return "사용할 수 없는 쿠폰이에요."
+            if row["used_at"]:
+                return "이미 사용한 쿠폰이에요."
+            coupons.append(row)
+        discounts = [c for c in coupons if c["kind"] == "discount"]
+        if len(discounts) > 1:
+            return "할인 쿠폰은 한 번에 한 장만 쓸 수 있어요."
+        # 서비스 쿠폰마다 '그 메뉴의 0원 줄'이 따로 있어야 한다 (같은 메뉴 쿠폰 2장이면 줄 수량도 2 이상)
+        for c in (c for c in coupons if c["kind"] == "free"):
+            need = sum(1 for o in coupons if o["kind"] == "free" and o["item_id"] == c["item_id"])
+            have = sum(l["qty"] for l in lines if l["id"] == c["item_id"] and l["unit"] == 0)
+            if have < need:
+                return "서비스 메뉴가 장바구니에 담겨 있지 않아요."
+        # 합계 확인: 화면의 계산(user/state/cart.py roulette_discount)과 같은 식 — 10원 단위 내림
+        subtotal = sum(l["unit"] * l["qty"] for l in lines)
+        percent = discounts[0]["percent"] if discounts else 0
+        if total != subtotal - subtotal * percent // 100 // 10 * 10:
+            return "쿠폰 할인이 반영된 합계가 맞지 않아요."
+        return None
+
     def use(self, coupon_ids: list[int], member_ids: list[int], order_id: int) -> list[int]:
         """주문에 쓴 쿠폰을 사용 처리하고, 처리된 id 를 돌려준다.
         """

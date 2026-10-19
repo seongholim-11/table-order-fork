@@ -51,11 +51,9 @@ def recommend_combos(people=2, budget=40000, spicy="상관없어요", drink="맥
     for item_id, count in counts.items():
         if item_id in menu_by_id:
             preferred_categories[menu_by_id[item_id]["cat"]] += count
-    portions = 2 if people >= 4 else 1
-    if hunger == "매우 배고파요":
-        portions += 1
-    elif hunger == "출출해요" and people >= 3:
-        portions = max(portions, 2)
+    # 같은 메뉴가 한 조합에 2개 이상 들어가지 않도록 안주는 메뉴당 1개로 고정한다
+    # (인원·배고픔은 수량을 늘리지 않는다). 음료만 "1인당 1개"라서 인원수만큼 담긴다.
+    portions = 1
     drink_id = drinks[drink]
     recommendations = []
     for combo_id, title, ids, pairing_reason in rules["pairings"]:
@@ -107,7 +105,8 @@ def recommend_combos(people=2, budget=40000, spicy="상관없어요", drink="맥
             score += 4
             notes.append("스트레스가 높은 날엔 칼칼한 맛이 잘 어울려요.")
         if hunger == "매우 배고파요":
-            notes.append("배고프다고 하셔서 안주를 한 접시 더 넉넉히 담았어요.")
+            score += 2 if meta.get("mood") == "hearty" else 0
+            notes.append("배고프다고 하셔서 든든한 조합을 우선 봤어요.")
         if gender == "남자만" and meta.get("mood") == "hearty":
             score += 3
         elif gender == "여자만" and meta.get("mood") == "light":
@@ -122,7 +121,7 @@ def recommend_combos(people=2, budget=40000, spicy="상관없어요", drink="맥
             score += 2
             notes.append("더운 날씨에 산뜻하게 즐길 수 있어요.")
         score += 3 * (1 - abs(price - budget * .8) / budget)
-        reason = f"{people}명이 나눠 먹도록 안주 수량을 맞췄어요. " + pairing_reason
+        reason = f"{people}명이 함께 즐기기 좋아요. " + pairing_reason
         if notes:
             reason += " " + " ".join(notes)
         if drink != "없이":
