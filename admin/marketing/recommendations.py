@@ -132,17 +132,36 @@ def regular_preference_cards(preferences: list[dict]) -> list[dict]:
     return cards
 
 
+def _short_menu(name: str) -> str:
+    """메뉴 이름에서 괄호 설명을 떼어 짧게 보여 준다: "역전 옛날통닭 (한 마리·반반)" → "역전 옛날통닭"."""
+    return (name or "").split("(")[0].strip() or (name or "")
+
+
+EVENT_TAG = {"birthday": "🎂 생일", "visit_anniversary": "🎉 첫 방문 기념일", "rainy_favorite": "🌧️ 비 오는 날",
+             "frequent_week": "🔁 이번 주 자주 방문", "regular_customer": "⭐ 단골"}
+
+
 def table_suggestions(preferences: list[dict]) -> dict[int, dict]:
-    """테이블 번호별 응대 제안을 만든다. 배치도에서 제안이 있는 테이블만 강조하는 데 쓴다."""
+    """테이블 번호별 응대 제안을 짧게 정리한다. 배치도 오른쪽 패널에 그대로 보여 줄 값들이다."""
     result = {}
     for preference in preferences:
         # regular_preference_cards 와 같은 조건: 오늘 앉은 테이블과 내보낼 메뉴가 있는 손님만
         if not preference.get("delivery_menu") or preference.get("today_table") is None:
             continue
+        visit = f"{preference.get('visit_count', '')}번째 방문"
+        # 근거는 첫 문장만 써서 짧게 한다(나머지 설명은 추천 행동·멘트가 대신한다)
+        reason = preference.get("care_reason") or "다시 방문한 사실을 알아봐 주기 좋은 순간이에요."
+        if "다. " in reason:
+            reason = reason.split("다. ")[0] + "다."
+        # 메뉴 취향은 80% 이상 확인된 손님에게만 한 줄로 덧붙인다
+        favorite = (preference.get("favorite_menu") if (preference.get("preference_rate") or 0) >= .8 else None)
         result[int(preference["today_table"])] = {
-            "nickname": preference["nickname"], "menu": preference["delivery_menu"],
-            "context": preference.get("visit_context") or f"{preference.get('visit_count', '')}회 방문한 손님입니다.",
-            "reason": preference.get("care_reason") or "다시 방문한 사실을 알아봐 주기 좋은 순간입니다.",
+            "nickname": preference["nickname"],
+            "tag": EVENT_TAG.get(preference.get("special_event"), ""),
+            "visit": visit,
+            "order": _short_menu(preference["delivery_menu"]),
+            "taste": f"{_short_menu(favorite)}을(를) 자주 드세요" if favorite else "",
+            "reason": reason,
             "action": preference.get("service_suggestion") or "작은 서비스와 함께 반갑게 인사해 주세요.",
             "note": preference.get("visit_note") or "또 찾아주셔서 감사합니다. 오늘도 편하게 즐기다 가세요!",
         }

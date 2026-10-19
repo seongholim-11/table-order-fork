@@ -17,6 +17,21 @@ def html_of(screen):
     return "\n".join(element.value for element in screen.get("html"))
 
 
+def panel_html(screen):
+    """배치도 오른쪽에 보이는 응대 제안 패널(선택한 테이블 한 곳)."""
+    return next(element.value for element in screen.get("html") if "table-suggestion" in element.value)
+
+
+def all_panels(screen):
+    """제안이 있는 테이블 버튼을 차례로 눌러 각 테이블의 패널 내용을 모은다."""
+    keys = [button.key for button in screen.button if button.key and button.key.startswith("mk_table_")]
+    panels = []
+    for key in keys:
+        screen.button(key=key).click().run()
+        panels.append(panel_html(screen))
+    return panels
+
+
 def open_customers(monkeypatch):
     screen = open_dashboard(monkeypatch)
     screen.sidebar.radio(key="nav_sub_고객 등급").set_value("고객 목록").run()
@@ -67,9 +82,10 @@ def test_dormant_label_thirty_days_filter_and_server_defaults(server, monkeypatc
 def test_real_order_preference_evidence_and_rerecommend(server, monkeypatch):
     member = prepare_history(server)
     screen = open_recommendations(monkeypatch)
-    assert "DB 먹태" in html_of(screen) and "오늘 주문: DB 계란말이" in html_of(screen)
-    assert "5번째 방문" in html_of(screen) and "문구는 사장님 말투에 맞게" in html_of(screen)
-    assert "오늘은 이런 멘트 어떠세요?" in html_of(screen) and "80% 이상" in html_of(screen)
+    panel = panel_html(screen)
+    assert "DB 먹태" in panel and "오늘 주문</b> DB 계란말이" in panel  # 취향(80% 이상)과 오늘 주문이 한 줄씩
+    assert "5번째 방문" in panel and "7번 테이블 · 주문 기억 손님님" in panel
+    assert 'class="recs regular-preferences"' not in html_of(screen)  # 아래 중복 목록은 없다
     db = server.app.state.db
     order = db.run("INSERT INTO orders (table_no, member_id, total, created_at) VALUES (?, ?, ?, ?)",
                    (7, member["id"], 14000, datetime.now(timezone.utc).isoformat()))
@@ -79,9 +95,9 @@ def test_real_order_preference_evidence_and_rerecommend(server, monkeypatch):
     for _ in range(4):
         screen.button(key="mk_rerecommend").click().run()
         assert not screen.exception
-        if "오늘도 DB 먹태 주문이 확인" in html_of(screen):
+        if "오늘 주문</b> DB 먹태" in panel_html(screen):
             break
-    assert "오늘도 DB 먹태 주문이 확인" in html_of(screen)
+    assert "오늘 주문</b> DB 먹태" in panel_html(screen)
 
 
 def test_empty_db_keeps_customer_screen_working(server, monkeypatch):
@@ -119,18 +135,15 @@ def test_three_db_examples_are_recommendation_cards(server, monkeypatch):
     seed_regular_examples(db, datetime.now(KST).date())
     screen = open_recommendations(monkeypatch)
     html = html_of(screen)
+    assert 'class="recs regular-preferences"' not in html  # 같은 내용이 아래에 중복으로 나오지 않는다
+    panels = "\n".join(all_panels(screen))
     for nickname in ("[예시] 먹태 단골", "[예시] 계란말이 단골", "[예시] 파전 단골"):
-        assert nickname in html
-    assert "오늘 주문: 예시 골뱅이" in html
-    assert "11번째 방문" in html and "멘트 예시" in html
+        assert nickname in panels
+    assert "오늘 주문</b> 예시 골뱅이" in panels
+    assert "11번째 방문" in panels and "멘트" in panels
     assert len({row["note"] for row in server.get("/admin/api/marketing/regular-preferences",
                                                headers={"Authorization": "Bearer admin-secret"}).json()["preferences"]}) > 1
-    addition = next(element.value for element in screen.get("html") if 'class="recs regular-preferences"' in element.value)
-    assert addition.count('class="rec"') == 2
-    assert "80% 이상" in addition and "90%" not in addition and "100%" not in addition
-    # 기본 인사 세 명과 메뉴 취향 제안 한 명으로 나누어 비율 설명이 반복되지 않게 한다.
-    assert addition.count("80% 이상") == 1
-    assert "자주 드시는 메뉴를 기억하는 인사" in addition
+    assert "자주 드세요" in panels and "90%" not in panels and "100%" not in panels
 
 
 def test_below_eighty_percent_still_shows_regular_without_claiming_preference(server, monkeypatch):
@@ -153,10 +166,10 @@ def test_below_eighty_percent_still_shows_regular_without_claiming_preference(se
     for line in db.all("SELECT id FROM order_items WHERE menu_id=? ORDER BY id", ("screen-fish",))[:2]:
         db.run("UPDATE order_items SET menu_id=?, name=? WHERE id=?", ("screen-egg", "DB 계란말이", line["id"]))
     screen = open_recommendations(monkeypatch)
-    addition = next(element.value for element in screen.get("html") if 'class="recs regular-preferences"' in element.value)
+    addition = panel_html(screen)
     assert "주문 기억 손님" in addition and "5번째 방문" in addition
-    assert "이전 주문일" not in addition and "오늘 주문: DB 계란말이" in addition
-    assert "멘트 예시" in addition and "DB 먹태" not in addition
+    assert "이전 주문일" not in addition and "오늘 주문</b> DB 계란말이" in addition
+    assert "멘트" in addition and "DB 먹태" not in addition and "자주 드세요" not in addition
 
 
 def test_original_cards_and_pagination_are_preserved_above_added_preferences(server, monkeypatch):
@@ -165,17 +178,17 @@ def test_original_cards_and_pagination_are_preserved_above_added_preferences(ser
     screen.button(key="mk_rerecommend").click().run()  # 추천은 [AI 추천 받기]를 눌러야 만들어진다
     sections = [element.value for element in screen.get("html")]
     original = [html for html in sections if 'class="rec recommendation-card"' in html]
-    addition = next(html for html in sections if 'class="recs regular-preferences"' in html)
+    addition = next(html for html in sections if "table-suggestion" in html)
     assert len(original) == 4
     assert all("주문 기억 손님" not in html for html in original)
-    assert "주문 기억 손님" in addition and "80% 이상" in addition
+    assert "주문 기억 손님" in addition and "자주 드세요" in addition
     assert sections.index(original[0]) < sections.index(addition)
     screen.button(key="mk_rerecommend").click().run()
     assert not screen.exception
     sections = [element.value for element in screen.get("html")]
     after = [html for html in sections if 'class="rec recommendation-card"' in html]
     assert after != original
-    assert next(html for html in sections if 'class="recs regular-preferences"' in html) == addition
+    assert next(html for html in sections if "table-suggestion" in html) == addition
 
 
 def test_preference_api_failure_does_not_break_original_recommendations(server, monkeypatch):
@@ -212,14 +225,16 @@ def test_ten_ordering_regulars_are_all_visible_without_truncating(server, monkey
         db.run("INSERT INTO order_items (order_id, menu_id, name, qty, unit_price) VALUES (?, ?, ?, ?, ?)",
                (order, "ten-screen", "단골의 오늘 메뉴", 1, 14000))
     screen = open_recommendations(monkeypatch)
-    addition = next(element.value for element in screen.get("html") if 'class="recs regular-preferences"' in element.value)
+    panels = all_panels(screen)
+    assert len(panels) == 10  # 열 팀 모두 테이블 버튼으로 볼 수 있다
+    addition = "\n".join(panels)
     for index in range(10):
         assert f"열 팀 단골 {index}님" in addition
         assert f"{5 + index}번째 방문" in addition
-    assert addition.count("멘트 예시:") == 10 and "최대 3" not in addition
+    assert addition.count("멘트</b>") == 10 and "최대 3" not in addition
     assert "이전 주문일" not in addition
     assert "80%" not in addition
-    assert addition.count('class="rec"') == 1
+    assert 'class="recs regular-preferences"' not in html_of(screen)
 
 
 def test_varied_regulars_and_one_preference_suggestion_use_separate_cards(server, monkeypatch):
@@ -240,11 +255,9 @@ def test_varied_regulars_and_one_preference_suggestion_use_separate_cards(server
         db.run("INSERT INTO order_items (order_id, menu_id, name, qty, unit_price) VALUES (?, ?, ?, ?, ?)",
                (order, menu_id, name, 1, 14000))
     screen = open_recommendations(monkeypatch)
-    addition = next(element.value for element in screen.get("html") if 'class="recs regular-preferences"' in element.value)
-    general, favorite = addition.split("자주 드시는 메뉴를 기억하는 인사", 1)
-    assert "여러 메뉴 단골님" in general and "8번째 방문" in general
-    assert "여러 안주" in general and "80%" not in general
-    assert favorite.count("멘트 예시:") == 1 and addition.count("80% 이상") == 1
+    varied = next(panel for panel in all_panels(screen) if "여러 메뉴 단골님" in panel)
+    assert "8번째 방문" in varied and "80%" not in varied
+    assert "자주 드세요" not in varied  # 취향이 하나로 확인되지 않은 손님에게는 취향을 단정하지 않는다
     # 예시를 실제로 제거한 뒤 고객 화면에서도 사라지고, 일반 단골 인사는 계속 표시된다.
     assert remove_regular_examples(db) == {"restored_members": 3, "restored_orders": 33}
     screen.sidebar.radio(key="nav_sub_고객 등급").set_value("고객 목록").run()
@@ -253,7 +266,7 @@ def test_varied_regulars_and_one_preference_suggestion_use_separate_cards(server
     assert screen.dataframe[0].value.iloc[0]["닉네임"] == "여러 메뉴 단골"
     screen.sidebar.radio(key="nav_sub_마케팅").set_value("AI 추천").run()
     assert not screen.exception
-    addition = next(element.value for element in screen.get("html") if 'class="recs regular-preferences"' in element.value)
+    addition = panel_html(screen)
     assert "여러 메뉴 단골님" in addition and "80%" not in addition
 
 
@@ -265,7 +278,7 @@ def test_preview_is_replaced_by_real_regular_greeting_and_changes_with_order(ser
     member = prepare_history(server)
     screen.button(key="mk_rerecommend").click().run()
     assert not screen.exception
-    addition = next(element.value for element in screen.get("html") if 'class="recs regular-preferences"' in element.value)
+    addition = panel_html(screen)
     assert "AI가 이런 인사를 추천할 예정" not in addition
     assert "주문 기억 손님님" in addition and "5번째 방문" in addition
     assert "7번 테이블" in addition and "DB 계란말이" in addition
@@ -282,7 +295,7 @@ def test_preview_is_replaced_by_real_regular_greeting_and_changes_with_order(ser
     screen.button(key="mk_rerecommend").click().run()
     assert not screen.exception
     after = server.get(path, headers=headers).json()["preferences"][0]
-    addition = next(element.value for element in screen.get("html") if 'class="recs regular-preferences"' in element.value)
+    addition = panel_html(screen)
     assert after["visit_note"] != before["visit_note"]
     assert after["visit_note"] in addition
     assert "AI가 이런 인사를 추천할 예정" not in addition
