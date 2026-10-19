@@ -132,6 +132,23 @@ def regular_preference_cards(preferences: list[dict]) -> list[dict]:
     return cards
 
 
+def table_suggestions(preferences: list[dict]) -> dict[int, dict]:
+    """테이블 번호별 응대 제안을 만든다. 배치도에서 제안이 있는 테이블만 강조하는 데 쓴다."""
+    result = {}
+    for preference in preferences:
+        # regular_preference_cards 와 같은 조건: 오늘 앉은 테이블과 내보낼 메뉴가 있는 손님만
+        if not preference.get("delivery_menu") or preference.get("today_table") is None:
+            continue
+        result[int(preference["today_table"])] = {
+            "nickname": preference["nickname"], "menu": preference["delivery_menu"],
+            "context": preference.get("visit_context") or f"{preference.get('visit_count', '')}회 방문한 손님입니다.",
+            "reason": preference.get("care_reason") or "다시 방문한 사실을 알아봐 주기 좋은 순간입니다.",
+            "action": preference.get("service_suggestion") or "작은 서비스와 함께 반갑게 인사해 주세요.",
+            "note": preference.get("visit_note") or "또 찾아주셔서 감사합니다. 오늘도 편하게 즐기다 가세요!",
+        }
+    return result
+
+
 def pick_recommendations(cards: list[dict], round_no: int) -> tuple[list[dict], int, int]:
     """round_no에 해당하는 네 장을 고르고 마지막 묶음은 앞 카드로 채운다."""
     pages = max(1, -(-len(cards) // RECOMMENDATION_PAGE_SIZE))

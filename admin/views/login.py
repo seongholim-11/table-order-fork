@@ -13,7 +13,7 @@ def login():
     with mid:
         st.html('<div style="height:8vh"></div><div style="text-align:center;margin-bottom:22px">'
                 '<div class="sb-logo" style="width:56px;height:56px;border-radius:16px;font-size:30px;margin:0 auto 14px">🍺</div>'
-                '<div style="font-size:26px;font-weight:800;letter-spacing:-.02em">식당도우미 관리자</div>'
+                '<div style="font-size:26px;font-weight:800;letter-spacing:-.02em">F&B Growth 관리자</div>'
                 '<div style="color:#8a857e;font-size:14px;margin-top:6px">사장님 전용 관리 화면이에요</div></div>')
         with st.container(border=True):
             token = st.text_input("관리자 토큰", type="password", placeholder="토큰을 입력하세요")

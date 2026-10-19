@@ -272,3 +272,14 @@ def test_server_chat_new_button_creates_room_and_list_switches(monkeypatch):
     assert [m.markdown[0].value for m in app.chat_message] == ["인사", "저번주 매출", "답:저번주 매출"]
     app.chat_input[0].set_value("그 전주는?").run()
     assert server.sessions["s1"]["messages"][-1]["content"] == "답:그 전주는?"
+
+
+def test_recommend_tab_shows_table_map_with_highlight():
+    """AI 추천 화면의 손님 응대 제안에 테이블 배치도가 보이고, 제안이 있는 테이블만 눌러 볼 수 있다."""
+    app = open_marketing("AI 추천")
+    buttons = {b.key: b for b in app.button if b.key and b.key.startswith("mk_table_")}
+    assert buttons, "테이블 배치도 버튼이 있어야 한다"
+    enabled = [b for b in buttons.values() if not b.disabled]
+    assert enabled and len(enabled) < len(buttons)  # 제안이 있는 테이블만 활성화
+    enabled[0].click().run()
+    assert not app.exception

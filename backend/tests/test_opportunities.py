@@ -112,3 +112,38 @@ def test_growth_performance_uses_db_and_one_month_formula(client):
     assert result["ai_monthly_revenue"] == 6_000
     assert result["monthly_growth"] == result["performance_monthly"] - result["baseline_monthly"]
 
+
+
+def _result():
+    """제미나이 다듬기 테스트용 추천 결과 (문자 1장 + 기타 1장)."""
+    sms = {"title": "휴면 되찾기", "why": "오래 안 왔어요", "action": "문자 보내기", "action_type": "sms",
+           "sms_body": "원래 문구", "member_ids": [1], "target_grades": ["휴면"]}
+    guide = {"title": "인기 메뉴", "why": "1위예요", "action": "앞세우기", "action_type": "guide",
+             "sms_body": "", "member_ids": [], "target_grades": []}
+    return {"items": [sms, guide], "groups": {"sms": {"items": [sms]}, "guide": {"items": [guide]}}}
+
+
+def test_refine_with_gemini_batches_once_caches_and_falls_back(monkeypatch):
+    """키가 없으면 규칙 문구 그대로, 있으면 한 번만 호출해 다듬고, 실패하면 규칙 문구로 돌아간다."""
+    from types import SimpleNamespace
+    from app.services import opportunities as service
+
+    service._REFINE_CACHE.clear()
+    calls = []
+    monkeypatch.setattr(service, "_ask_gemini_batch",
+                        lambda settings, cards: calls.append(cards) or {0: "AI 문자", 1: "AI 할 일"})
+    # 키가 없으면 호출하지 않고 source 만 rule 로 붙는다.
+    plain = service.refine_with_gemini(_result(), SimpleNamespace(gemini_api_key="", gemini_model="m"))
+    assert not calls and plain["items"][0]["source"] == "rule" and plain["items"][0]["sms_body"] == "원래 문구"
+    # 키가 있으면 묶음 한 번으로 문자 본문·할 일이 바뀐다. 같은 입력을 다시 보내도 호출하지 않는다.
+    settings = SimpleNamespace(gemini_api_key="k", gemini_model="m")
+    for _ in range(2):
+        refined = service.refine_with_gemini(_result(), settings)
+    assert len(calls) == 1
+    assert refined["items"][0]["sms_body"] == "AI 문자" and refined["items"][1]["action"] == "AI 할 일"
+    assert refined["items"][0]["source"] == "ai"
+    # 호출이 실패하면 규칙 문구를 그대로 쓴다.
+    service._REFINE_CACHE.clear()
+    monkeypatch.setattr(service, "_ask_gemini_batch", lambda s, c: (_ for _ in ()).throw(ValueError("x")))
+    failed = service.refine_with_gemini(_result(), settings)
+    assert failed["items"][0]["sms_body"] == "원래 문구" and failed["items"][0]["source"] == "rule"

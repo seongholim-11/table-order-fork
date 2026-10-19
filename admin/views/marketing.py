@@ -10,7 +10,7 @@ import admin_repository as repo_mod
 import marketing_ai
 from admin.marketing.config import RECOMMENDATION_PAGE_SIZE
 from admin.marketing.recommendations import pick_recommendations as pick_recommendation_page
-from admin.marketing.recommendations import regular_preference_cards, regular_preference_preview_cards
+from admin.marketing.recommendations import regular_preference_cards, regular_preference_preview_cards, table_suggestions
 from admin.ui.widgets import kpi, page_head, sec_title
 from admin.views.growth_performance import page_growth_performance
 from admin_dummy_data import Unsupported
@@ -271,10 +271,56 @@ def pick_recommendations(recs, round_no):
     return pick_recommendation_page(recs, round_no)
 
 
+TABLE_MAP_COLUMNS = 6  # 배치도 한 줄에 놓을 테이블 수
+
+
+def _pick_table(number):
+    """배치도에서 눌린 테이블을 기억해 옆 패널에 그 테이블의 제안을 보여 준다."""
+    ss["mk_table_sel"] = number
+
+
+def _render_table_map(repo, preferences):
+    """매장 테이블 배치도. 제안이 있는 테이블만 강조(눌러서 선택)하고, 선택한 테이블의 제안을 옆에 보여 준다."""
+    try:
+        total = int(repo.store()["tables"])
+    except (KeyError, TypeError, ValueError):
+        return
+    suggestions = table_suggestions(preferences)
+    # 테이블 좌표 정보가 없으므로 번호 순서대로 격자에 놓는다. 제안은 매장 테이블 수를 넘는 번호여도 놓치지 않게 포함한다.
+    last = max([total, *suggestions])
+    selected = ss.get("mk_table_sel")
+    if selected not in suggestions:
+        selected = next(iter(sorted(suggestions)), None)  # 처음에는 제안이 있는 첫 테이블을 보여 준다
+    left, right = st.columns([3, 2], gap="large")
+    with left.container(key="mk_table_map"):
+        st.caption("💡 표시된 테이블에 응대 제안이 있어요. 눌러서 내용을 확인하세요.")
+        for start in range(1, last + 1, TABLE_MAP_COLUMNS):
+            cols = st.columns(TABLE_MAP_COLUMNS)
+            for offset, col in enumerate(cols):
+                number = start + offset
+                if number > last:
+                    break
+                has = number in suggestions
+                col.button(f"💡 {number}" if has else str(number), key=f"mk_table_{number}", width="stretch",
+                           type="primary" if number == selected else "secondary", disabled=not has,
+                           on_click=_pick_table, args=(number,),
+                           help="응대 제안 보기" if has else "제안 없음")
+    with right:
+        if selected is None:
+            st.info("오늘은 응대 제안이 있는 테이블이 없어요.")
+            return
+        tip = suggestions[selected]
+        st.html('<div class="rec"><div class="rt">' + escape(f"{selected}번 테이블 · {tip['nickname']}님") + '</div>'
+                f'<div class="rw">{escape(tip["context"])}<br>{escape("추천 이유: " + tip["reason"])}</div>'
+                f'<div class="ra">{escape("추천 행동: " + tip["action"])}<br>'
+                f'{escape("“" + tip["note"] + "”")}</div></div>')
+
+
 def _render_regular_preferences(repo):
     """오늘 주문한 단골·주간 반복 방문·특별일 고객의 응대 제안을 표시한다."""
     try:
-        cards = regular_preference_cards(repo.regular_preferences())
+        preferences = repo.regular_preferences()
+        cards = regular_preference_cards(preferences)
     except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable):
         # 추가 정보 조회가 실패해도 기존 추천 카드·재추천 버튼은 그대로 사용할 수 있다.
         st.info("단골 손님 정보를 불러오지 못했어요. 잠시 후 재추천을 눌러 주세요.")
@@ -284,6 +330,7 @@ def _render_regular_preferences(repo):
         if repo.source == "api":
             sec_title("손님 응대 제안")
             st.info("오늘 주문이 확인된 재방문 고객이 아직 없습니다. 새 주문 후 재추천을 눌러 확인해 주세요.")
+            _render_table_map(repo, [])
             return
         # DB에 예시 회원을 넣지 않고도 발표에서 추천 동작과 문구를 보여줄 수 있게 한다.
         cards = regular_preference_preview_cards()
@@ -292,6 +339,7 @@ def _render_regular_preferences(repo):
                "첫 방문 기념일이 확인된 손님이 오늘 주문하면 상황에 맞는 응대를 제안해요.")
     else:
         sec_title("손님 응대 제안", "단골과 특별한 방문 상황이 확인된 손님에게 응대를 제안해요")
+        _render_table_map(repo, preferences)
     # 한 안내 안에서 손님별 제안을 읽기 쉽도록 줄바꿈하며, DB 텍스트는 먼저 이스케이프한다.
     body = "".join(f'<div class="rec" style="grid-column:1 / -1"><div class="rt">{escape(card["title"])}</div>'
                    f'<div class="rw">{escape(card["why"])}</div>'

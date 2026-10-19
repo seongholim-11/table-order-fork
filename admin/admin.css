@@ -51,6 +51,8 @@ hr { border-color: var(--line) !important; }
 .st-key-nav_top [role="radiogroup"] > div:nth-child(3) p::before { content: "🎚️"; }
 .st-key-nav_top [role="radiogroup"] > div:nth-child(4) p::before { content: "🎉"; }
 .st-key-nav_top [role="radiogroup"] > div:nth-child(5) p::before { content: "👥"; }
+/* 마케팅 하위 메뉴(항목 4개인 묶음)의 3번째 'AI 문자'는 사이드바에서 숨긴다. AI 추천의 [AI 문자로 실행]으로만 들어간다 */
+[data-testid="stSidebar"] [role="radiogroup"]:has(> div:nth-child(4):last-child) > div:nth-child(3) { display: none; }
 /* 접고 펼 수 있는 하위 메뉴 (주문 이력·마케팅) */
 [data-testid="stSidebar"] [data-testid="stExpander"] details { background: transparent !important; border: 0 !important; box-shadow: none !important; }
 [data-testid="stSidebar"] [data-testid="stExpander"] summary { background: transparent !important; padding: 11px 12px; border-radius: 10px; font-size: 14.5px; font-weight: 600; color: var(--nav-ink); }

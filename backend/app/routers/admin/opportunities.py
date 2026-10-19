@@ -26,8 +26,10 @@ def opportunities(request: Request, round: int = Query(default=0, ge=0),
     store = StatsStore(request.app.state.db)
     orders, members = store.orders(), request.app.state.members.all()
     stats = stats_service.dashboard(orders, members, store.recommendation_count(), today, rule)
-    return opportunity_service.opportunities(
+    result = opportunity_service.opportunities(
         orders, members, request.app.state.shop.menus(), stats, today, rule, round)
+    # 규칙 엔진이 고른 카드만 제미나이로 다듬는다 (키가 없거나 실패하면 규칙 문구 그대로)
+    return opportunity_service.refine_with_gemini(result, settings)
 
 
 @router.get("/marketing/growth-performance")

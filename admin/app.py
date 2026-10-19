@@ -54,7 +54,7 @@ from admin.views.orders import page_orders  # noqa: E402
 from admin.views.weights import page_weights  # noqa: E402
 from admin_repository import DEFAULT_RULE  # noqa: E402
 
-st.set_page_config(page_title="식당도우미 관리자", page_icon="🍺", layout="wide", initial_sidebar_state="auto")
+st.set_page_config(page_title="F&B Growth 관리자", page_icon="🍺", layout="wide", initial_sidebar_state="auto")
 st.html(Path(__file__).with_name("admin.css"))
 
 # 사이드바 메뉴. 화면 안에 탭이 있는 페이지(대시보드·고객 등급·주문 이력·마케팅)는 탭을 접고 펼 수 있는 하위 메뉴로 보여 준다.
@@ -120,7 +120,7 @@ if ss.get("customer_rule_defaults") != current_rule or ss.get("customer_rule_sou
 ss["grade_rule"] = dict(current_rule)
 store = repo.backend.store()
 with st.sidebar:
-    st.html(f'<div class="sb-brand"><div class="sb-logo">🍺</div><div><div class="sb-name">식당도우미</div>'
+    st.html(f'<div class="sb-brand"><div class="sb-logo">🍺</div><div><div class="sb-name">F&B Growth</div>'
             f'<div class="sb-sub">관리자 콘솔</div></div></div><div class="sb-label">MENU</div>')
     # 새로고침해도 보던 메뉴가 유지되도록 URL(?page=...&tab=...)에 저장하고 거기서 복원한다.
     if "nav_top" not in ss:

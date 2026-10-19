@@ -172,7 +172,8 @@ class ApiBackend:
 
     def opportunities(self, round_no=0):
         """서버가 DB 자료로 계산한 네 장의 마케팅 추천을 읽는다."""
-        return api.get(ENDPOINTS["opportunities"], self.token, params={"round": round_no})
+        # 서버가 제미나이로 문구를 다듬는 동안 기다릴 수 있게 시간을 넉넉히 둔다
+        return api.get(ENDPOINTS["opportunities"], self.token, params={"round": round_no}, timeout=30)
 
     def growth_performance(self):
         # backend/app/services/growth_performance.py가 orders·members DB를 읽어 계산한다.
