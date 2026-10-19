@@ -92,6 +92,9 @@ def _roulette_editor(old, menu_names):
                                       key=f"roulette_menu_{row_id}")
             # 전체 메뉴는 할인 전용 옵션이므로 선택 즉시 종류를 할인으로 고정한다.
             selected_kind = ROULETTE_KINDS["discount"] if menu == ALL_MENU_LABEL else row.get("종류", "서비스")
+            # 같은 키의 위젯은 index보다 이전 선택값을 우선하므로 세션 값도 함께 바꾼다.
+            if menu == ALL_MENU_LABEL:
+                ss[f"roulette_kind_{row_id}"] = selected_kind
             kind = kind_col.selectbox("종류", list(ROULETTE_KINDS.values()),
                                       index=list(ROULETTE_KINDS.values()).index(selected_kind),
                                       key=f"roulette_kind_{row_id}", disabled=menu == ALL_MENU_LABEL)

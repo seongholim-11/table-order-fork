@@ -89,6 +89,30 @@ def test_page_shows_event_and_preview(monkeypatch):
     assert not [button for button in app.button if button.label in ("변경 저장", "↩ 되돌리기")]
 
 
+def test_all_menu_switches_service_to_discount_and_saves(monkeypatch):
+    # 이미 서비스로 렌더링된 칸에서 전체 메뉴를 골라도 이전 위젯 값이 남지 않아야 한다.
+    monkeypatch.setenv("DATA_SOURCE", "dummy")
+    monkeypatch.setenv("ADMIN_TOKEN", "change-me")
+    app = AppTest.from_file(APP, default_timeout=30).run()
+    app.text_input[0].set_value("change-me")
+    app.button[0].click().run()
+    app.sidebar.radio(key="nav_top").set_value("이벤트").run()
+    assert not app.exception
+    assert app.selectbox(key="roulette_kind_0-1").value == "서비스"
+    app.selectbox(key="roulette_menu_0-1").select(ar.ALL_MENU_LABEL).run()
+    assert not app.exception
+    kind = app.selectbox(key="roulette_kind_0-1")
+    assert kind.value == "할인" and kind.disabled
+    rate = app.selectbox(key="roulette_rate_0-1")
+    assert not rate.disabled
+    rate.select(10).run()
+    assert any("10% 할인" in h.value for h in app.get("html"))
+    app.button(key="roulette_save").click().run()
+    assert not app.exception and not app.error
+    saved = app.session_state["repo"].backend.roulette_prizes()[1]
+    assert saved["kind"] == "discount" and saved["percent"] == 10
+
+
 def test_user_spin_follows_weights():
     prizes = [{"weight": 0}, {"weight": 5}, {"weight": 0}]
     assert {pick_prize_index(prizes) for _ in range(50)} == {1}
