@@ -6,5 +6,6 @@ secondaryBackgroundColor = "#ffffff"
 textColor = "#1d1b19"
 font = "sans serif"
 
+# 포트는 지정하지 않는다. 배포 플랫폼 헬스체크가 기본 포트(8501)를 보므로 8502로 고정하면 배포가 실패한다.
+# 로컬에서 손님 화면과 같이 켤 때는 `--server.port 8502` 로 직접 지정한다.
 [server]
-port = 8502
