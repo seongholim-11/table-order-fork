@@ -47,7 +47,9 @@ class Database:
             import psycopg
             from psycopg.rows import dict_row
             # prepare_threshold=None: Supabase 풀러(트랜잭션 모드)는 prepared statement 를 지원하지 않는다.
-            return psycopg.connect(self._url, row_factory=dict_row, prepare_threshold=None, autocommit=True)
+            return psycopg.connect(self._url, row_factory=dict_row, prepare_threshold=None, autocommit=True,
+                                   # 연결이 반쯤 끊겨 쿼리가 영원히 멈추는 것을 막는다: 연결 10초 제한 + 유휴 연결 생존 확인(keepalive).
+                                   connect_timeout=10, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
         conn = sqlite3.connect(self._url.removeprefix("sqlite:///") or ":memory:", check_same_thread=False)
         conn.row_factory = sqlite3.Row
         return conn

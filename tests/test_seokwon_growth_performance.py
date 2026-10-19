@@ -52,16 +52,17 @@ def test_monthly_growth_uses_first_ai_order_as_adoption_date():
     assert result["monthly_growth"] == 3_000 and result["growth_rate"] == 1
 
 
-def test_growth_page_lists_sales_customers_and_growth_results(monkeypatch):
+def test_growth_page_shows_only_growth_results_without_dashboard_duplicates(monkeypatch):
     app = open_growth(monkeypatch)
     assert not app.exception
     html = "\n".join(element.value for element in app.get("html"))
-    for title in ("F&amp;B그로스 성과", "1. 매출데이터", "2. 고객데이터", "3. F&amp;B그로스와 함께한 결과"):
-        assert title in html
+    assert "F&amp;B그로스 성과" in html
+    assert "F&amp;B그로스와 함께한 결과" in html
+    assert "1. 매출데이터" not in html and "2. 고객데이터" not in html
     for label in ("AI 추천 사용 주문", "AI 연동 월환산 매출", "최종 월환산 매출 차이",
                   "2회 이상 방문한 신규고객", "새로 방문한 휴면고객"):
         assert label in html
-    assert app.dataframe and len(app.dataframe[0].value) > 0
+    assert not app.dataframe
     assert app.number_input[0].label == "성과 수수료율(%)"
     assert len(app.get("vega_lite_chart")) >= 2
     assert app.sidebar.radio(key="nav_sub_마케팅").value == "F&B그로스 성과"

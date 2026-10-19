@@ -24,7 +24,7 @@ def _order(client, member_id: int, days_ago: int, menu_id: str, name: str, table
 
 
 def test_second_visit_birthday_connects_previous_table_menu_and_current_table(client):
-    """두 번째 방문부터 과거 자리·메뉴와 생일을 현재 테이블 응대에 연결한다."""
+    """방문 횟수가 적어도 생일 근거가 있으면 과거 기록과 응대를 연결한다."""
     db = client.app.state.db
     db.run("DELETE FROM menus")
     for menu_id, name in (("care-pajeon", "해물파전"), ("care-egg", "계란말이")):
@@ -67,16 +67,16 @@ def test_rainy_day_pajeon_history_creates_data_based_service_suggestion(client):
     assert "해물파전" in row["care_reason"] and "서비스" in row["service_suggestion"]
 
 
-def test_three_login_days_drive_frequent_visit_suggestion_even_with_two_orders(client):
-    """한 주 방문 빈도는 주문 건수가 아니라 table_logins의 서로 다른 로그인 날짜로 계산한다."""
+def test_two_login_days_drive_frequent_visit_suggestion_even_with_two_orders(client):
+    """한 주 2일 이상 방문하면 주문 건수와 관계없이 빈도 응대를 제안한다."""
     db = client.app.state.db
     db.run("DELETE FROM menus")
     db.run("INSERT INTO menus (id, category_id, name, price) VALUES ('care-egg', 'anju', '계란말이', 15000)")
     member = client.app.state.members.upsert_login("care-frequent", "자주온손님")
     db.run("UPDATE members SET visit_count=3 WHERE id=?", (member["id"],))
-    _order(client, member["id"], 2, "care-egg", "계란말이", 8)
+    _order(client, member["id"], 8, "care-egg", "계란말이", 8)
     _order(client, member["id"], 0, "care-egg", "계란말이", 4)
-    for days_ago, table in ((2, 8), (1, 6), (0, 4)):
+    for days_ago, table in ((1, 6), (0, 4)):
         logged_at = datetime.now(KST) - timedelta(days=days_ago)
         db.run(
             "INSERT INTO table_logins (table_no, member_id, login_day, logged_in_at) VALUES (?, ?, ?, ?)",
@@ -84,5 +84,31 @@ def test_three_login_days_drive_frequent_visit_suggestion_even_with_two_orders(c
         )
 
     row, = client.get(URL, headers=ADMIN).json()["preferences"]
-    assert row["weekly_visits"] == 3 and row["special_event"] == "frequent_week"
-    assert "최근 7일 동안 3일 방문" in row["care_reason"]
+    assert row["weekly_visits"] == 2 and row["special_event"] == "frequent_week"
+    assert "최근 7일 동안 2일 방문" in row["care_reason"]
+
+
+def test_ordinary_second_visit_without_special_reason_is_not_recommended(client):
+    db = client.app.state.db
+    db.run("DELETE FROM menus")
+    db.run("INSERT INTO menus (id, category_id, name, price) VALUES ('care-egg', 'anju', '계란말이', 15000)")
+    member = client.app.state.members.upsert_login("care-ordinary", "일반 재방문")
+    db.run("UPDATE members SET visit_count=2, birthday=NULL WHERE id=?", (member["id"],))
+    _order(client, member["id"], 8, "care-egg", "계란말이", 8)
+    _order(client, member["id"], 0, "care-egg", "계란말이", 4)
+
+    assert client.get(URL, headers=ADMIN).json()["preferences"] == []
+
+
+def test_first_visit_anniversary_is_a_valid_recommendation_reason(client):
+    db = client.app.state.db
+    db.run("DELETE FROM menus")
+    db.run("INSERT INTO menus (id, category_id, name, price) VALUES ('care-egg', 'anju', '계란말이', 15000)")
+    member = client.app.state.members.upsert_login("care-anniversary", "기념일 손님")
+    db.run("UPDATE members SET visit_count=2, birthday=NULL WHERE id=?", (member["id"],))
+    _order(client, member["id"], 365, "care-egg", "계란말이", 8)
+    _order(client, member["id"], 0, "care-egg", "계란말이", 4)
+
+    row, = client.get(URL, headers=ADMIN).json()["preferences"]
+    assert row["special_event"] == "visit_anniversary" and row["is_visit_anniversary"]
+    assert "첫 방문일" in row["care_reason"] and "기념" in row["service_suggestion"]

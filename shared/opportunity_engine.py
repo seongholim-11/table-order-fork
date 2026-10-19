@@ -47,8 +47,11 @@ def _birthday_distance(value: str | None, today: date) -> int | None:
     return (birthday - today).days
 
 
-def build_context(members: list[dict], orders: list[dict], menus: list[dict], stats: dict, today: date) -> dict:
+def build_context(members: list[dict], orders: list[dict], menus: list[dict], stats: dict, today: date,
+                  rule: dict | None = None) -> dict:
     """정규화된 행을 추천 규칙이 읽는 집계 자료로 바꾼다."""
+    # 휴면 고객의 과거 방문 수준도 고객 목록에 저장된 재방문·단골 기준으로 분류한다.
+    repeat_min, regular_min = (rule or {}).get("repeat", 2), (rule or {}).get("regular", 5)
     member_by_id = {row["id"]: row for row in members}
     sendable_ids = {row["id"] for row in members if row.get("has_phone") and row.get("marketing_consent")
                     and not row.get("opted_out")}
@@ -107,8 +110,8 @@ def build_context(members: list[dict], orders: list[dict], menus: list[dict], st
     for grade in ("신규", "재방문", "단골", "휴면"):
         segment(f"grade:{grade}", lambda row, _p, grade=grade: row.get("grade") == grade)
     segment("dormant_once", lambda row, _p: row.get("grade") == "휴면" and int(row.get("visit_count") or 0) <= 1)
-    segment("dormant_regular", lambda row, _p: row.get("grade") == "휴면" and int(row.get("visit_count") or 0) >= 5)
-    segment("dormant_repeat", lambda row, _p: row.get("grade") == "휴면" and 2 <= int(row.get("visit_count") or 0) < 5)
+    segment("dormant_regular", lambda row, _p: row.get("grade") == "휴면" and int(row.get("visit_count") or 0) >= regular_min)
+    segment("dormant_repeat", lambda row, _p: row.get("grade") == "휴면" and repeat_min <= int(row.get("visit_count") or 0) < regular_min)
     segment("birthday_30", lambda row, _p: (distance := _birthday_distance(row.get("birthday"), today)) is not None
                                            and distance <= 30)
     for age in ("20대", "30대", "40대", "50대 이상"):
@@ -200,7 +203,7 @@ def recommend(ctx: dict) -> list[dict]:
     dormant_rules = [
         ("dormant_once", "한 번 방문 후 멈춘 휴면 고객", "첫 경험이 두 번째 방문의 충분한 이유로 이어지지 않았을 가능성이 커요.",
          "첫 방문 고객 전용 복귀 혜택을 제안하세요.", "첫 방문 이후 다시 뵙지 못했어요. 재방문해 주시면 음료 1잔을 서비스로 드릴게요."),
-        ("dormant_repeat", "재방문하다 멈춘 휴면 고객", "2~4회 방문 뒤 끊긴 고객은 메뉴 변화나 혜택 부족이 원인일 가능성을 점검할 필요가 있어요.",
+        ("dormant_repeat", "재방문하다 멈춘 휴면 고객", "재방문 기준을 충족한 뒤 방문이 끊긴 고객은 메뉴 변화나 혜택 부족이 원인일 가능성을 점검할 필요가 있어요.",
          "새 메뉴 소식과 복귀 혜택을 함께 알리세요.", "전에 찾아주셨던 기억이 나요. 새 메뉴도 준비했으니 이번 주 다시 들러 주세요."),
         ("dormant_regular", "예전 단골이 된 휴면 고객", "방문 횟수는 높지만 오래 오지 않아 관계가 약해진 상태일 가능성이 커요.",
          "일반 광고보다 기억하고 있다는 개인화된 감사 문자를 보내세요.", "자주 찾아주셨던 고객님이 생각났어요. 다시 오시면 감사 서비스로 반갑게 맞아드릴게요."),

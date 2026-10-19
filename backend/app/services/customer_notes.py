@@ -68,7 +68,7 @@ def _visit_label(day: date, table_no: int, menus: list[str]) -> str:
 def regular_notes(members: list[dict], orders: list[dict], lines: list[dict],
                   menus: list[dict], today: date, dormant_days: int = 30, repeat_visits: int = 2,
                   regular_visits: int = 5, weather_text: str = "", visits: list[dict] | None = None) -> list[dict]:
-    """오늘 주문한 2회 이상 방문 고객에게 DB 근거가 있는 현장 응대를 제안한다."""
+    """단골·주간 반복 방문·생일·첫 방문 기념일이 확인된 손님에게만 응대를 제안한다."""
     by_id = {menu["id"]: menu for menu in menus}
     by_name = defaultdict(list)
     for menu in menus:
@@ -103,10 +103,8 @@ def regular_notes(members: list[dict], orders: list[dict], lines: list[dict],
 
     result = []
     for member in members:
-        # 두 번째 방문부터 알아봐 주는 경험을 만들되, 아직 돌아오지 않은 휴면 고객은 현장 응대에서 제외한다.
+        # 고객 등급과 특별 상황은 계산하되, 일반 재방문만으로는 제안을 만들지 않는다.
         grade = grade_of(member, today, repeat=repeat_visits, regular=regular_visits, dormant=dormant_days)
-        if int(member.get("visit_count") or 0) < repeat_visits or grade == "휴면":
-            continue
         history, history_all, history_orders, current = defaultdict(set), defaultdict(set), [], []
         for order in by_member[member["id"]]:
             day = order["at"].date()
@@ -130,6 +128,14 @@ def regular_notes(members: list[dict], orders: list[dict], lines: list[dict],
         paid_orders = [order for order in current if ordered_menus[order["id"]]]
         if not paid_orders:
             continue
+        distinct_visit_days = login_days[member["id"]] | {order["at"].date() for order in history_orders + current}
+        weekly_visits = sum(day >= today - timedelta(days=6) for day in distinct_visit_days)
+        first_visit = min(distinct_visit_days) if distinct_visit_days else None
+        anniversary = bool(first_visit and first_visit.year < today.year
+                           and (first_visit.month, first_visit.day) == (today.month, today.day))
+        birthday = _is_birthday(member, today)
+        if grade == "휴면" or (grade != "단골" and weekly_visits < 2 and not birthday and not anniversary):
+            continue
         latest = max(paid_orders, key=lambda order: (order["at"], order["id"]))
         current_menus = set().union(*(ordered_menus[order["id"]] for order in current
                                      if order["table_no"] == latest["table_no"]))
@@ -150,9 +156,6 @@ def regular_notes(members: list[dict], orders: list[dict], lines: list[dict],
                           if previous else [])
         previous_visit = (_visit_label(previous["at"].date(), previous["table_no"], previous_menus)
                           if previous else "이전 주문 기록 없음")
-        distinct_visit_days = login_days[member["id"]] | {order["at"].date() for order in history_orders + current}
-        weekly_visits = sum(day >= today - timedelta(days=6) for day in distinct_visit_days)
-        birthday = _is_birthday(member, today)
         age = today.year - member["birth_year"] if birthday and member.get("birth_year") else None
 
         # 80% 기준이 아직 안 쌓였어도 가장 자주 확인된 과거 메뉴는 서비스 아이디어로만 사용한다.
@@ -162,8 +165,6 @@ def regular_notes(members: list[dict], orders: list[dict], lines: list[dict],
         most_ordered = by_id[most_ordered_id]["name"] if most_ordered_id else None
         rainy_favorite = bool(most_ordered and "파전" in most_ordered and
                               any(word in weather_text for word in ("비", "소나기", "천둥")))
-        gap = (today - previous["at"].date()).days if previous else None
-
         if birthday:
             age_text = f" 만 {age}세" if age is not None else ""
             care_reason = f"오늘은 {member['nickname']}님의{age_text} 생일이고, {member['visit_count']}번째 방문입니다."
@@ -171,28 +172,26 @@ def regular_notes(members: list[dict], orders: list[dict], lines: list[dict],
             visit_note = (f"{member['nickname']}님, 생일 축하드립니다! 자주 드시던 "
                           f"{most_ordered + '도 기억하고 있어요. ' if most_ordered else ''}오늘 작은 생일 서비스를 준비해 드릴게요.")
             special_event = "birthday"
+        elif anniversary:
+            care_reason = f"오늘은 첫 방문일로부터 {today.year - first_visit.year}주년입니다. 다시 찾아주신 기념일을 알아봐 주세요."
+            service_suggestion = f"첫 방문 기념 인사와 함께 {most_ordered or delivery} 취향에 맞는 작은 서비스를 제안해 보세요."
+            visit_note = f"{member['nickname']}님, 처음 찾아주신 날부터 함께해 주셔서 감사합니다. 작은 기념 서비스를 준비했어요."
+            special_event = "visit_anniversary"
         elif rainy_favorite:
             care_reason = f"오늘은 {weather_text}이고, {member['nickname']}님은 이전에 {most_ordered}을(를) 자주 주문했습니다."
             service_suggestion = f"비 오는 날 취향에 맞춰 {most_ordered} 또는 작은 곁들임 서비스를 제안해 보세요."
             visit_note = f"{member['nickname']}님, 비 오는 날 좋아하시던 {most_ordered} 생각나서 작은 서비스를 준비했어요."
             special_event = "rainy_favorite"
-        elif weekly_visits >= 3:
+        elif weekly_visits >= 2:
             care_reason = f"최근 7일 동안 {weekly_visits}일 방문한 고객입니다. 자주 찾아주는 사실을 지금 알아봐 주면 충성 고객 전환에 도움이 됩니다."
             service_suggestion = f"자주 드신 {most_ordered or delivery}와 어울리는 작은 서비스 메뉴를 드려 보세요."
             visit_note = (f"{member['nickname']}님, 이번 주에 자주 찾아주셔서 정말 감사합니다. "
                           f"오늘 고르신 {delivery}와 함께 작은 서비스를 준비했어요.")
             special_event = "frequent_week"
-        elif gap is not None and gap >= 14:
-            care_reason = f"{previous_visit}한 뒤 {gap}일 만에 다시 방문했습니다. 오랜만의 재방문을 알아봐 주기 좋은 순간입니다."
-            service_suggestion = f"반가운 인사와 함께 {most_ordered or delivery} 취향에 맞는 작은 서비스를 제안하세요."
-            visit_note = f"{member['nickname']}님, {gap}일 만에 다시 뵈니 정말 반갑습니다. 작은 서비스를 준비해 드릴게요."
-            special_event = "long_time_return"
         else:
-            care_reason = f"{previous_visit}했고 오늘 다시 방문했습니다. {member['visit_count']}번째 방문을 알아봐 주면 단골 전환 가능성을 높일 수 있습니다."
-            service_suggestion = f"오늘 주문한 {delivery}와 어울리는 작은 서비스 메뉴를 드리며 반갑게 인사하세요."
-            # 평범한 재방문도 방문 횟수와 오늘 주문에 따라 기존 인사말이 달라지도록 유지한다.
-            visit_note = f"{member['nickname']}님, {visit_note} 지난 방문도 기억하고 있어요. 작은 서비스를 준비해 드릴게요."
-            special_event = "return_visit"
+            care_reason = f"{member['visit_count']}회 방문한 단골 고객입니다. 오늘 주문을 계기로 감사 인사를 전해 보세요."
+            service_suggestion = f"단골 고객에게 {most_ordered or delivery}와 어울리는 작은 감사 서비스를 제안해 보세요."
+            special_event = "regular_customer"
         if favorite:
             context += f" 이전 주문일 {len(history)}일 중 {frequency}일에 {name} 메뉴를 주문했습니다(80% 이상)."
             if changed_today:
@@ -228,6 +227,7 @@ def regular_notes(members: list[dict], orders: list[dict], lines: list[dict],
             "grade": grade, "previous_visit": previous_visit, "previous_table": previous["table_no"] if previous else None,
             "previous_menus": previous_menus, "weekly_visits": weekly_visits,
             "is_birthday": birthday, "age": age, "weather_text": weather_text,
+            "is_visit_anniversary": anniversary,
             "special_event": special_event, "care_reason": care_reason,
             "service_suggestion": service_suggestion, "most_ordered_menu": most_ordered,
         })

@@ -50,7 +50,9 @@ def set_client(client: httpx.Client | None) -> None:
 def _http() -> httpx.Client:
     global _client
     if _client is None:
-        _client = httpx.Client(base_url=API_URL, timeout=5)
+        # 배포 서버(Render 등)는 한동안 안 쓰면 잠들어 첫 응답에 수십 초 걸린다.
+        # 읽기 대기만 40초로 늘리고, 연결 자체가 안 되는 경우는 5초 만에 실패시킨다.
+        _client = httpx.Client(base_url=API_URL, timeout=httpx.Timeout(40, connect=5))
     return _client
 
 

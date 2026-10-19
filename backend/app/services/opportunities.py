@@ -31,7 +31,7 @@ def build_context(orders: list[dict], members: list[dict], menus: list[dict], st
         "spicy": int(menu.get("spicy") or 0), "soldout": bool(menu.get("soldout")),
         "weight": int(menu.get("weight") or 0),
     } for menu in menus]
-    return build_shared_context(normalized_members, orders, normalized_menus, stats, today)
+    return build_shared_context(normalized_members, orders, normalized_menus, stats, today, rule=rule)
 
 
 def opportunities(orders: list[dict], members: list[dict], menus: list[dict], stats: dict,

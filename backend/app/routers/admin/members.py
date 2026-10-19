@@ -68,19 +68,18 @@ router.add_api_route("/customers/{member_id}/opt-out", member_opt_out, methods=[
 
 @router.get("/marketing/regular-preferences")
 async def regular_preferences(request: Request, settings: Settings = Depends(get_settings)):
-    """오늘 주문한 2회 이상 방문 고객의 과거 기록과 응대 제안을 조회한다."""
+    """오늘 주문한 단골·주간 반복 방문·생일·첫 방문 기념일 고객의 응대 제안을 조회한다."""
     from app.services.customer_notes import regular_notes
     from app.stores.customer_notes import CustomerNotesStore
 
     # 기존 고객 목록 응답은 유지하고 마케팅 화면에서만 선호도 조회를 사용한다.
     store = CustomerNotesStore(request.app.state.db)
-    # 재방문 기준(기본 2회)부터 안내해 두 번째 방문을 단골 전환 기회로 활용한다.
     rule = grade_rule(settings, db=request.app.state.db)
     today = datetime.now(KST).date()
     # 날씨는 외부 호출로 지어내지 않고, 기존 서비스가 오늘 DB에 저장한 값이 있을 때만 사용한다.
     saved_weather = request.app.state.external.store.get(today.isoformat()) or {}
-    notes = regular_notes(request.app.state.members.all(), store.orders(rule["repeat"]),
-                          store.lines(rule["repeat"]), store.menus(), today, dormant_days=rule["dormant"],
+    notes = regular_notes(request.app.state.members.all(), store.orders(1),
+                          store.lines(1), store.menus(), today, dormant_days=rule["dormant"],
                           repeat_visits=rule["repeat"], regular_visits=rule["regular"],
-                          weather_text=saved_weather.get("weather_text", ""), visits=store.visits(rule["repeat"]))
+                          weather_text=saved_weather.get("weather_text", ""), visits=store.visits(1))
     return {"preferences": notes}

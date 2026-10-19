@@ -466,7 +466,7 @@ class AdminRepository:
 
     # ---- 고객 / 주문 / 통계 ----
     def regular_preferences(self) -> list[dict]:
-        """마케팅 AI 추천에서 쓸 실제 DB의 오늘 주문한 2회 이상 방문 고객을 읽는다."""
+        """마케팅에서 쓸 단골·주간 반복 방문·특별일 응대 대상을 읽는다."""
         # 더미는 admin_dummy_data의 1,000명 주문으로 시연하고, API 모드는 아래 DB 경로를 그대로 읽는다.
         # 실제 DB 연결: backend/app/stores/customer_notes.py -> members/orders/order_items/menus
         if self.source != "api":

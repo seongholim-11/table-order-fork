@@ -71,7 +71,8 @@ def test_thousand_members_and_orders_update_every_marketing_reader(client):
         assert f'전체 누적: 매출 {revenue:,}원, 주문 {order_count}건' in chat
 
     verify(1000, 1000, 15000000, 10000000, 500)
-    assert len(get(client, 'marketing/regular-preferences')['preferences']) == 400
+    # 각 회원은 오늘 또는 이틀 전 중 하루만 주문했으므로 반복 방문 기준에 해당하지 않는다.
+    assert get(client, 'marketing/regular-preferences')['preferences'] == []
     # 같은 앱 인스턴스를 유지한 채 고객·주문을 추가하고 기존 회원의 수신거부를 변경한다.
     member = client.app.state.members.upsert_login('sync-new', '새고객', phone='01000000000')
     client.app.state.members.set_marketing_consent(member['id'], True)
@@ -92,3 +93,28 @@ def test_recommendation_hour_weekday_follow_kst(stamp):
     context = build_context([], [{'ts': stamp, 'total': 10000}], [], {}, datetime(2026, 10, 17).date())
     assert context['orders']['peak_hours'] == [0]
     assert context['orders']['weekdays'] == [(5, 1)]
+
+
+def test_dormant_recommendations_follow_saved_grade_rules(client):
+    """단골 기준 변경 시 휴면 고객의 추천도 고정 5회가 아닌 저장 기준으로 다시 분류한다."""
+    member = client.app.state.members.upsert_login('sync-dormant', '휴면 고객')
+    client.app.state.db.run('UPDATE members SET visit_count=6, last_visit_at=? WHERE id=?',
+                            ((datetime.now(KST) - timedelta(days=40)).isoformat(), member['id']))
+
+    def titles():
+        first = get(client, 'marketing/opportunities')
+        cards = first['items']
+        for page in range(1, first['pages']):
+            cards += get(client, f'marketing/opportunities?round={page}')['items']
+        return ' '.join(card['title'] for card in cards)
+
+    response = client.put('/admin/api/customers/grades/rules', headers=ADMIN,
+                          json={'repeat': 3, 'regular': 8, 'dormant': 30})
+    assert response.status_code == 200
+    current = titles()
+    assert '재방문하다 멈춘 휴면 고객' in current and '예전 단골이 된 휴면 고객' not in current
+    response = client.put('/admin/api/customers/grades/rules', headers=ADMIN,
+                          json={'repeat': 2, 'regular': 5, 'dormant': 30})
+    assert response.status_code == 200
+    current = titles()
+    assert '예전 단골이 된 휴면 고객' in current and '재방문하다 멈춘 휴면 고객' not in current

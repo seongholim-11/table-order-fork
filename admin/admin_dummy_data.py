@@ -224,7 +224,7 @@ class DummyBackend:
         return [{**o, "nickname": nick.get(o["member_id"])} for o in self.orders_]
 
     def regular_preferences(self) -> list[dict]:
-        """더미 주문만 근거로 오늘 매장에 온 2회 이상 방문 손님의 응대 제안을 만든다."""
+        """더미 주문에서 단골·주간 반복 방문·생일 근거가 있는 손님만 제안한다."""
         members = {member["id"]: member for member in self.members_ if member["visit_count"] >= 2}
         by_member: dict[int, list[dict]] = defaultdict(list)
         for order in self.orders_:
@@ -241,6 +241,7 @@ class DummyBackend:
             previous = max(history, key=lambda order: (order["ts"], order["id"]))
             member = members[member_id]
             previous_day = date.fromisoformat(previous["ts"][:10])
+            first_day = min(date.fromisoformat(order["ts"][:10]) for order in orders)
             previous_menus = [line["name"] for line in previous["lines"]]
             today_menus = [line["name"] for line in latest["lines"]]
             menu_counts = Counter(line["name"] for order in history for line in order["lines"])
@@ -248,6 +249,11 @@ class DummyBackend:
             visit_days = {order["ts"][:10] for order in orders
                           if order["ts"][:10] >= (TODAY - timedelta(days=6)).isoformat()}
             birthday = member["birthday"] == TODAY.strftime("%m%d")
+            anniversary = (first_day.year < TODAY.year
+                           and (first_day.month, first_day.day) == (TODAY.month, TODAY.day))
+            grade = _grade(member["visit_count"], member["last_visit"], self.customer_grade_rules())
+            if grade == "휴면" or (grade != "단골" and len(visit_days) < 2 and not birthday and not anniversary):
+                continue
             age = TODAY.year - member["birth_year"] if birthday else None
             gap = (TODAY - previous_day).days
             previous_visit = (f"{previous_day.month}월 {previous_day.day}일 {previous['table_no']}번 테이블에서 "
@@ -258,21 +264,22 @@ class DummyBackend:
                 reason = f"오늘은 {member['nickname']}님의 만 {age}세 생일이고, {member['visit_count']}번째 방문입니다."
                 action = f"생일 축하와 함께 자주 드신 {favorite}와 어울리는 작은 서비스를 드려 보세요."
                 note = f"{member['nickname']}님, 생일 축하드립니다! 자주 드시던 {favorite}도 기억하고 있어요."
-            elif len(visit_days) >= 3:
+            elif anniversary:
+                event = "visit_anniversary"
+                years = TODAY.year - first_day.year
+                reason = f"오늘은 첫 방문일로부터 {years}주년입니다. 다시 찾아주신 기념일을 알아봐 주세요."
+                action = f"첫 방문 기념 인사와 함께 {favorite} 취향에 맞는 작은 서비스를 제안해 보세요."
+                note = f"{member['nickname']}님, 처음 찾아주신 날부터 함께해 주셔서 감사합니다."
+            elif len(visit_days) >= 2:
                 event = "frequent_week"
                 reason = f"최근 7일 동안 {len(visit_days)}일 방문했습니다. 자주 찾아주는 사실을 알아봐 주기 좋은 순간입니다."
                 action = f"자주 드신 {favorite}와 어울리는 작은 서비스를 드려 보세요."
                 note = f"{member['nickname']}님, 이번 주에 자주 찾아주셔서 감사합니다. 작은 서비스를 준비했어요."
-            elif gap >= 14:
-                event = "long_time_return"
-                reason = f"{previous_visit}한 뒤 {gap}일 만에 다시 방문했습니다."
-                action = f"반가운 인사와 함께 {favorite} 취향에 맞는 작은 서비스를 제안하세요."
-                note = f"{member['nickname']}님, {gap}일 만에 다시 뵈니 정말 반갑습니다!"
             else:
-                event = "return_visit"
-                reason = f"{previous_visit}했고 오늘 다시 방문했습니다."
-                action = f"오늘 주문한 {today_menus[0]}와 어울리는 작은 서비스를 드리며 반갑게 인사하세요."
-                note = f"{member['nickname']}님, 다시 찾아주셔서 감사합니다. 지난 방문도 기억하고 있어요!"
+                event = "regular_customer"
+                reason = f"{member['visit_count']}회 방문한 단골 고객입니다. 오늘 주문을 계기로 감사 인사를 전해 보세요."
+                action = f"단골 고객에게 {favorite}와 어울리는 작은 감사 서비스를 제안해 보세요."
+                note = f"{member['nickname']}님, 꾸준히 찾아주셔서 감사합니다. 작은 서비스를 준비했어요!"
 
             rows.append({
                 "member_id": member_id, "nickname": member["nickname"], "visit_count": member["visit_count"],
@@ -286,6 +293,7 @@ class DummyBackend:
                 "previous_visit": previous_visit, "previous_table": previous["table_no"],
                 "previous_menus": previous_menus, "weekly_visits": len(visit_days),
                 "is_birthday": birthday, "age": age, "weather_text": "", "special_event": event,
+                "is_visit_anniversary": anniversary,
                 "care_reason": reason, "service_suggestion": action, "most_ordered_menu": favorite,
             })
         return sorted(rows, key=lambda row: (row["today_table"], row["member_id"]))
@@ -336,7 +344,7 @@ class DummyBackend:
                         "last_visit_at": member["last_visit"]} for member in self.members_]
         menu_rows = [{"name": menu["name"], "category": menu["cat"], "spicy": menu["spicy"],
                       "soldout": menu["soldout"], "weight": menu["weight"]} for menu in self.menus_]
-        context = build_context(member_rows, self.orders_, menu_rows, self.stats(rule), TODAY)
+        context = build_context(member_rows, self.orders_, menu_rows, self.stats(rule), TODAY, rule=rule)
         result = pick_recommendations(recommend(context), round_no)
         result["summary"] = {
             "members": {key: context["members"][key] for key in

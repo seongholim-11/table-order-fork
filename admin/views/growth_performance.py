@@ -9,7 +9,6 @@ import pandas as pd
 import streamlit as st
 
 from admin.ui.widgets import kpi, kpi_row, page_head, sec_title
-from admin.views.dashboard import render_sales_insights
 from dashboard_stats import recent_orders
 
 
@@ -143,24 +142,9 @@ def _performance_charts(result: dict) -> None:
     right.altair_chart((bars + labels).properties(height=360), use_container_width=True)
 
 
-def _customer_section(members: pd.DataFrame) -> None:
-    """고객 목록 화면과 같은 등급 자료와 고객 표를 보여 준다."""
-    sec_title("2. 고객데이터", "고객 목록의 현재 등급과 방문 정보를 그대로 확인해요")
-    counts = members["등급"].value_counts() if not members.empty else pd.Series(dtype=int)
-    kpi_row(
-        kpi("전체 고객", len(members), "명", accent=True),
-        kpi("신규", int(counts.get("신규", 0)), "명"),
-        kpi("재방문", int(counts.get("재방문", 0)), "명"),
-        kpi("단골", int(counts.get("단골", 0)), "명"),
-        kpi("휴면", int(counts.get("휴면", 0)), "명"),
-        min_width=140,
-    )
-    st.dataframe(members, hide_index=True, width="stretch", height=320)
-
-
 def _growth_section(result: dict) -> None:
     """AI 주문에서 직접 확인한 성과와 임시 산정 기준을 함께 표시한다."""
-    sec_title("3. F&B그로스와 함께한 결과", "AI 추천 사용 주문을 기준으로 성과를 확인해요")
+    sec_title("F&B그로스와 함께한 결과", "AI 추천 사용 주문을 기준으로 성과를 확인해요")
     if result["empty"]:
         st.info("주문 데이터가 쌓이면 고객 전환과 매출 성과가 표시됩니다.")
         return
@@ -218,21 +202,12 @@ def _growth_section(result: dict) -> None:
 
 
 def page_growth_performance(repo) -> None:
-    """기존 대시보드·고객 데이터와 AI 성과를 순서대로 조립한다."""
-    page_head("F&B그로스 성과", "AI 추천을 통한 고객 전환과 매출 성장을 한눈에 확인하세요")
+    """대시보드와 겹치는 매출·고객 요약 없이 F&B그로스 성과만 보여 준다."""
+    page_head("F&B그로스 성과", "AI 추천 사용 주문의 고객 전환과 매출 성과를 확인하세요")
     # 버튼 클릭 시 Streamlit이 화면을 다시 실행하므로 저장소에서 최신 DB 값을 다시 조회한다.
     st.button("🔄 최신 데이터 반영", key="growth_refresh")
-    # DB 연동 경로 1: backend/app/routers/admin/stats.py → backend/app/stores/stats.py
-    # DB 테이블: orders, order_items, order_item_components, members, recommendation_events
-    stats = repo.stats(st.session_state["grade_rule"])
-    insights = repo.sales_insights(st.session_state["grade_rule"])
-    # DB 연동 경로 2: backend/app/routers/admin/members.py → backend/app/stores/members.py → members 테이블
-    members = repo.members(st.session_state["grade_rule"])
     # 성과 API: backend/app/routers/admin/opportunities.py → backend/app/services/growth_performance.py
     # DB 테이블: orders·order_items·order_item_components·members (API 모드에서는 화면 더미와 섞지 않음)
     result = repo.growth_performance(st.session_state["grade_rule"])
-    render_sales_insights(stats, insights, title="1. 매출데이터",
-                          subtitle="대시보드와 같은 매출 지표를 한곳에서 확인해요")
-    _customer_section(members)
     _growth_section(result)
 

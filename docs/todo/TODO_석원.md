@@ -21,7 +21,7 @@
 | 0 | 0. 개발 흐름 확인 (테스트 버튼) | `POST /api/dev/db-test` (개발 전용) | 확인 전 |
 | 1 | 1. 직원 호출 (손님 호출 → 관리자 확인) | `POST /api/v1/staff-calls`, `GET /api/v1/staff-call-items`, `GET /admin/api/calls`, `POST /admin/api/calls/{callId}/done` | 완료 |
 | 2 | 2. 룰렛 설정 | `GET /api/v1/roulette/prizes`, `PUT /api/v1/owner/roulette/prizes` | 완료 |
-| 3 | 3. 관리자 AI 추천 | `GET /api/admin/marketing/opportunities?round=` | 진행 중 |
+| 3 | 3. 관리자 AI 추천 | `GET /api/admin/marketing/opportunities?round=` | 완료 |
 
 **다른 팀원과 겹치는 지점**
 
@@ -177,7 +177,7 @@ UI(관리자 > 이벤트 > 룰렛 · 칸 편집 · 저장) → A/views/events.py
 
 ---
 
-## 3. 관리자 AI 추천 (진행 중)
+## 3. 관리자 AI 추천 (완료)
 
 ### 3-1. `GET /api/admin/marketing/opportunities?round=`
 
@@ -220,4 +220,38 @@ UI(마케팅 > AI 추천 탭 · 🔄 재추천) → A/views/marketing.py marketi
 - [x] 화면: `A/views/marketing.py`의 `marketing_recommend_tab`, `next_rec_round`, `pick_recommendations`만 수정한다. 서버가 닿으면 서버 카드, 아니면 기존 로컬 계산(`DATA_SOURCE=auto`의 폴백).
 - [x] `A/admin_repository.py ApiBackend`와 `A/admin_dummy_data.py DummyBackend`에 `opportunities` 메서드 추가(같은 이름·같은 반환 모양).
 - [x] `A/marketing_ai.py`의 기존 문자 후보 함수는 건드리지 않고, 추천·컨텍스트는 성격별 모듈과 공통 규칙 엔진으로 분리해 충돌을 피했다.
-- [ ] PR 직전 백엔드 전체 테스트의 기존 채팅 세션 최신순 정렬 실패(`BT/test_chat.py`)를 팀과 확인한 뒤 최종 완료 처리한다. 관리자 AI 추천 관련 테스트와 화면·통합 전체 테스트는 통과했다.
+- [x] 2026-10-19 최종 전체 테스트: 서버 **293 passed, 1 skipped**, 화면·통합 **153 passed, 9 skipped**. 현재 반영된 채팅 세션 정렬 수정도 통과했다. 운영 Supabase 검증 범위는 아래에 별도로 기록한다.
+
+### 3-2. 마케팅 DB 연동 점검 (2026-10-19)
+
+**팀원 연결 방법**
+
+- 백엔드의 `DATABASE_URL`이 데이터를 넣은 DB를 가리키고, 테이블·컬럼은 `docs/db/fbgrowth_schema.sql` 계약을 따라야 한다. 고객 파일을 폴더에 넣는 것만으로는 반영되지 않는다.
+- 관리자 화면은 `DATA_SOURCE=api`로 실행한다. `dummy`는 시연 자료만 사용하고, `auto`는 최초 연결 실패 시 더미로 열릴 수 있으므로 실제 DB 검증에는 `api`를 사용한다. 이미 더미로 열린 화면은 API 모드로 다시 연결한다.
+- 조회는 `admin/admin_repository.py`를 통해 이뤄진다. 고객·매출 집계는 재조회할 때 계산되며, 자동 푸시 방식은 아니다. F&B그로스는 **최신 데이터 반영**, AI 추천은 **재추천**, AI 문자는 화면 재실행·후보 재생성, 챗봇은 **새 질문** 시 최신 DB를 읽는다. 기존 문자 초안과 과거 채팅 답변은 작성 당시 내용이다.
+
+| 영역 | 서버에서 읽는 코드 | DB 원본 |
+|---|---|---|
+| 고객 목록·등급 | `B/routers/admin/members.py`, `B/stores/members.py`, `B/stores/grade_rules.py` | `members`, `app_settings`의 저장된 등급 기준 |
+| F&B 매출·그래프 | `B/stores/stats.py`, `B/services/stats.py`, `B/services/growth_performance.py` | `orders.total`, `orders.created_at`, `orders.ai_combo`, `members` |
+| AI 마케팅 추천 | `B/services/opportunities.py`, `shared/opportunity_engine.py` | 위 고객·주문 + `order_items`, `order_item_components`, `menus`, `recommendation_events` |
+| 손님 응대 제안 | `B/stores/customer_notes.py`, `B/services/customer_notes.py` | `members`, `orders`, 주문 메뉴, `table_logins`, 저장된 당일 날씨 |
+| AI 문자 대상·문구 | `B/services/sms.py`, `B/services/sms_candidates.py` | 회원 전화번호·수신 동의·수신거부, 저장된 등급 기준, 메뉴·판매량; 발송 이력은 `sms_logs` |
+| AI 챗봇 근거 | `B/services/chat.py`, `B/stores/stats.py` | 최신 주문·메뉴 판매량·회원; 대화 이력은 `chat_sessions`, `chat_messages` |
+
+**검증 및 보완 내용**
+
+- [x] `BT/test_seokwon_marketing_db_sync.py`의 대량 DB 변경·KST 경계·저장 등급 기준 테스트와 `T/test_seokwon_marketing_db_sync.py`의 성과 화면 갱신·문자 대상 유지 테스트를 전체 테스트와 함께 통과했다.
+- 격리된 SQLite 테스트 DB에 회원 1,000명·회원/비회원 주문 1,000건을 넣고 고객 추가, 주문 추가·금액 변경, 문자 수신거부·동의 변경 후 다시 조회한다. 목록·추천 요약·문자 대상·챗봇 근거·성과 합계가 함께 변하는지 검증한다. 운영 DB에는 테스트 행을 넣지 않는다.
+- 실제 API에 연결한 Streamlit 화면에서 새 회원·비회원 주문 추가 후 고객표·오늘 매출·월환산 매출·최종 차이·AI 주문 매출 비중이 함께 갱신되는지 검증한다.
+- 실제 오늘 매출과 마지막 주문일 매출을 분리했고, UTC 주문을 KST로 변환해 시간대·요일 추천을 맞췄다. API에 응대 대상이 없으면 시연용 손님을 표시하지 않는다.
+- AI 추천에서 선택한 문자 대상 ID를 유지한다. 이후 가입한 고객은 자동 선택하지 않고, 사장님이 직접 체크하면 추가할 수 있다. 실제 발송 대상은 서버에서 수신 동의·수신거부를 다시 검사한다.
+- 휴면 고객의 재방문·단골 추천은 고정 2회/5회 대신 저장된 등급 기준을 따른다.
+
+**해석·검증 범위**
+
+- 오늘 지표는 KST 오늘, 최근 7·14·30일 분석은 **마지막 주문일 기준**이다. 화면에 기준 날짜를 표시한다. 회원 수만 늘려도 매출이 증가하지는 않으며, 실제 매출은 연결된 `orders`가 있어야 변한다.
+- AI 도입일은 **최초 `ai_combo=true` 주문일**로 추정한다. 도입 전후 달력 일평균 × 30으로 월환산하며, 주문 없는 날짜는 0원으로 센다. 누락된 과거 자료와 실제 무매출일은 현재 스키마만으로 구분할 수 없다.
+- 매출 증가액은 도입 전후 총매출의 차이이며, AI만의 인과적 효과를 입증한 값은 아니다. 휴면 복귀·신규 정착·방문 빈도 증가의 정확한 전환 성과에는 과거 등급/캠페인 노출·방문 연결 기록이 더 필요하다. 현재 화면의 재방문·단골 성과는 AI 주문과 **현재 등급**의 교집합인 임시 지표다.
+- DB에 이미 들어간 시연 주문은 일반 주문과 함께 집계된다. 실제 데이터 전환 시 시연 행의 처리 범위는 팀이 결정해야 한다. 이번 점검에서는 삭제하지 않는다.
+- Supabase 운영 인스턴스에 대한 실제 연결·외부 문자 전송·Gemini 응답 품질은 이번 자동 테스트 범위가 아니다. 챗봇은 `CHAT_OWNER_ID`와 Gemini 설정, 실제 문자 전송은 Solapi 설정이 별도로 필요하다.
