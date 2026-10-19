@@ -47,7 +47,7 @@ _reload_if_changed(admin_dummy_data, marketing_recommendations, marketing_ai, re
 from admin.views.customers import page_customers  # noqa: E402
 from admin.views.events import page_events  # noqa: E402
 from admin.views.dashboard import page_dashboard  # noqa: E402
-from admin.views.login import login  # noqa: E402
+from admin.views.login import forget_token, login, remember_token, saved_token  # noqa: E402
 from admin.views.marketing import page_marketing  # noqa: E402
 from admin.views.menu import page_menu  # noqa: E402
 from admin.views.orders import page_orders  # noqa: E402
@@ -94,6 +94,17 @@ if ss["repo"] is not None and type(ss["repo"]) is not repo_mod.AdminRepository:
     ss["owner"], ss["repo"] = False, None  # 코드가 다시 읽히기 전에 만든 옛 저장소 객체는 버리고 다시 입장
 
 
+if not ss["owner"] and not ss.get("restore_tried"):
+    # 새로고침하면 세션이 사라지므로, 사장님 로그인 때 저장해 둔 쿠키 토큰으로 다시 입장한다(세션마다 한 번만 시도).
+    ss["restore_tried"] = True
+    _saved = saved_token()
+    if _saved:
+        _restored = repo_mod.connect(_saved)
+        if _restored.error:
+            forget_token()  # 만료됐거나 잘못된 토큰이면 쿠키를 지우고 로그인 화면으로 간다
+        else:
+            ss["owner"], ss["repo"], ss["token"], ss["notice"] = True, _restored.repo, _saved, _restored.notice
+
 if not ss["owner"] and repo_mod.skip_token_login() and not ss.get("auto_login_failed"):
     # 임시: 토큰 입력 없이 입장. 실패하면 아래에서 기존 토큰 입력 화면을 보여준다. (ADMIN_SKIP_TOKEN=0 으로 끔)
     _auto = repo_mod.connect(repo_mod.default_admin_token())
@@ -103,8 +114,12 @@ if not ss["owner"] and repo_mod.skip_token_login() and not ss.get("auto_login_fa
         ss["owner"], ss["repo"], ss["token"], ss["notice"] = True, _auto.repo, repo_mod.default_admin_token(), _auto.notice
 
 if not ss["owner"]:
+    if ss.pop("forget_token", False):
+        forget_token()
     login()
     st.stop()
+if ss.pop("remember_token", False):
+    remember_token(ss["token"])  # 방금 사장님 로그인을 했다면 새로고침해도 유지되도록 토큰을 쿠키에 저장한다
 
 repo = ss["repo"]
 # 다른 관리자나 서버 재시작으로 저장 기준이 바뀌어도 모든 메뉴에서 최신 값을 반영한다.
@@ -161,6 +176,7 @@ with st.sidebar:
     st.html('<div style="height:10px"></div>')
     if st.button("로그아웃"):
         ss["owner"], ss["repo"] = False, None
+        ss["forget_token"] = True  # 저장해 둔 로그인 쿠키는 다음 화면에서 지운다(바로 rerun 하면 스크립트가 실행되지 않는다)
         st.rerun()
 if ss["notice"]:
     st.warning(ss["notice"])

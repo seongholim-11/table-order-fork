@@ -1,11 +1,39 @@
 """관리자 로그인 화면.
 """
 
+import json
+
 import streamlit as st
 
 import admin_repository as repo_mod
 
 ss = st.session_state
+
+COOKIE = "owner_token"  # 사장님 로그인 토큰을 보관하는 브라우저 쿠키 이름 (새로고침해도 로그인을 유지하려고 쓴다)
+COOKIE_SECONDS = 3600  # Supabase 토큰 기본 유효기간(1시간)에 맞춘다. 토큰이 만료되면 복원에 실패하고 로그인 화면으로 돌아간다
+
+
+def _set_cookie(value: str, max_age: int) -> None:
+    """브라우저에 쿠키를 쓴다. Streamlit 은 서버에서 쿠키를 쓸 수 없어서 짧은 JavaScript 를 실행한다."""
+    st.html(f"<script>document.cookie = {json.dumps(COOKIE)} + '=' + {json.dumps(value)} + "
+            f"'; path=/; max-age={max_age}; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : '');</script>",
+            unsafe_allow_javascript=True)
+
+
+def remember_token(token: str) -> None:
+    _set_cookie(token, COOKIE_SECONDS)
+
+
+def forget_token() -> None:
+    _set_cookie("", 0)  # max-age=0 이면 브라우저가 쿠키를 지운다
+
+
+def saved_token() -> str:
+    """새로고침 전에 저장해 둔 사장님 토큰. 없거나 읽을 수 없으면 빈 문자열."""
+    try:
+        return st.context.cookies.get(COOKIE, "") or ""
+    except Exception:  # 쿠키를 읽을 수 없는 환경(테스트 등)에서는 저장된 토큰이 없는 것으로 본다
+        return ""
 
 
 def login():
@@ -26,6 +54,7 @@ def login():
                         st.error(result.error)
                     else:
                         ss["owner"], ss["repo"], ss["token"], ss["notice"] = True, result.repo, result.token, result.notice
+                        ss["remember_token"] = True  # 다음 화면에서 쿠키에 저장한다(지금 바로 rerun 하면 스크립트가 실행되지 않는다)
                         st.rerun()
             st.caption("사장님으로 등록된 계정만 들어올 수 있어요.")
             return

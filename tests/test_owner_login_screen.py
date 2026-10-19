@@ -81,3 +81,27 @@ def test_login_screen_shows_email_password_and_enters(owner_server, monkeypatch)
     app.text_input[1].set_value("pw")
     app.button[0].click().run()
     assert app.session_state["owner"] is True and app.session_state["token"] == "jwt-owner" and not app.exception
+
+
+def test_owner_login_is_remembered_and_restored_after_refresh(owner_server, monkeypatch):
+    """사장님 로그인 직후 토큰을 쿠키에 저장하고, 새로고침(새 세션)에서는 쿠키 토큰으로 다시 입장한다. 로그아웃하면 쿠키를 지운다."""
+    import admin.views.login as login_view
+
+    monkeypatch.setenv("DATA_SOURCE", "api")
+    monkeypatch.setenv("ADMIN_SKIP_TOKEN", "0")
+    app = AppTest.from_file(APP, default_timeout=30).run()
+    app.text_input[0].set_value("owner@x.com")
+    app.text_input[1].set_value("pw")
+    app.button[0].click().run()
+    assert any("owner_token" in h.value and "jwt-owner" in h.value for h in app.get("html")), "로그인 직후 쿠키 저장 스크립트"
+
+    # 새로고침: 새 세션이지만 쿠키에 토큰이 있으면 로그인 화면 없이 들어간다
+    monkeypatch.setattr(login_view, "saved_token", lambda: "jwt-owner")
+    refreshed = AppTest.from_file(APP, default_timeout=30).run()
+    assert refreshed.session_state["owner"] is True and not refreshed.text_input and not refreshed.exception
+
+    # 만료·잘못된 토큰이면 쿠키를 지우고 로그인 화면으로 간다
+    monkeypatch.setattr(login_view, "saved_token", lambda: "jwt-expired")
+    expired = AppTest.from_file(APP, default_timeout=30).run()
+    assert expired.session_state["owner"] is False and [t.label for t in expired.text_input] == ["이메일", "비밀번호"]
+    assert any("max-age=0" in h.value for h in expired.get("html"))
