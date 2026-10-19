@@ -9,7 +9,7 @@ import admin_repository as repo_mod
 
 ss = st.session_state
 
-COOKIE = "owner_token"  # 사장님 로그인 토큰을 보관하는 브라우저 쿠키 이름 (새로고침해도 로그인을 유지하려고 쓴다)
+COOKIE = "owner_token"  # 사장님 로그인 토큰(또는 관리자 토큰)을 보관하는 브라우저 쿠키 이름 (새로고침해도 로그인을 유지하려고 쓴다)
 COOKIE_SECONDS = 3600  # Supabase 토큰 기본 유효기간(1시간)에 맞춘다. 토큰이 만료되면 복원에 실패하고 로그인 화면으로 돌아간다
 
 
@@ -66,6 +66,7 @@ def login():
                     st.error(result.error)
                 else:
                     ss["owner"], ss["repo"], ss["token"], ss["notice"] = True, result.repo, token, result.notice
+                    ss["remember_token"] = True  # 토큰 로그인도 새로고침 후 유지되도록 다음 화면에서 쿠키에 저장한다
                     st.rerun()
         st.caption("백엔드 `.env`의 `ADMIN_TOKEN` 값을 입력하세요. (기본값 `change-me`) "
                    "OWNER(사장님)만 접근할 수 있고, MANAGER·STAFF 권한은 1차 Prototype에서 사용하지 않습니다.")

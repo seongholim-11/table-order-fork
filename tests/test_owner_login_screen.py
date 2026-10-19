@@ -105,3 +105,19 @@ def test_owner_login_is_remembered_and_restored_after_refresh(owner_server, monk
     expired = AppTest.from_file(APP, default_timeout=30).run()
     assert expired.session_state["owner"] is False and [t.label for t in expired.text_input] == ["이메일", "비밀번호"]
     assert any("max-age=0" in h.value for h in expired.get("html"))
+
+
+def test_token_login_is_also_remembered(monkeypatch):
+    """Supabase 가 없는 환경의 관리자 토큰 로그인도 새로고침 후 유지되도록 쿠키에 저장한다."""
+    monkeypatch.setenv("DATA_SOURCE", "api")
+    monkeypatch.setenv("ADMIN_SKIP_TOKEN", "0")
+    with make_server(False) as c:
+        api.set_client(c)
+        try:
+            app = AppTest.from_file(APP, default_timeout=30).run()
+            app.text_input[0].set_value("admin-secret")
+            app.button[0].click().run()
+            assert app.session_state["owner"] is True
+            assert any("owner_token" in h.value and "admin-secret" in h.value for h in app.get("html"))
+        finally:
+            api.set_client(None)
