@@ -162,6 +162,7 @@ def test_below_eighty_percent_still_shows_regular_without_claiming_preference(se
 def test_original_cards_and_pagination_are_preserved_above_added_preferences(server, monkeypatch):
     prepare_history(server)
     screen = open_recommendations(monkeypatch)
+    screen.button(key="mk_rerecommend").click().run()  # 추천은 [AI 추천 받기]를 눌러야 만들어진다
     sections = [element.value for element in screen.get("html")]
     original = [html for html in sections if 'class="rec recommendation-card"' in html]
     addition = next(html for html in sections if 'class="recs regular-preferences"' in html)
@@ -182,8 +183,10 @@ def test_preference_api_failure_does_not_break_original_recommendations(server, 
     from pathlib import Path
 
     screen = open_recommendations(monkeypatch)
+    screen.button(key="mk_rerecommend").click().run()  # 추천은 버튼을 눌러야 만들어진다
     original = [element.value for element in screen.get("html")
                 if 'class="rec recommendation-card"' in element.value]
+    assert original
     ar._loaded_mtime = Path(ar.__file__).stat().st_mtime
 
     def unavailable(self):

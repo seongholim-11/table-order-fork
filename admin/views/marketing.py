@@ -200,9 +200,17 @@ def marketing_dashboard(repo):
 REC_PAGE_SIZE = RECOMMENDATION_PAGE_SIZE  # 기존 테스트·호출부에서 쓰는 이름은 유지한다.
 
 
-def next_rec_round():
-    ss["mk_rec_round"] = ss.get("mk_rec_round", 0) + 1
-    ss["mk_rec_refresh"] = True  # 재추천은 캐시를 건너뛰고 제미나이가 문구를 새로 만들게 한다
+def run_recommend(repo):
+    """[AI 추천 받기]/[재추천] 버튼: 이때만 서버(제미나이)로 추천을 만든다. 화면에 들어오는 것만으로는 호출하지 않는다."""
+    if "mk_rec_result" in ss:  # 처음 누른 뒤의 버튼(재추천)은 다음 묶음으로 넘어간다
+        ss["mk_rec_round"] = ss.get("mk_rec_round", 0) + 1
+    try:
+        # 재추천은 캐시를 건너뛰고 제미나이가 문구를 새로 만들게 한다(refresh).
+        ss["mk_rec_result"] = repo.opportunities(ss.get("mk_rec_round", 0), refresh="mk_rec_result" in ss)
+        ss.pop("mk_rec_error", None)
+    except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable) as e:
+        # 콜백에서 예외가 나면 화면이 멈추므로 오류를 기억해 두었다가 화면에서 알린다
+        ss["mk_rec_error"] = str(e)
 
 
 def execute_sms_recommendation(repo, recommendation):
@@ -241,8 +249,8 @@ def _render_table_map(repo, preferences):
     """매장 테이블 배치도(SVG). 제안이 있는 테이블만 강조하고, 선택한 테이블의 제안을 옆에 보여 준다."""
     try:
         total = int(repo.store()["tables"])
-    except (KeyError, TypeError, ValueError):
-        return
+    except (KeyError, TypeError, ValueError, repo_mod.api.ApiError, repo_mod.api.ApiUnavailable):
+        total = 30  # 매장 정보를 못 읽어도 배치도는 보이도록 기본 테이블 수를 쓴다
     suggestions = table_suggestions(preferences)
     selected = ss.get("mk_table_sel")
     if selected not in suggestions:
@@ -270,19 +278,22 @@ def _render_table_map(repo, preferences):
 
 
 def _render_regular_preferences(repo):
-    """오늘 주문한 단골·주간 반복 방문·특별일 고객의 응대 제안을 표시한다."""
+    """오늘 주문한 단골·주간 반복 방문·특별일 고객의 응대 제안을 표시한다. 배치도는 데이터가 없어도 항상 보인다."""
     try:
         preferences = repo.regular_preferences()
-        cards = regular_preference_cards(preferences)
     except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable):
-        # 추가 정보 조회가 실패해도 기존 추천 카드·재추천 버튼은 그대로 사용할 수 있다.
-        st.info("단골 손님 정보를 불러오지 못했어요. 잠시 후 재추천을 눌러 주세요.")
+        preferences = None  # 조회 실패: 아래에서 안내만 하고 배치도는 그대로 보여 준다
+    cards = regular_preference_cards(preferences or [])
+    if preferences is None:
+        sec_title("손님 응대 제안")
+        st.info("단골 손님 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
+        _render_table_map(repo, [])
         return
     if not cards:
         # 실제 DB에 대상이 없을 때 예시 손님을 섞으면 고객 정보로 오해할 수 있다.
         if repo.source == "api":
             sec_title("손님 응대 제안")
-            st.info("오늘 주문이 확인된 재방문 고객이 아직 없습니다. 새 주문 후 재추천을 눌러 확인해 주세요.")
+            st.info("오늘 주문이 확인된 재방문 고객이 아직 없습니다. 새 주문 후 다시 확인해 주세요.")
             _render_table_map(repo, [])
             return
         # DB에 예시 회원을 넣지 않고도 발표에서 추천 동작과 문구를 보여줄 수 있게 한다.
@@ -290,6 +301,7 @@ def _render_regular_preferences(repo):
         sec_title("손님 응대 제안", "AI가 추천할 현장 응대를 미리 확인해 보세요")
         st.caption("지금은 추천 예정 예시예요. 단골 등급, 최근 7일 2일 이상 방문, 생일 또는 "
                "첫 방문 기념일이 확인된 손님이 오늘 주문하면 상황에 맞는 응대를 제안해요.")
+        _render_table_map(repo, [])
     else:
         sec_title("손님 응대 제안", "단골과 특별한 방문 상황이 확인된 손님에게 응대를 제안해요")
         _render_table_map(repo, preferences)
@@ -303,12 +315,15 @@ def _render_regular_preferences(repo):
 def marketing_recommend_tab(repo):
     sec_title("사장님을 위한 AI 마케팅 추천", "문자로 방문을 유도할 추천과 현장에서 활용할 추천을 나눠 제안해요")
     round_no = ss.get("mk_rec_round", 0)
-    try:
-        # API는 실제 DB, 더미 모드는 1,000명 시연 자료를 같은 추천 계약으로 돌려준다.
-        # AI 추천 화면에 들어오면 서버가 제미나이로 문자 내용·기타 추천을 만든다(같은 입력은 캐시). 재추천이면 새로 만든다.
-        result = repo.opportunities(round_no, refresh=ss.pop("mk_rec_refresh", False))
-    except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable) as e:
-        st.error(f"DB 기반 마케팅 추천을 불러오지 못했어요: {e}")
+    result = ss.get("mk_rec_result")
+    if ss.get("mk_rec_error"):
+        st.error(f"DB 기반 마케팅 추천을 불러오지 못했어요: {ss['mk_rec_error']}")
+    if result is None:
+        # 처음 들어왔을 때는 AI를 부르지 않고, 버튼을 누르도록 안내한다.
+        st.info("아래 [✨ AI 추천 받기] 버튼을 누르면 AI가 매장 데이터를 분석해 문자 추천과 기타 추천을 만들어 드려요.")
+        st.button("✨ AI 추천 받기", key="mk_rerecommend", type="primary", on_click=run_recommend, args=(repo,),
+                  help="누를 때만 AI 추천을 만들어요")
+        _render_regular_preferences(repo)
         return
     # 각 목록을 따로 순환하므로 문자 추천과 현장 운영 추천을 한 화면에서 모두 확인할 수 있다.
     for kind, title, description in (
@@ -334,8 +349,8 @@ def marketing_recommend_tab(repo):
                               on_click=execute_sms_recommendation, args=(repo, recommendation),
                               help=f"{index + 1}번 추천 실행: {recommendation['title']}")
         st.caption(f"추천 {group['page']}/{group['pages']} · 전체 {group['total']}개 · 한 번에 최대 네 가지를 보여드려요")
-    st.button("🔄 재추천", key="mk_rerecommend", on_click=next_rec_round,
-              help="두 카테고리의 다음 추천을 확인해요")
+    st.button("🔄 재추천", key="mk_rerecommend", on_click=run_recommend, args=(repo,),
+              help="두 카테고리의 다음 추천을 AI가 새로 만들어요")
     _render_regular_preferences(repo)
 
 

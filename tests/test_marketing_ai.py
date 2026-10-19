@@ -55,6 +55,7 @@ def test_default_tab_is_chatbot_and_other_tabs_render_separately():
 
 def test_recommend_tab_has_only_recommendations():
     app = open_marketing("AI 추천")
+    app.button(key="mk_rerecommend").click().run()  # 추천은 버튼을 눌러야 만들어진다
     assert not app.exception
     assert not app.chat_input and not app.text_area
     assert any('class="rec recommendation-card"' in h.value for h in app.get("html"))
@@ -88,6 +89,25 @@ def test_sidebar_sub_menus_are_collapsible_and_select_tabs():
     assert "tab" not in app.query_params and app.sidebar.radio(key="nav_sub_주문 이력").value is None
 
 
+def open_recommend():
+    """AI 추천 화면을 열고 [AI 추천 받기] 버튼을 눌러 추천을 만든 상태로 돌려준다."""
+    app = open_marketing("AI 추천")
+    app.button(key="mk_rerecommend").click().run()
+    return app
+
+
+def test_recommend_runs_only_on_button_and_map_always_shows():
+    """들어갈 때는 AI 추천을 만들지 않고 안내만 보이며, 배치도는 처음부터 보인다."""
+    app = open_marketing("AI 추천")
+    assert not app.exception
+    assert not [h for h in app.get("html") if 'class="rec recommendation-card"' in h.value]
+    assert any("AI 추천 받기" in i.value for i in app.info)
+    assert any("<svg" in h.value and "매장 테이블 배치도" in h.value for h in app.get("html"))
+    app.button(key="mk_rerecommend").click().run()
+    assert [h for h in app.get("html") if 'class="rec recommendation-card"' in h.value]
+    assert app.session_state["mk_rec_round"] == 0 if "mk_rec_round" in app.session_state else True
+
+
 def test_rerecommend_cycles_through_recommendations():
     from admin.views.marketing import pick_recommendations
     recs = [{"title": str(i)} for i in range(7)]
@@ -102,7 +122,7 @@ def test_rerecommend_cycles_through_recommendations():
 
 
 def test_rerecommend_button_changes_cards():
-    app = open_marketing("AI 추천")
+    app = open_recommend()
     before = [h.value for h in app.get("html") if 'class="rec recommendation-card"' in h.value]
     app.button(key="mk_rerecommend").click().run()
     after = [h.value for h in app.get("html") if 'class="rec recommendation-card"' in h.value]
@@ -111,7 +131,7 @@ def test_rerecommend_button_changes_cards():
 
 
 def test_sms_recommendation_moves_to_sms_and_prefills_targets_and_body():
-    app = open_marketing("AI 추천")
+    app = open_recommend()
     execute = next(button for button in app.button if button.key and button.key.startswith("mk_execute_"))
     execute.click().run()
     assert not app.exception
@@ -123,7 +143,7 @@ def test_sms_recommendation_moves_to_sms_and_prefills_targets_and_body():
 
 def test_each_sms_button_is_rendered_with_its_own_numbered_card():
     """문자 추천에만 실행 버튼을 붙이고 기타 추천과 손님 응대 제안을 순서대로 표시한다."""
-    app = open_marketing("AI 추천")
+    app = open_recommend()
     recommendation_cards = [html.value for html in app.get("html")
                             if 'class="rec recommendation-card"' in html.value]
     execute_buttons = [button for button in app.button if button.key and button.key.startswith("mk_execute_")]
