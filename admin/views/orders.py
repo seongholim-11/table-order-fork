@@ -1,6 +1,7 @@
 """주문 이력 화면.
 """
 
+import time
 from datetime import timedelta
 
 import streamlit as st
@@ -60,12 +61,29 @@ def render_order_filters(orders):
                          min_amount=min_amount or None, max_amount=max_amount or None)
 
 
+ORDERS_CACHE_SECONDS = 20  # 이 시간 안에는 필터를 바꿔 화면이 다시 그려져도 서버에서 주문을 다시 받지 않는다
+
+
+def cached_orders(repo):
+    """주문 목록을 잠깐 세션에 보관한다.
+
+    필터 위젯을 만질 때마다 화면 전체가 다시 실행되는데, 그때마다 원격 서버(DB)에서
+    주문을 다시 읽으면 느려진다. 그래서 몇 초 동안은 받아 둔 값을 다시 쓴다.
+    """
+    saved = ss.get("orders_cache")
+    if saved and saved["repo"] is repo and time.monotonic() - saved["at"] < ORDERS_CACHE_SECONDS:
+        return saved["orders"]
+    orders = repo.orders()
+    ss["orders_cache"] = {"repo": repo, "at": time.monotonic(), "orders": orders}
+    return orders
+
+
 def page_orders(repo, sub="전체 주문"):
     page_head("주문 이력", "기간·테이블·메뉴·금액으로 주문을 골라 볼 수 있어요")
-    orders = repo.orders()
-    cust = repo.members(ss["grade_rule"]).set_index("customer_id")
+    orders = cached_orders(repo)
     mode = sub  # 전체 주문 / 고객별 주문은 사이드바 하위 메뉴에서 고른다
     if mode == "고객별 주문":
+        cust = repo.members(ss["grade_rule"]).set_index("customer_id")  # 고객 목록은 고객별 주문에서만 필요하다
         if cust.empty:
             st.info("아직 회원이 없어요.")
             return

@@ -99,7 +99,7 @@ class OrderMixin:
             "o.recommendation_event_id, o.created_at AS ts, m.nickname "
             f"FROM orders o LEFT JOIN members m ON m.id=o.member_id{where} "
             "ORDER BY o.created_at DESC, o.id DESC", params)
-        return [self._with_lines(row) for row in rows]
+        return self._with_lines_many(rows)
 
     def table_orders(self, table_no: int, since: str | None) -> list[dict]:
         """기준 로그인 시각 이후 해당 테이블의 주문만 최신순으로 읽는다."""
@@ -111,7 +111,7 @@ class OrderMixin:
             "FROM orders o LEFT JOIN members m ON m.id=o.member_id "
             "WHERE o.table_no=? AND o.created_at>=? ORDER BY o.created_at DESC, o.id DESC",
             (table_no, since))
-        return [self._with_lines(row) for row in rows]
+        return self._with_lines_many(rows)
 
     def _insert_id(self, sql: str, params: tuple) -> int:
         """현재 트랜잭션 안에서 INSERT한 행의 id를 SQLite·Postgres 공통으로 가져온다."""
@@ -119,6 +119,40 @@ class OrderMixin:
         if self.db.pg:
             return cursor.fetchone()["id"]
         return cursor.lastrowid
+
+    def _with_lines_many(self, rows: list[dict]) -> list[dict]:
+        """주문 여러 건의 품목을 쿼리 3번으로 한꺼번에 읽는다.
+
+        주문마다 쿼리를 보내면(N+1) 원격 DB(Supabase)에서는 주문이 많을수록 응답이 느려져
+        관리자 화면이 타임아웃으로 주문을 못 불러온다. 그래서 id 목록으로 한 번에 조회해 묶는다.
+        """
+        if not rows:
+            return []
+        marks = ",".join("?" * len(rows))
+        items = self.db.all(
+            "SELECT id, order_id, menu_id, kind, name, option_label, unit_price, original_unit_price, qty "
+            f"FROM order_items WHERE order_id IN ({marks}) ORDER BY id", tuple(r["id"] for r in rows))
+        components: dict[int, list[dict]] = {}
+        combo_ids = [i["id"] for i in items if i["kind"] == "combo"]
+        if combo_ids:
+            cmarks = ",".join("?" * len(combo_ids))
+            for c in self.db.all(
+                    "SELECT id, order_item_id, menu_id, name, option_label, qty FROM order_item_components "
+                    f"WHERE order_item_id IN ({cmarks}) ORDER BY id", tuple(combo_ids)):
+                components.setdefault(c["order_item_id"], []).append(
+                    {"id": c["menu_id"] or f"component:{c['id']}", "name": c["name"],
+                     "opt": c["option_label"], "qty": c["qty"]})
+        lines_by_order: dict[int, list[dict]] = {}
+        for item in items:
+            is_combo = item["kind"] == "combo"
+            line = {"id": f"combo:{item['id']}" if is_combo else (item["menu_id"] or f"item:{item['id']}"),
+                    "name": item["name"], "opt": item["option_label"], "unit": item["unit_price"], "qty": item["qty"]}
+            if item["original_unit_price"] is not None:
+                line["original_unit"] = item["original_unit_price"]
+            if is_combo:
+                line["components"] = components.get(item["id"], [])
+            lines_by_order.setdefault(item["order_id"], []).append(line)
+        return [{**r, "ai_combo": bool(r["ai_combo"]), "lines": lines_by_order.get(r["id"], [])} for r in rows]
 
     def _with_lines(self, row: dict) -> dict:
         items = self.db.all(

@@ -61,3 +61,18 @@ def test_admin_orders_are_real_latest_first_and_filterable(client):
     mine = client.get("/admin/api/orders", headers=ADMIN, params={"member_id": member_id})
     assert len(mine.json()) == 1 and mine.json()[0]["member_id"] == member_id
     assert client.get("/admin/api/orders").status_code == 401
+
+
+def test_admin_orders_read_lines_with_few_queries(client):
+    """주문이 많아도 품목 조회 쿼리 수가 늘지 않아야 한다(원격 DB에서 N+1로 느려지는 문제 방지)."""
+    for _ in range(5):
+        client.post("/api/orders", json={"table_no": 1, "lines": [line()], "total": 18000})
+    db = client.app.state.db
+    real_all, calls = db.all, []
+    db.all = lambda sql, params=(): (calls.append(sql), real_all(sql, params))[1]
+    try:
+        rows = client.app.state.shop.orders()
+    finally:
+        db.all = real_all
+    assert len(rows) == 5 and all(r["lines"][0]["name"] == "통닭" for r in rows)
+    assert len(calls) <= 3
