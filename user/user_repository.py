@@ -30,7 +30,7 @@ from shared import api
 ENDPOINTS = {
     "store": "/api/v1/store",                    # {name, branch, tables}
     "menus": "/api/menus",                    # [메뉴...]
-    "content": "/api/content",                # {categories} (기존 묶음 경로)
+    "content": "/api/content/categories",     # [카테고리...] (묶음 경로 /api/content 는 안 쓰는 값까지 읽어서 느리다)
     "staff_call_items": "/api/v1/staff-call-items",  # ["💧 물", ...]
     "questions": "/api/v1/ai/questions",      # 추천 질문·선택지
     "weather": "/api/v1/weather/current",    # 현재 날씨
@@ -121,15 +121,32 @@ class DummyRepository:
         return {"result": 0, "error": "더미 데이터 모드에서는 DB에 연결하지 않습니다."}
 
 
+def _get_all(paths: dict) -> dict:
+    """여러 GET 을 동시에 보낸다. 하나씩 보내면 (서버 왕복 시간 × 개수) 만큼 기다려야 해서 느리다."""
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=len(paths)) as pool:
+        futures = {key: pool.submit(api.get, path) for key, path in paths.items()}
+        return {key: f.result() for key, f in futures.items()}  # 하나라도 실패하면 그 오류가 그대로 올라간다
+
+
 @st.cache_data(ttl=10, show_spinner=False)
+def _fetch_live_content() -> dict:
+    """관리자가 자주 바꾸는 값(메뉴·카테고리·룰렛 칸). 10초 캐시라서 바꾼 값이 곧 반영된다."""
+    data = _get_all({"categories": ENDPOINTS["content"], "menus": ENDPOINTS["menus"],
+                     "roulette_prizes": ENDPOINTS["roulette"]})
+    return {"menus": data["menus"], "content": {"categories": data["categories"]}, "roulette_prizes": data["roulette_prizes"]}
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _fetch_static_content() -> dict:
+    """거의 안 바뀌는 값(매장 정보·AI 질문·날씨·추천 규칙·직원호출 항목). 60초 캐시로 호출 횟수를 줄인다."""
+    return _get_all({"store": ENDPOINTS["store"], "questions": ENDPOINTS["questions"], "weather": ENDPOINTS["weather"],
+                     "rules": ENDPOINTS["rules"], "staff_call_items": ENDPOINTS["staff_call_items"]})
+
+
 def _fetch_content() -> dict:
-    """서버에서 화면 콘텐츠를 가져온다 (10초 캐시: 관리자가 바꾼 값이 곧 반영된다)."""
-    content = api.get(ENDPOINTS["content"])
-    data = {"store": api.get(ENDPOINTS["store"]), "menus": api.get(ENDPOINTS["menus"]),
-            "content": content, "questions": api.get(ENDPOINTS["questions"]),
-            "weather": api.get(ENDPOINTS["weather"]), "rules": api.get(ENDPOINTS["rules"]),
-            "roulette_prizes": api.get(ENDPOINTS["roulette"]),
-            "staff_call_items": api.get(ENDPOINTS["staff_call_items"])}
+    """서버에서 화면 콘텐츠를 가져온다. 바뀌는 값은 10초, 거의 안 바뀌는 값은 60초 캐시."""
+    data = {**_fetch_static_content(), **_fetch_live_content()}
     missing = [k for k in CONTENT_KEYS if k not in data["content"]]
     if missing:
         raise api.ApiError(502, f"서버 응답에 {missing} 가 없습니다.")

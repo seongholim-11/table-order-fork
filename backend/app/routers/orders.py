@@ -28,7 +28,7 @@ class OrderIn(BaseModel):
 
 @router.post("/orders", status_code=201)
 @router.post("/v1/orders", status_code=201)
-async def create_order(body: OrderIn, request: Request, member: dict | None = Depends(optional_member)):
+def create_order(body: OrderIn, request: Request, member: dict | None = Depends(optional_member)):
     """주문 생성. 주문 본체와 주문 줄을 저장하고 화면이 쓰는 응답을 돌려준다.
 
     쿠폰의 실제 사용 처리는 3-4에서 같은 주문 id에 연결한다.
@@ -45,7 +45,7 @@ async def create_order(body: OrderIn, request: Request, member: dict | None = De
 
 
 @router.get("/v1/tables/{table_no}/orders")
-async def table_orders(table_no: int, request: Request):
+def table_orders(table_no: int, request: Request):
     """현재 유효한 테이블 로그인 이후의 주문과 누적 금액을 돌려준다."""
     since = request.app.state.tablet_logins.first_valid_login_at(table_no)
     rows = request.app.state.shop.table_orders(table_no, since)

@@ -16,10 +16,20 @@ from user.ui.dialogs import orders_dialog, staff_dialog
 from user.views.ai import render_recommendations
 
 
+def go_popular():
+    """로고 클릭: 어느 화면에서든 주문 화면(page=order)의 인기메뉴(cat=best)로 돌아온다."""
+    st.session_state.page = "order"
+    st.session_state.cat = "best"
+
+
 def render_header():
     with st.container(key="header"):
         c_brand, c_table, c_actions, c_mini = st.columns([3.5, 1.2, 3, 1], vertical_alignment="center")
-        c_brand.html(f'<div class="brand"><div class="logo">🍺</div><div><div class="name">{ctx.STORE["name"]}</div>'
+        # 로고 영역 위에 투명 버튼을 겹쳐 두어, 로고를 누르면 주문 화면의 인기메뉴로 이동한다.
+        # (링크로 이동하면 페이지가 새로 로드돼 세션이 풀리므로 세션 상태만 바꾸는 버튼을 쓴다)
+        brand_box = c_brand.container(key="brand_link")
+        brand_box.button("인기메뉴로 이동", key="brand_home", on_click=go_popular)
+        brand_box.html(f'<div class="brand"><div class="logo">🍺</div><div><div class="name">{ctx.STORE["name"]}</div>'
                      f'<div class="sub">{ctx.STORE["branch"]}{f" · {escape(st.session_state.member["nickname"])}님 (회원)" if st.session_state.member else " · 비회원"}</div></div></div>')
         c_table.html(f'<div class="table-chip">TABLE <b>{st.session_state.table}</b></div>')
         with c_actions.container(horizontal=True, key="header_actions"):

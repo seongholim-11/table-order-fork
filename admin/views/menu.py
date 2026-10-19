@@ -79,14 +79,15 @@ def render_menu_register_form(repo, category):
         price = c2.number_input("가격 *", min_value=0, step=500, value=10000)
         desc = st.text_input("설명", placeholder="손님 화면에 보이는 한 줄 설명")
         image = st.text_input("이미지 URL", placeholder="https://...")
-        c3, c4, c5, c6 = st.columns(4)
+        c3, c4, c5, c6, c7 = st.columns(5)
         spicy = c3.selectbox("매운 정도", list(SPICY_LABELS.values()))
         weight = c4.slider("추천 가중치", 0, 100, 50, 5, help="높을수록 AI 추천 조합에 우선 반영돼요 (기본 50)")
         on_sale = c5.checkbox("판매 중", value=True)
         set_ok = c6.checkbox("세트 가능", value=True)
+        is_event = c7.checkbox("이벤트", value=False, help="체크하면 이벤트 페이지의 서비스 메뉴 목록에 나와요")
         if st.form_submit_button("메뉴 등록", type="primary"):
             try:
-                repo.add_menu(category["id"], name, price, desc, image, not on_sale, spicy, weight, set_ok)
+                repo.add_menu(category["id"], name, price, desc, image, not on_sale, spicy, weight, set_ok, is_event)
             except CategoryError as e:
                 st.error(str(e))
             else:
@@ -131,7 +132,7 @@ def _menu_editor(old, category):
         old, hide_index=True, width="stretch", num_rows="add", disabled=["id"], height="stretch",
         key=f"menu_editor_{category['id']}_{ss['menu_editor_v']}",
         # 삭제 선택란을 실제 데이터 열보다 앞에 보여 빠르게 찾게 한다.
-        column_order=["선택", "메뉴명", "가격", "설명", "이미지 URL", "판매 여부", "매운 정도", "추천 가중치", "세트 가능"],
+        column_order=["선택", "메뉴명", "가격", "설명", "이미지 URL", "판매 여부", "매운 정도", "추천 가중치", "세트 가능", "이벤트"],
         column_config={
             "id": None, "카테고리": None,
             "메뉴명": st.column_config.TextColumn(required=True),
@@ -141,6 +142,7 @@ def _menu_editor(old, category):
             "이미지 URL": st.column_config.LinkColumn(),
             "판매 여부": st.column_config.CheckboxColumn(),
             "세트 가능": st.column_config.CheckboxColumn(),
+            "이벤트": st.column_config.CheckboxColumn(help="체크한 메뉴만 이벤트 페이지의 서비스 메뉴 목록에 나와요."),
             "선택": st.column_config.CheckboxColumn(help="삭제할 메뉴를 선택하세요."),
         })
 

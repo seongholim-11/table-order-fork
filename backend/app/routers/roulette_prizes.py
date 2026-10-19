@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api", tags=["사용자"])
 
 
 @router.get("/v1/roulette/prizes")
-async def list_roulette_prizes(request: Request):
+def list_roulette_prizes(request: Request):
     return request.app.state.roulette_prizes.list()
 
 

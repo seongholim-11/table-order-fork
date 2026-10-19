@@ -1,6 +1,7 @@
 """마케팅 화면 (AI 챗봇 · AI 추천 · AI 문자).
 """
 
+import time
 from datetime import datetime, timedelta, timezone
 from html import escape
 
@@ -241,15 +242,37 @@ TABLE_MAP_COLUMNS = 6  # 배치도 한 줄에 놓을 테이블 수
 POLL_SECONDS = 10      # 새 로그인·주문을 확인하는 주기(초)
 
 
-def _poll_live_activity(repo, preferences):
+PREFERENCES_REFRESH_SECONDS = 60  # 새 로그인·주문이 없어도 응대 제안을 이 주기로는 다시 읽는다 (날짜·시간 조건이 바뀔 수 있어서)
+
+
+def _fetch_live_activity(repo):
+    """새 로그인·주문 번호를 가볍게 조회한다. 실패하면 None (다음 주기에 다시 확인)."""
+    try:
+        return repo.live_activity()
+    except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable):
+        return None
+
+
+def _load_preferences(repo, activity):
+    """응대 제안 목록. 서버 연결 모드에서는 무겁게 계산되므로, 새 로그인·주문이 없으면 받아 둔 값을 다시 쓴다.
+
+    (예전에는 10초마다 매번 전체를 다시 계산해서 서버와 화면이 모두 느려졌다.)
+    """
+    marker = (activity["login_id"], activity["order_id"]) if activity else None
+    saved = ss.get("mk_pref_cache")
+    if (repo_mod.CACHE_ON and repo.source == "api" and saved and saved["repo"] is repo and marker is not None and saved["marker"] == marker
+            and time.monotonic() - saved["at"] < PREFERENCES_REFRESH_SECONDS):
+        return saved["preferences"]
+    preferences = repo.regular_preferences()  # 실패하면 호출한 쪽에서 안내 문구를 보여 준다
+    ss["mk_pref_cache"] = {"repo": repo, "marker": marker, "at": time.monotonic(), "preferences": preferences}
+    return preferences
+
+
+def _poll_live_activity(activity, preferences):
     """주기적으로(폴링) 새 로그인·주문과 새 응대 제안이 생겼는지 확인해 알림을 띄운다.
 
     처음 화면을 열 때는 현재 상태만 기억하고 알리지 않는다. 그 뒤 번호가 바뀌면 새 일이 생긴 것이다.
     """
-    try:
-        activity = repo.live_activity()
-    except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable):
-        activity = None  # 조회 실패는 조용히 넘기고 다음 주기에 다시 확인한다
     if activity is not None:
         last = ss.get("mk_live_last")
         ss["mk_live_last"] = (activity["login_id"], activity["order_id"])
@@ -317,11 +340,12 @@ def _render_regular_preferences(repo):
 
 def _regular_preferences_body(repo):
     """오늘 주문한 단골·주간 반복 방문·특별일 고객의 응대 제안을 표시한다. 배치도는 데이터가 없어도 항상 보인다."""
+    activity = _fetch_live_activity(repo)
     try:
-        preferences = repo.regular_preferences()
+        preferences = _load_preferences(repo, activity)
     except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable):
         preferences = None  # 조회 실패: 아래에서 안내만 하고 배치도는 그대로 보여 준다
-    _poll_live_activity(repo, preferences)
+    _poll_live_activity(activity, preferences)
     cards = regular_preference_cards(preferences or [])
     if preferences is None:
         sec_title("손님 응대 제안")

@@ -20,3 +20,9 @@ def token_login_screen(monkeypatch):
 def not_dev_env(monkeypatch):
     """내 PC 의 backend/.env 에 APP_ENV=dev 가 있어도 기존 테스트가 자동 로그인에 영향받지 않게 prod 로 고정한다."""
     monkeypatch.setenv("APP_ENV", "prod")
+
+
+@pytest.fixture(autouse=True)
+def no_admin_cache(monkeypatch):
+    """관리자 저장소는 운영에서 서버 응답을 10초쯤 보관한다. 테스트는 DB 를 직접 바꾸고 바로 확인하므로 캐시를 끈다."""
+    monkeypatch.setenv("ADMIN_CACHE", "0")

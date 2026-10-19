@@ -48,6 +48,7 @@ create table if not exists menus (
   spicy        smallint not null default 0 check (spicy between 0 and 3),   -- 0 안 매움 … 3 아주 매움
   weight       smallint not null default 50 check (weight between 0 and 100), -- 추천 가중치
   set_ok       boolean not null default false,                  -- AI 추천 세트에 넣을 수 있는지
+  is_event     boolean not null default false,                  -- 이벤트 페이지 서비스 메뉴 목록에 넣을지 (기존 DB는 fbgrowth_menus_is_event.sql)
   image_url    text not null default '',
   sort_order   integer not null default 0,
   created_at   timestamptz not null default now(),

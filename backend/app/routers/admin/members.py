@@ -13,7 +13,7 @@ router = APIRouter()
 
 
 @router.get("/members")
-async def list_members(request: Request, settings: Settings = Depends(get_settings),
+def list_members(request: Request, settings: Settings = Depends(get_settings),
                        repeat: int | None = Query(default=None, ge=2), regular: int | None = Query(default=None, ge=3),
                        dormant: int | None = Query(default=None, ge=1)):
     """고객 목록과 등급. 등급 기준은 쿼리로 미리 바꿔 볼 수 있다 (저장되지는 않음)."""
@@ -30,14 +30,14 @@ async def list_members(request: Request, settings: Settings = Depends(get_settin
 
 
 @router.post("/members/{member_id}/opt-out")
-async def member_opt_out(member_id: int, request: Request):
+def member_opt_out(member_id: int, request: Request):
     if not request.app.state.members.opt_out(member_id):
         raise HTTPException(404, "없는 회원입니다.")
     return {"ok": True}
 
 
 @router.get("/customers/grades")
-async def customer_grades(request: Request, settings: Settings = Depends(get_settings),
+def customer_grades(request: Request, settings: Settings = Depends(get_settings),
                           repeat: int | None = Query(default=None, ge=2),
                           regular: int | None = Query(default=None, ge=3),
                           dormant: int | None = Query(default=None, ge=1)):
@@ -50,13 +50,13 @@ async def customer_grades(request: Request, settings: Settings = Depends(get_set
 
 
 @router.get("/customers/grades/rules")
-async def customer_grade_rules(request: Request, settings: Settings = Depends(get_settings)):
+def customer_grade_rules(request: Request, settings: Settings = Depends(get_settings)):
     """화면의 초기값·기본값 복원에 쓰는 현재 서버 등급 기준을 반환한다."""
     return grade_rule(settings, db=request.app.state.db)
 
 
 @router.put("/customers/grades/rules")
-async def save_customer_grade_rules(rule: GradeRule, request: Request):
+def save_customer_grade_rules(rule: GradeRule, request: Request):
     """검증된 기준만 영구 저장한다. 기존 GET과 같은 세 필드를 반환한다."""
     return GradeRuleStore(request.app.state.db).save(rule.model_dump())
 
@@ -75,7 +75,7 @@ def live_activity(request: Request) -> dict:
 
 
 @router.get("/marketing/regular-preferences")
-async def regular_preferences(request: Request, settings: Settings = Depends(get_settings)):
+def regular_preferences(request: Request, settings: Settings = Depends(get_settings)):
     """오늘 주문한 단골·주간 반복 방문·생일·첫 방문 기념일 고객의 응대 제안을 조회한다."""
     from app.services.customer_notes import regular_notes
     from app.stores.customer_notes import CustomerNotesStore

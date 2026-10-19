@@ -81,8 +81,11 @@ def test_login_then_spin_then_second_spin_needs_another_login(server):
     assert [m["nickname"] for m in ss(app)["members"]] == ["가", "나"] and ss(app)["members"][1]["prize"] is None
     app.button(key="roulette_btn").click().run()
     assert ss(app)["members"][1]["prize"] and ss(app)["login"] is None and not app.exception
-    # 하단에 로그인한 회원이 누적된다
-    log = next(h.value for h in app.get("html") if "mlog" in h.value)
+    # 시작 화면의 높이를 늘리지 않고 회원 기록 팝업에 로그인한 회원이 누적된다.
+    assert app.button(key="splash_members").label == "👥 로그인한 회원 2명 보기"
+    app.button(key="splash_members").click().run()
+    assert not app.exception
+    log = next(h.value for h in app.get("html") if '<div class="mlog">' in h.value)
     assert "가님" in log and "나님" in log and "로그인한 회원 <span>2</span>" in log
 
 

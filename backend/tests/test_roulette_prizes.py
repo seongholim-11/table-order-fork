@@ -55,3 +55,20 @@ def test_rejects_bad_prizes(client):
     ]
     for body in bad_cases:
         assert client.put("/admin/api/owner/roulette/prizes", headers=ADMIN, json=body).status_code == 422
+
+
+def test_only_event_checked_menus_are_allowed(client):
+    shop = client.app.state.shop
+
+    def save(menu_id):
+        body = [_prizes()[0], {**_prizes()[1], "item_id": menu_id}]
+        return client.put("/admin/api/owner/roulette/prizes", headers=ADMIN, json=body).status_code
+
+    # 이벤트 체크가 없는 메뉴는 서비스 메뉴로 저장할 수 없고, 체크하면 저장된다.
+    assert save("c2") == 422
+    shop.save_menu("c2", {"is_event": True})
+    assert save("c2") == 200
+
+    # 이미 룰렛 칸에 저장된 메뉴는 체크를 풀어도 같은 설정을 다시 저장할 수 있다.
+    shop.save_menu("c2", {"is_event": False})
+    assert save("c2") == 200

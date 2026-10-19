@@ -8,7 +8,7 @@ router = APIRouter()
 
 
 @router.put("/content/{name}")
-async def save_content(name: str, request: Request, data: dict | list = Body(...)):
+def save_content(name: str, request: Request, data: dict | list = Body(...)):
     """콘텐츠를 통째로 교체한다. [더미] 저장하지 않고 받은 값을 그대로 돌려준다.
 
     TODO: name 이 알려진 콘텐츠(categories, roulette_prizes, staff_calls ...)인지 확인하고 아니면 404.

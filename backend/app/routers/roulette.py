@@ -61,7 +61,7 @@ def _save_prize(table_no: int, body: PrizeIn, request: Request) -> dict:
 
 
 @router.put("/tables/{table_no}/logins/prize")
-async def tablet_login_prize(table_no: int, body: PrizeIn, request: Request,
+def tablet_login_prize(table_no: int, body: PrizeIn, request: Request,
                              member: dict = Depends(current_member)):
     """룰렛 당첨을 기록하고 쿠폰을 발급한다."""
     tablet_rows(request, table_no, member)
@@ -69,7 +69,7 @@ async def tablet_login_prize(table_no: int, body: PrizeIn, request: Request,
 
 
 @router.get("/v1/roulette/status")
-async def roulette_status(request: Request, table_no: int = Query(ge=1),
+def roulette_status(request: Request, table_no: int = Query(ge=1),
                           member: dict = Depends(current_member)):
     """이 태블릿의 회원별 룰렛 상태와 남은 기회를 반환한다."""
     rows = tablet_rows(request, table_no, member)
@@ -78,7 +78,7 @@ async def roulette_status(request: Request, table_no: int = Query(ge=1),
 
 
 @router.post("/v1/roulette/plays", status_code=201)
-async def play_roulette(body: PlayIn, request: Request, member: dict = Depends(current_member)):
+def play_roulette(body: PlayIn, request: Request, member: dict = Depends(current_member)):
     """가중치에 따라 서버가 룰렛 칸을 정하고, 당첨 기록과 쿠폰을 저장한다."""
     rows = tablet_rows(request, body.table_no, member)
     target_id = body.member_id if body.member_id is not None else member["id"]

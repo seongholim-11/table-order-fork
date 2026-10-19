@@ -36,6 +36,22 @@ def test_roulette_table_matches_prizes(repo):
     assert next(choice for choice in choices if choice["id"] == "a4")["emoji"] == "🥚"
 
 
+def test_event_checked_menus_only_in_service_choices(repo):
+    """메뉴의 '이벤트' 체크가 서비스 메뉴 선택 목록을 정한다. 이미 룰렛에 저장된 메뉴는 체크가 풀려도 남는다."""
+    def ids():
+        return {choice["id"] for choice in repo.roulette_menu_choices()} - {None}
+
+    assert "s1" not in ids()
+    repo.backend.save_menu("s1", {"is_event": True})
+    assert "s1" in ids()
+    # 룰렛에 저장된 a4(계란말이)의 체크를 풀어도 기존 칸이 깨지지 않게 목록에 남는다.
+    repo.backend.save_menu("a4", {"is_event": False})
+    assert "a4" in ids()
+    # 칸에 쓰이지 않는 d1 은 체크를 풀면 목록에서 빠진다.
+    repo.backend.save_menu("d1", {"is_event": False})
+    assert "d1" not in ids()
+
+
 def test_save_roulette_roundtrip_and_odds(repo):
     t = repo.roulette_table()
     # 10의 배수가 아닌 직접 입력값도 합계가 100이면 그대로 저장된다.

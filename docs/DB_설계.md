@@ -48,7 +48,7 @@
 |---|---|---|
 | `store_info` | 매장 정보(1행만 허용) | name, branch, slogan, tables(전체 테이블 수) |
 | `categories` | 메뉴 카테고리 | id, name, icon, color_from/to, is_virtual(`ai`·`best`는 메뉴를 직접 넣지 않음), sort_order |
-| `menus` | 메뉴 | id, category_id, name, price, tags[], is_soldout, spicy, weight(추천 가중치), set_ok, image_url |
+| `menus` | 메뉴 | id, category_id, name, price, tags[], is_soldout, spicy, weight(추천 가중치), set_ok, is_event(이벤트 서비스 메뉴 후보), image_url |
 
 ### 회원·로그인·룰렛
 

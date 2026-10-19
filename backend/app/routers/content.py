@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api", tags=["사용자"])
 
 
 @router.get("/content")
-async def all_content(request: Request):
+def all_content(request: Request):
     """기존 화면용 묶음 경로를 유지하되 AI 항목은 새 DB 저장소에서 합친다."""
     data = dummy.content()
     # 카테고리는 관리자가 DB에서 추가·수정·삭제하므로 더미 대신 DB 값을 내려 준다.
@@ -21,7 +21,7 @@ async def all_content(request: Request):
 
 
 @router.get("/content/{name}")
-async def one_content(name: str, request: Request):
+def one_content(name: str, request: Request):
     if name == "quiz_questions":
         return request.app.state.ai_content.questions()
     if name == "weather":

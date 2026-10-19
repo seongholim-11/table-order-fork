@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from app.stores.db import Database
+from app.stores.shop_menus import EVENT_DEFAULT_IDS
 
 SCHEMA = """\
 CREATE TABLE IF NOT EXISTS roulette_prizes (
@@ -24,7 +25,6 @@ CREATE TABLE IF NOT EXISTS roulette_prizes (
 
 SEED_PATH = Path(__file__).resolve().parent.parent / "seed" / "roulette_prizes.json"
 MENU_SEED_PATH = Path(__file__).resolve().parent.parent / "seed" / "menu.json"
-SERVICE_MENU_IDS = {"a1", "a4", "a11", "d7", "d8", "d1", "j1", "b1"}
 
 
 class RoulettePrizeStore:
@@ -46,20 +46,24 @@ class RoulettePrizeStore:
                  **({"percent": row["percent"]} if row["kind"] == "discount" else {"item_id": row["menu_id"]})}
                 for row in rows]
 
-    @staticmethod
-    def _service_allowed(menu: dict) -> bool:
-        """사장님이 정한 맛보기·간식·음료 메뉴만 서비스 경품으로 허용한다."""
-        return menu["id"] in SERVICE_MENU_IDS
+    def _service_allowed(self, menu_id: str, is_event: bool | None) -> bool:
+        """이벤트로 체크한 메뉴만 서비스 경품으로 허용한다.
+
+        is_event 가 None 이면(DB에 컬럼이 없음) 예전처럼 정해 둔 기본 메뉴만 허용한다.
+        이미 저장된 룰렛 칸의 메뉴는 체크가 풀려도 계속 허용해, 같은 설정을 다시 저장할 수 있게 한다."""
+        if is_event is None:
+            is_event = menu_id in EVENT_DEFAULT_IDS
+        return bool(is_event) or self.db.one("SELECT id FROM roulette_prizes WHERE menu_id=?", (menu_id,)) is not None
 
     def service_menu_exists(self, menu_id: str) -> bool:
         """메뉴 담당 DB 전환 전에는 시드, 전환 후에는 DB 메뉴를 같은 기준으로 검사한다."""
-        row = self.db.one("SELECT id, category_id AS cat, name, price, is_soldout AS soldout "
-                          "FROM menus WHERE id=?", (menu_id,))
+        has_event_column = "is_event" in self.db.columns("menus")
+        event_sql = "is_event" if has_event_column else "0 AS is_event"
+        row = self.db.one(f"SELECT id, {event_sql} FROM menus WHERE id=?", (menu_id,))
         if row:
-            return self._service_allowed(row)
-        seed = next((menu for menu in json.loads(MENU_SEED_PATH.read_text(encoding="utf-8"))
-                     if menu["id"] == menu_id), None)
-        return bool(seed and self._service_allowed(seed))
+            return self._service_allowed(menu_id, row["is_event"] if has_event_column else None)
+        in_seed = any(menu["id"] == menu_id for menu in json.loads(MENU_SEED_PATH.read_text(encoding="utf-8")))
+        return in_seed and self._service_allowed(menu_id, None)
 
     def replace(self, prizes: list[dict]) -> list[dict]:
         """칸 순서를 보존해 전체 교체한다. 중간 실패 시 기존 설정이 유지된다."""

@@ -17,12 +17,12 @@ def _me(m: dict) -> dict:
 
 
 @router.get("/members/me")
-async def get_me(member: dict = Depends(current_member)):
+def get_me(member: dict = Depends(current_member)):
     return _me(member)
 
 
 @router.post("/members/me/opt-out")
-async def opt_out(request: Request, member: dict = Depends(current_member)):
+def opt_out(request: Request, member: dict = Depends(current_member)):
     return _me(request.app.state.members.opt_out(member["id"]))
 
 
@@ -35,6 +35,6 @@ def tablet_rows(request: Request, table_no: int, member: dict) -> list[dict]:
 
 
 @router.get("/tables/{table_no}/logins")
-async def tablet_logins(table_no: int, request: Request, member: dict = Depends(current_member)):
+def tablet_logins(table_no: int, request: Request, member: dict = Depends(current_member)):
     """새로고침 후 '이 태블릿에서 로그인한 회원'(룰렛 사용 여부 포함)을 되살리기 위한 기록."""
     return tablet_rows(request, table_no, member)

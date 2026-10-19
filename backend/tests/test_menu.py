@@ -43,3 +43,33 @@ def test_menu_seed_only_fills_an_empty_catalog(client, empty_menu_catalog):
     shop.save_menu("c2", {"price": 21000})
     shop.seed_menus()
     assert shop.menu("c2")["price"] == 21000
+
+
+def test_menu_event_flag_defaults_and_saves(client):
+    shop = client.app.state.shop
+
+    # 시드에서는 기본 이벤트 메뉴(계란말이)만 체크되어 있고, 새 메뉴는 체크가 없는 상태로 시작한다.
+    assert shop.menu("a4")["is_event"] is True
+    assert shop.menu("c2")["is_event"] is False
+    assert shop.save_menu("m-event", {"cat": "anju", "name": "이벤트 안주", "price": 1000})["is_event"] is False
+
+    # 관리자 API 로 체크하고 해제할 수 있다.
+    from tests.conftest import ADMIN
+    response = client.put("/admin/api/menus/m-event", headers=ADMIN, json={"is_event": True})
+    assert response.json()["is_event"] is True
+    assert next(m for m in client.get("/admin/api/menus", headers=ADMIN).json()["menus"] if m["id"] == "m-event")["is_event"]
+    assert client.put("/admin/api/menus/m-event", headers=ADMIN, json={"is_event": False}).json()["is_event"] is False
+
+
+def test_menu_event_flag_works_before_migration(client):
+    shop = client.app.state.shop
+
+    # 운영 DB에 is_event 컬럼이 아직 없는 상황: 컬럼을 지워도 조회·저장이 죽지 않고 기본 메뉴만 이벤트로 본다.
+    shop.db.run("ALTER TABLE menus DROP COLUMN is_event")
+    shop._event_column_ok = False
+    assert shop.menu("a4")["is_event"] is True
+    assert shop.menu("c2")["is_event"] is False
+    assert shop.save_menu("c2", {"is_event": True, "name": "치킨"})["name"] == "치킨"
+    assert shop.menu("c2")["is_event"] is False
+    assert client.app.state.roulette_prizes.service_menu_exists("a4") is True
+    assert client.app.state.roulette_prizes.service_menu_exists("c2") is False

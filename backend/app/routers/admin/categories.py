@@ -32,13 +32,13 @@ def _category_error(error: CategoryError) -> HTTPException:
 
 
 @router.get("/categories")
-async def admin_categories(request: Request):
+def admin_categories(request: Request):
     """관리자 카테고리 목록에는 메뉴 개수를 포함한다."""
     return request.app.state.shop.categories.list(include_count=True)
 
 
 @router.post("/categories", status_code=201)
-async def add_category(body: CategoryIn, request: Request):
+def add_category(body: CategoryIn, request: Request):
     """새 카테고리를 표시 순서의 마지막에 추가한다."""
     category_id = body.id or f"cat{uuid.uuid4().hex[:8]}"
     try:
@@ -48,7 +48,7 @@ async def add_category(body: CategoryIn, request: Request):
 
 
 @router.patch("/categories/{category_id}")
-async def update_category(category_id: str, body: CategoryPatch, request: Request):
+def update_category(category_id: str, body: CategoryPatch, request: Request):
     """요청에 포함된 카테고리 항목만 수정한다."""
     try:
         category = request.app.state.shop.categories.update(
@@ -62,7 +62,7 @@ async def update_category(category_id: str, body: CategoryPatch, request: Reques
 
 
 @router.delete("/categories/{category_id}", status_code=204)
-async def delete_category(category_id: str, request: Request):
+def delete_category(category_id: str, request: Request):
     """메뉴가 연결된 카테고리는 삭제하지 않고 409로 안내한다."""
     try:
         exists, menu_count = request.app.state.shop.categories.delete(category_id)
@@ -76,6 +76,6 @@ async def delete_category(category_id: str, request: Request):
 
 
 @guest_router.get("/categories")
-async def guest_categories(request: Request):
+def guest_categories(request: Request):
     """손님 주문 화면에 필요한 카테고리를 같은 테이블에서 읽어 준다."""
     return request.app.state.shop.categories.list()

@@ -26,25 +26,25 @@ class RecommendationGenerateIn(BaseModel):
 
 
 @router.get("/v1/ai/questions")
-async def questions(request: Request):
+def questions(request: Request):
     """추천 질문과 선택지를 DB에서 화면용 모양으로 묶어 반환한다."""
     return request.app.state.ai_content.questions()
 
 
 @router.get("/v1/weather/current")
-async def current_weather(request: Request):
+def current_weather(request: Request):
     """외부 API 연동 전까지 DB에 저장된 마지막 날씨를 반환한다."""
     return request.app.state.ai_content.weather_shape()
 
 
 @router.get("/v1/ai/recommendation-rules")
-async def recommendation_rules(request: Request):
+def recommendation_rules(request: Request):
     """추천 화면이 사용하는 규칙 JSON을 DB에서 반환한다."""
     return request.app.state.ai_content.rules()
 
 
 @router.post("/v1/ai/recommendations/generate")
-async def generate_recommendations(
+def generate_recommendations(
     body: RecommendationGenerateIn,
     request: Request,
     member: dict | None = Depends(optional_member),
@@ -66,7 +66,7 @@ async def generate_recommendations(
 
 @router.post("/v1/ai/recommendations", status_code=201)
 @router.post("/recommendations", status_code=201)
-async def log_recommendation(body: RecommendationIn, request: Request, member: dict | None = Depends(optional_member)):
+def log_recommendation(body: RecommendationIn, request: Request, member: dict | None = Depends(optional_member)):
     """추천 조합이 손님에게 노출된 사실을 기록한다 (AI 추천 적중률의 분모)."""
     event_id = request.app.state.shop.add_recommendation(
         body.table_no, member["id"] if member else None, body.params, body.combo_ids

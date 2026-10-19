@@ -26,7 +26,8 @@ CATEGORIES = [c for c in menu_data.CATEGORIES if c["id"] not in ("ai", "best")]
 
 def _menu(id_, cat, name, price, spicy=0, soldout=False, weight=50, set_ok=True, desc=""):
     return {"id": id_, "cat": cat, "name": name, "desc": desc, "price": price, "emoji": "🍽️", "tags": [],
-            "soldout": soldout, "spicy": spicy, "weight": weight, "set_ok": set_ok, "image_url": ""}
+            "soldout": soldout, "spicy": spicy, "weight": weight, "set_ok": set_ok, "image_url": "",
+            "is_event": id_ in ("a1", "a4", "a11", "d7", "d8", "d1", "j1", "b1")}
 
 
 MENUS = [

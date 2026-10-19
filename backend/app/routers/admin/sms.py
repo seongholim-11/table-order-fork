@@ -33,7 +33,7 @@ def _check_grades(grades: list[str]) -> None:
 
 
 @router.get("/marketing/sms/usage")
-async def sms_usage(request: Request):
+def sms_usage(request: Request):
     return _sms(request).usage()
 
 
@@ -44,7 +44,7 @@ def sms_balance(request: Request):
 
 
 @router.post("/marketing/sms/preview")
-async def sms_preview(body: SmsIn, request: Request):
+def sms_preview(body: SmsIn, request: Request):
     _check_grades(body.grades)
     return _sms(request).preview(body.grades, body.body, body.scheduled_at, body.member_ids)
 
@@ -79,7 +79,7 @@ def sms_cancel(log_id: int, request: Request):
 
 
 @router.get("/marketing/sms/logs")
-async def sms_logs(request: Request):
+def sms_logs(request: Request):
     return request.app.state.sms_logs.logs()
 
 

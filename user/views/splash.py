@@ -1,8 +1,11 @@
 """시작(스플래시) 화면: 룰렛 + 로그인 + 주문 시작.
 """
 
+import base64
 import os
+from functools import lru_cache
 from html import escape
+from pathlib import Path
 
 import streamlit as st
 
@@ -16,14 +19,41 @@ from user.ui.login import login_dialog, render_members_log
 from user.ui.roulette import render_roulette
 
 
+@lru_cache(maxsize=1)
+def _carousel_html():
+    """배경 사진은 한 번만 읽고 내장해 서버 주소와 관계없이 표시한다."""
+    asset_dir = Path(__file__).resolve().parents[1] / "assets" / "roulette"
+    slides = []
+    for name in ("beer", "snacks", "pub"):
+        source = base64.b64encode((asset_dir / f"{name}.webp").read_bytes()).decode("ascii")
+        slides.append(f'<img class="splash-slide" src="data:image/webp;base64,{source}" '
+                      'alt="" decoding="async">')
+    # 장식용 배경은 스크린 리더에서 제외하고 클릭은 기존 버튼으로 전달한다.
+    return '<div class="splash-carousel" aria-hidden="true">' + "".join(slides) + '</div>'
+
+
 def render_splash():
+    """시작 화면을 뷰포트 높이에 맞출 전용 컨테이너에 모은다."""
+    with st.container(key="splash_screen"):
+        _render_splash()
+
+
+@st.dialog("로그인한 회원")
+def _members_dialog():
+    """회원이 많아도 시작 화면이 길어지지 않도록 전체 기록은 팝업에서 확인한다."""
+    render_members_log()
+
+
+def _render_splash():
     ss = st.session_state
+    st.html(_carousel_html())
     poll_login_once()  # 팝업을 닫았거나 다시 그려진 뒤에도 완료된 로그인은 반영
     mini_buttons("splash", home=False)
     store = ctx.STORE  # 매장 정보(이름·지점)는 서버가 Supabase store_info 테이블에서 읽어 준다
     st.html(f'<div class="brand splash-brand"><div class="logo">🍺</div><div><div class="name">{escape(store["name"])}</div>'
             f'<div class="sub">{escape(store["branch"])}</div></div></div>')
-    render_roulette()
+    with st.container(key="splash_game"):
+        render_roulette()
     member = ss.member
     with st.container(horizontal=True, key="splash_bottom"):
         with st.container(horizontal=True, key="qr_card"):
@@ -47,4 +77,6 @@ def render_splash():
         with st.container(key="start_cta"):
             st.button("🍴 회원 주문  ›" if member else "🍴 비회원 주문  ›", type="primary", width="stretch",
                       key="start_btn", on_click=go, args=("menu",))
-    render_members_log()
+    if ss.members:
+        if st.button(f"👥 로그인한 회원 {len(ss.members)}명 보기", key="splash_members"):
+            _members_dialog()

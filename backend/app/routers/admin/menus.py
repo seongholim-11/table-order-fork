@@ -23,18 +23,19 @@ class MenuIn(BaseModel):
     spicy: int | None = Field(default=None, ge=0, le=3)
     weight: int | None = Field(default=None, ge=0, le=100)  # OWNER 추천 가중치
     set_ok: bool | None = None
+    is_event: bool | None = None  # 이벤트(룰렛 서비스 메뉴) 선택 목록에 넣을지
     emoji: str | None = None
     tags: list[str] | None = None
 
 
 @router.get("/menus")
-async def menus(request: Request):
+def menus(request: Request):
     """관리자 화면에 필요한 카테고리와 메뉴 목록을 돌려준다."""
     return {"categories": menu_categories(request), "menus": request.app.state.shop.menus()}
 
 
 @router.put("/menus/{menu_id}")
-async def save_menu(menu_id: str, body: MenuIn | list[MenuIn], request: Request):
+def save_menu(menu_id: str, body: MenuIn | list[MenuIn], request: Request):
     """한 메뉴 또는 여러 메뉴를 기존 PUT 경로에서 검증한 뒤 저장한다."""
     shop = request.app.state.shop
     categories = {category["id"] for category in menu_categories(request)}
@@ -87,7 +88,7 @@ def _validate_menu_fields(shop, menu_id: str, fields: dict, categories: set[str]
 
 
 @router.delete("/menus/{menu_id}", status_code=204)
-async def delete_menu(menu_id: str, request: Request):
+def delete_menu(menu_id: str, request: Request):
     """메뉴를 삭제하고, 없는 메뉴면 404를 돌려준다."""
     if not request.app.state.shop.delete_menu(menu_id):
         raise HTTPException(404, "메뉴를 찾을 수 없습니다.")

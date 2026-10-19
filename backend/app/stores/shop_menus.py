@@ -5,7 +5,11 @@ from pathlib import Path
 
 from app.stores.db import Database
 
-MENU_FIELDS = ("name", "cat", "price", "desc", "image_url", "soldout", "spicy", "weight", "set_ok", "emoji", "tags")
+MENU_FIELDS = ("name", "cat", "price", "desc", "image_url", "soldout", "spicy", "weight", "set_ok", "emoji", "tags", "is_event")
+
+# 이벤트(룰렛 서비스 메뉴)로 쓸 수 있는 메뉴의 기본값. 운영 DB에 is_event 컬럼이 아직 없을 때와
+# 마이그레이션 SQL(docs/db/fbgrowth_menus_is_event.sql)의 초기값이 이 목록과 같다.
+EVENT_DEFAULT_IDS = frozenset({"a1", "a4", "a11", "d7", "d8", "d1", "j1", "b1"})
 
 # 컬럼 이름은 Supabase 스키마(db/fbgrowth_schema.sql)를 따른다. 밖으로는 예전 키(cat, desc, soldout)로 내보낸다.
 SCHEMA = """\
@@ -21,6 +25,7 @@ CREATE TABLE IF NOT EXISTS menus (
     spicy       INTEGER NOT NULL DEFAULT 0,
     weight      INTEGER NOT NULL DEFAULT 50,
     set_ok      INTEGER NOT NULL DEFAULT 0,
+    is_event    INTEGER NOT NULL DEFAULT 0,
     image_url   TEXT NOT NULL DEFAULT '',
     sort_order  INTEGER NOT NULL DEFAULT 0
 );
@@ -40,6 +45,30 @@ class MenuMixin:
         # DB 컬럼명 세 개만 API 필드명으로 바꾼다.
         names = {"category_id": "cat", "description": "desc", "is_soldout": "soldout"}
         return {names.get(key, key): value for key, value in fields.items()}
+
+    def _has_event_column(self) -> bool:
+        """menus.is_event 컬럼이 있는지 확인한다. 마이그레이션 전 운영 DB에서도 앱이 죽지 않게 하려는 것이다."""
+        if getattr(self, "_event_column_ok", False):
+            return True
+        # 컬럼이 생기면(마이그레이션 실행) 서버를 다시 켜지 않아도 바로 쓰도록, 있다고 확인된 뒤에만 기억한다.
+        self._event_column_ok = "is_event" in self.db.columns("menus")
+        return self._event_column_ok
+
+    def _menu_columns(self) -> str:
+        """SELECT 할 컬럼 목록. is_event 컬럼이 없으면 0 으로 대신 채운다."""
+        event = "is_event" if self._has_event_column() else "0 AS is_event"
+        return ("id, category_id, name, description, price, emoji, tags, is_soldout, "
+                f"spicy, weight, set_ok, {event}, image_url")
+
+    def _menu_from_row(self, row: dict) -> dict:
+        """DB 행을 API 필드 모양으로 바꾼다."""
+        menu = self._from_db_fields(row)
+        menu["tags"] = self.db.from_list(menu["tags"])
+        menu["soldout"] = bool(menu["soldout"])
+        menu["set_ok"] = bool(menu["set_ok"])
+        # 컬럼이 없으면 예전처럼 정해 둔 기본 메뉴만 이벤트 메뉴로 본다.
+        menu["is_event"] = bool(menu["is_event"]) if self._has_event_column() else menu["id"] in EVENT_DEFAULT_IDS
+        return menu
 
     def _seed_categories(self) -> None:
         """카테고리 테이블이 있으면 메뉴 시드에 필요한 기본 카테고리를 추가한다."""
@@ -101,41 +130,24 @@ class MenuMixin:
                 menus = json.load(f)
 
             for sort, menu in enumerate(menus):
-                self.save_menu(menu_id=menu["id"],fields=menu,sort=sort)
+                # 처음 넣는 메뉴는 기본 이벤트 메뉴만 체크해 둔다.
+                self.save_menu(menu_id=menu["id"], fields={**menu, "is_event": menu["id"] in EVENT_DEFAULT_IDS}, sort=sort)
 
     def menus(self) -> list[dict]:
         """TODO: 정렬(sort_order, id)된 전체 메뉴. 컬럼 category_id→cat, description→desc, is_soldout→soldout 로 이름을 바꿔
         내보내고 tags 는 db.from_list, soldout·set_ok 는 bool 로 만든다."""
-        rows = self.db.all(
-            "SELECT id, category_id, name, description, price, emoji, tags, is_soldout, "
-            "spicy, weight, set_ok, image_url FROM menus ORDER BY sort_order, id"
-        )
-        menus = []
-        for row in rows:
-            # DB 컬럼명을 기존 API 필드명으로 바꾸고, 화면에서 쓰기 좋은 자료형으로 변환한다.
-            menu = self._from_db_fields(row)
-            menu["tags"] = self.db.from_list(menu["tags"])
-            menu["soldout"] = bool(menu["soldout"])
-            menu["set_ok"] = bool(menu["set_ok"])
-            menus.append(menu)
-        return menus
+        rows = self.db.all(f"SELECT {self._menu_columns()} FROM menus ORDER BY sort_order, id")
+        # DB 컬럼명을 기존 API 필드명으로 바꾸고, 화면에서 쓰기 좋은 자료형으로 변환한다.
+        return [self._menu_from_row(row) for row in rows]
 
     def menu(self, menu_id: str) -> dict | None:
         """메뉴 ID로 한 건을 조회하고 API 필드 모양으로 돌려준다."""
-        row = self.db.one(
-            "SELECT id, category_id, name, description, price, emoji, tags, is_soldout, "
-            "spicy, weight, set_ok, image_url FROM menus WHERE id=?",
-            (menu_id,),
-        )
+        row = self.db.one(f"SELECT {self._menu_columns()} FROM menus WHERE id=?", (menu_id,))
         if row is None:
             return None
 
         # DB 컬럼명과 자료형을 손님·관리자 API가 쓰는 모양으로 바꾼다.
-        menu = self._from_db_fields(row)
-        menu["tags"] = self.db.from_list(menu["tags"])
-        menu["soldout"] = bool(menu["soldout"])
-        menu["set_ok"] = bool(menu["set_ok"])
-        return menu
+        return self._menu_from_row(row)
 
     def save_menu(self, menu_id: str, fields: dict | list[dict], sort: int | None = None):
         """한 메뉴 또는 여러 메뉴를 만들거나 수정하고, 변경 전체를 한 트랜잭션으로 저장한다."""
@@ -147,6 +159,7 @@ class MenuMixin:
         if len(ids) != len(set(ids)):
             raise ValueError("같은 메뉴 ID를 한 요청에서 여러 번 저장할 수 없습니다.")
 
+        has_event_column = self._has_event_column()
         next_order = self.db.one("SELECT COALESCE(MAX(sort_order) + 1, 0) AS next_order FROM menus")["next_order"]
         statements = []
         saved_ids, deleted_ids = [], []
@@ -166,9 +179,14 @@ class MenuMixin:
                 "category_id": "side", "name": "새 메뉴", "price": 0,
                 "description": "", "image_url": "", "is_soldout": False,
                 "spicy": 0, "weight": 50, "set_ok": False, "emoji": "🍽️", "tags": [],
+                "is_event": False,
             }
             db_fields = self._to_db_fields({key: value for key, value in item.items() if key in MENU_FIELDS})
             values.update(db_fields)
+            if not has_event_column:
+                # 마이그레이션 전 DB에는 컬럼이 없으므로 이벤트 값은 저장하지 않고 나머지만 저장한다.
+                values.pop("is_event")
+                db_fields.pop("is_event", None)
             values["tags"] = self.db.to_list(values["tags"])
 
             existing = self.db.one("SELECT sort_order FROM menus WHERE id=?", (item_id,))
