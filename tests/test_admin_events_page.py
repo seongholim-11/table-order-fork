@@ -38,23 +38,25 @@ def test_roulette_table_matches_prizes(repo):
 
 def test_save_roulette_roundtrip_and_odds(repo):
     t = repo.roulette_table()
-    # 확률은 10% 단위로, 합계가 100이어야 저장된다.
-    t.loc[0, "확률 가중치"] = 50
-    t.loc[1:, "확률 가중치"] = 10
+    # 10의 배수가 아닌 직접 입력값도 합계가 100이면 그대로 저장된다.
+    t["확률 가중치"] = [37, 23, 17, 13, 9, 1]
     repo.save_roulette(t)
     back = repo.roulette_table()
-    assert list(back["확률 가중치"][:2]) == [50, 10] and repo.roulette_odds(back)[:2] == [50.0, 10.0]
+    assert list(back["확률 가중치"]) == [37, 23, 17, 13, 9, 1]
+    assert repo.roulette_odds(back) == [37.0, 23.0, 17.0, 13.0, 9.0, 1.0]
     assert back.iloc[1]["서비스 메뉴"] == t.iloc[1]["서비스 메뉴"]
     back.loc[0, "할인율(%)"] = 10
     repo.save_roulette(back)
     first = repo.backend.roulette_prizes()[0]
-    assert first["label"] == "모든 메뉴<br><b>10% 할인</b>" and first["short"] == "전 메뉴 10% 할인" and first["weight"] == 50.0
+    assert first["label"] == "모든 메뉴<br><b>10% 할인</b>" and first["short"] == "전 메뉴 10% 할인" and first["weight"] == 37.0
     assert repo.backend.roulette_prizes()[1]["emoji"] == "🐟"  # 맛보기 먹태구이에 맞춰 자동 배정
 
 
 @pytest.mark.parametrize("edit, msg", [
     (lambda t: t.drop(t.index[1:]), "2~8개"),
     (lambda t: t.assign(**{"확률 가중치": 0}), "합계를 100%"),
+    (lambda t: t.assign(**{"확률 가중치": 17}), "합계를 100%"),
+    (lambda t: t.assign(**{"확률 가중치": 0.5}), "1% 단위"),
     (lambda t: t.assign(색상="red"), "#RRGGBB"),
     (lambda t: t.assign(**{"확률 가중치": -1}), "0 이상"),
     (lambda t: t.assign(**{"할인율(%)": 0}), "할인율"),
@@ -82,11 +84,24 @@ def test_page_shows_event_and_preview(monkeypatch):
     assert {option.split("] ")[-1] for option in menu_picker.options} == {
         "전체 메뉴", "맛보기 먹태구이", "계란말이", "노가리 구이", "라면", "짜장라면",
         "탄산음료", "소주 1병", "생맥주 1잔"}
-    weight_picker = next(selectbox for selectbox in app.selectbox
-                         if selectbox.key and selectbox.key.startswith("roulette_weight_"))
-    assert weight_picker.options == [f"{value}%" for value in range(0, 101, 10)]
+    weight_input = app.number_input(key="roulette_weight_0-0")
+    assert weight_input.label == "확률 (%)" and weight_input.min == 0 and weight_input.max == 100
     assert app.button(key="roulette_save").label == "저장하기"
     assert not [button for button in app.button if button.label in ("변경 저장", "↩ 되돌리기")]
+
+    # 합계가 틀린 상태에서는 저장되지 않고, 100%로 맞추면 입력값이 유지된다.
+    saved = app.session_state["repo"].backend.roulette_prizes()
+    app.number_input(key="roulette_weight_0-0").set_value(37).run()
+    app.button(key="roulette_save").click().run()
+    assert not app.exception and app.error
+    assert any("합계를 100%" in error.value for error in app.error)
+    assert app.session_state["repo"].backend.roulette_prizes() == saved
+    app.number_input(key="roulette_weight_0-1").set_value(23).run()
+    assert any("확률 합계 100%" in success.value for success in app.success)
+    app.button(key="roulette_save").click().run()
+    assert not app.exception and not app.error
+    assert app.number_input(key="roulette_weight_1-0").value == 37
+    assert app.number_input(key="roulette_weight_1-1").value == 23
 
 
 def test_all_menu_switches_service_to_discount_and_saves(monkeypatch):

@@ -257,7 +257,8 @@ def _render_table_map(repo, preferences):
         selected = next(iter(sorted(suggestions)), None)  # 처음에는 제안이 있는 첫 테이블을 보여 준다
     left, right = st.columns([3, 2], gap="large")
     with left.container(key="mk_table_map"):
-        st.html(table_map_svg(total, set(suggestions), selected))
+        # st.html/markdown 은 보안상 <svg> 를 제거해 그림이 안 보이므로, SVG 를 이미지로 표시한다.
+        st.image(table_map_svg(total, set(suggestions), selected), width="stretch")
         # SVG 는 눌러도 반응하지 않으므로, 제안이 있는 테이블만 버튼으로 골라 보게 한다
         if suggestions:
             st.caption("💡 제안이 있는 테이블을 눌러 내용을 확인하세요.")

@@ -461,8 +461,9 @@ class AdminRepository:
         if not ROULETTE_MIN_SLOTS <= len(prizes) <= ROULETTE_MAX_SLOTS:
             raise CategoryError(f"룰렛 칸은 {ROULETTE_MIN_SLOTS}~{ROULETTE_MAX_SLOTS}개여야 해요.")
         weights = [p["weight"] for p in prizes]
-        if any(weight % 10 for weight in weights) or sum(weights) != 100:
-            raise CategoryError("확률은 10% 단위로 고르고 전체 합계를 100%로 맞춰 주세요.")
+        # 직접 입력한 1% 단위 확률도 허용하되 전체 합계는 반드시 100%로 유지한다.
+        if any(weight % 1 for weight in weights) or sum(weights) != 100:
+            raise CategoryError("확률은 1% 단위로 입력하고 전체 합계를 100%로 맞춰 주세요.")
         self.backend.save_roulette_prizes(prizes)
 
     # ---- 고객 / 주문 / 통계 ----

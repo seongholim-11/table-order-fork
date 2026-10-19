@@ -103,11 +103,11 @@ def _roulette_editor(old, menu_names):
             rate = rate_col.selectbox("할인율", rates, index=rates.index(current_rate) if current_rate in rates else 0,
                                       format_func=lambda value: f"{value}%", key=f"roulette_rate_{row_id}",
                                       disabled=kind != ROULETTE_KINDS["discount"])
-            weights = list(range(0, 101, 10))
             current_weight = int(row.get("확률 가중치", 0))
-            weight = weight_col.selectbox("확률", weights,
-                                          index=weights.index(current_weight) if current_weight in weights else 0,
-                                          format_func=lambda value: f"{value}%", key=f"roulette_weight_{row_id}")
+            # 목록에서 고르는 대신 1% 단위 숫자를 직접 입력한다.
+            weight = weight_col.number_input("확률 (%)", min_value=0, max_value=100,
+                                             value=current_weight, step=1, format="%d",
+                                             key=f"roulette_weight_{row_id}")
             color = color_col.color_picker("색상", value=row.get("색상", "#3ea0f5"), key=f"roulette_color_{row_id}")
             if delete_col.button("삭제", key=f"roulette_delete_{row_id}", use_container_width=True):
                 delete_id = row_id

@@ -89,6 +89,12 @@ def test_sidebar_sub_menus_are_collapsible_and_select_tabs():
     assert "tab" not in app.query_params and app.sidebar.radio(key="nav_sub_주문 이력").value is None
 
 
+def _has_table_map(app):
+    """배치도 SVG 가 st.html 이 아니라 이미지로 표시되는지 확인한다(st.html 은 <svg> 를 지워 화면에 안 보였다)."""
+    assert not any("<svg" in h.value for h in app.get("html"))
+    return any(i.proto.imgs[0].url.startswith("data:image/svg+xml") for i in app.get("image"))
+
+
 def open_recommend():
     """AI 추천 화면을 열고 [AI 추천 받기] 버튼을 눌러 추천을 만든 상태로 돌려준다."""
     app = open_marketing("AI 추천")
@@ -102,7 +108,7 @@ def test_recommend_runs_only_on_button_and_map_always_shows():
     assert not app.exception
     assert not [h for h in app.get("html") if 'class="rec recommendation-card"' in h.value]
     assert any("AI 추천 받기" in i.value for i in app.info)
-    assert any("<svg" in h.value and "매장 테이블 배치도" in h.value for h in app.get("html"))
+    assert _has_table_map(app)
     app.button(key="mk_rerecommend").click().run()
     assert [h for h in app.get("html") if 'class="rec recommendation-card"' in h.value]
     assert app.session_state["mk_rec_round"] == 0 if "mk_rec_round" in app.session_state else True
@@ -276,6 +282,6 @@ def test_recommend_tab_shows_table_map_with_highlight():
     app = open_marketing("AI 추천")
     buttons = {b.key: b for b in app.button if b.key and b.key.startswith("mk_table_")}
     assert buttons, "제안이 있는 테이블 버튼이 있어야 한다"
-    assert any("<svg" in e.value and "매장 테이블 배치도" in e.value for e in app.get("html"))  # 아이소메트릭 SVG 배치도
+    assert _has_table_map(app)  # 아이소메트릭 SVG 배치도
     list(buttons.values())[-1].click().run()
     assert not app.exception

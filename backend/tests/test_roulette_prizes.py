@@ -24,6 +24,16 @@ def test_put_requires_admin(client):
     assert client.put("/api/v1/owner/roulette/prizes", json=_prizes()).status_code == 401
 
 
+def test_saves_typed_probabilities(client):
+    # 0% 및 100% 경계와 1% 단위 값을 양쪽 저장 경로에서 그대로 유지한다.
+    for path in ("/admin/api/owner/roulette/prizes", "/api/v1/owner/roulette/prizes"):
+        for weights in ((55, 45), (1, 99), (0, 100)):
+            body = [{**prize, "weight": weight} for prize, weight in zip(_prizes(), weights)]
+            response = client.put(path, headers=ADMIN, json=body)
+            assert response.status_code == 200
+            assert [prize["weight"] for prize in client.get("/api/v1/roulette/prizes").json()] == list(weights)
+
+
 def test_drink_service_options_are_allowed(client):
     for menu_id in ("d1", "j1", "b1"):
         body = [_prizes()[0], {**_prizes()[1], "item_id": menu_id}]
@@ -35,7 +45,9 @@ def test_rejects_bad_prizes(client):
         _prizes()[:1],
         _prizes() * 5,
         [{**prize, "weight": 0} for prize in _prizes()],
-        [{**_prizes()[0], "weight": 55}, {**_prizes()[1], "weight": 45}],
+        [{**_prizes()[0], "weight": 55.5}, {**_prizes()[1], "weight": 44.5}],
+        [{**_prizes()[0], "weight": -1}, {**_prizes()[1], "weight": 101}],
+        [{**_prizes()[0], "weight": 51}, {**_prizes()[1], "weight": 50}],
         [{**_prizes()[0], "weight": 40}, {**_prizes()[1], "weight": 40}],
         [{**_prizes()[0], "percent": None}, _prizes()[1]],
         [_prizes()[0], {**_prizes()[1], "item_id": "missing"}],

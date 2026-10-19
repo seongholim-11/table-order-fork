@@ -37,8 +37,9 @@ async def save_roulette_prizes(prizes: list[RoulettePrizeIn], request: Request):
     if not 2 <= len(prizes) <= 8:
         raise HTTPException(422, "룰렛 칸은 2~8개여야 합니다.")
     weights = [prize.weight for prize in prizes]
-    if any(weight % 10 for weight in weights) or sum(weights) != 100:
-        raise HTTPException(422, "확률은 10% 단위로 고르고 전체 합계를 100%로 맞춰야 합니다.")
+    # 화면을 거치지 않는 요청도 1% 단위와 합계 100% 규칙을 동일하게 검사한다.
+    if any(weight % 1 for weight in weights) or sum(weights) != 100:
+        raise HTTPException(422, "확률은 1% 단위로 입력하고 전체 합계를 100%로 맞춰야 합니다.")
     missing = [prize.item_id for prize in prizes
                if prize.kind == "free" and not request.app.state.roulette_prizes.service_menu_exists(prize.item_id)]
     if missing:
