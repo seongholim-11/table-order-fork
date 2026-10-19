@@ -1,8 +1,6 @@
-"""손님 API: 화면용 콘텐츠(카테고리·룰렛·직원호출 항목·AI 질문·날씨·추천 규칙). 서준·석원·재현이 각자 항목을 새 엔드포인트로 옮긴다."""
+"""손님 API: 화면용 콘텐츠(카테고리·AI 질문·날씨·추천 규칙). 모두 DB 저장소 값을 돌려준다."""
 
 from fastapi import APIRouter, HTTPException, Request
-
-from app import dummy
 
 router = APIRouter(prefix="/api", tags=["사용자"])
 
@@ -10,14 +8,13 @@ router = APIRouter(prefix="/api", tags=["사용자"])
 
 @router.get("/content")
 def all_content(request: Request):
-    """기존 화면용 묶음 경로를 유지하되 AI 항목은 새 DB 저장소에서 합친다."""
-    data = dummy.content()
-    # 카테고리는 관리자가 DB에서 추가·수정·삭제하므로 더미 대신 DB 값을 내려 준다.
-    data["categories"] = request.app.state.shop.categories.list()
-    data["quiz_questions"] = request.app.state.ai_content.questions()
-    data["weather"] = request.app.state.ai_content.weather_shape()
-    data["rules"] = request.app.state.ai_content.rules()
-    return data
+    """기존 화면용 묶음 경로. 카테고리·AI 질문·날씨·추천 규칙을 모두 DB 저장소에서 모아 돌려준다."""
+    return {
+        "categories": request.app.state.shop.categories.list(),  # 관리자가 바꾼 DB 값
+        "quiz_questions": request.app.state.ai_content.questions(),
+        "weather": request.app.state.ai_content.weather_shape(),
+        "rules": request.app.state.ai_content.rules(),
+    }
 
 
 @router.get("/content/{name}")
@@ -30,7 +27,5 @@ def one_content(name: str, request: Request):
         return request.app.state.ai_content.rules()
     if name == "categories":
         return request.app.state.shop.categories.list()  # 관리자가 바꾼 DB 값
-    data = dummy.content_item(name)  # [더미]
-    if data is None:
-        raise HTTPException(404, "없는 콘텐츠입니다.")
-    return data
+    # 위 네 가지 말고는 없는 콘텐츠다.
+    raise HTTPException(404, "없는 콘텐츠입니다.")

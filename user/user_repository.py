@@ -102,7 +102,7 @@ class DummyRepository:
             weather=copy.deepcopy(ai_quiz_data.WEATHER), rules=copy.deepcopy(recommendation_data.RULES),
             source="dummy")
 
-    def create_order(self, table_no, lines, total, token, coupon_ids=()):
+    def create_order(self, table_no, lines, total, token, coupon_ids=(), recommendation_event_id=None):
         return None
 
     def table_orders(self, table_no, token):
@@ -173,9 +173,11 @@ class ApiRepository:
                        roulette_prizes=data["roulette_prizes"], staff_calls=data["staff_call_items"],
                        quiz_questions=data["questions"], weather=data["weather"], rules=data["rules"], source="api")
 
-    def create_order(self, table_no, lines, total, token, coupon_ids=()):
-        r = server.safe_call(api.post, ENDPOINTS["orders"], token,
-                             json={"table_no": table_no, "lines": lines, "total": total, "coupon_ids": list(coupon_ids)})
+    def create_order(self, table_no, lines, total, token, coupon_ids=(), recommendation_event_id=None):
+        body = {"table_no": table_no, "lines": lines, "total": total, "coupon_ids": list(coupon_ids)}
+        if recommendation_event_id is not None:  # AI 조합을 담은 주문이면 어떤 추천에서 나왔는지 함께 보낸다
+            body["recommendation_event_id"] = recommendation_event_id
+        r = server.safe_call(api.post, ENDPOINTS["orders"], token, json=body)
         return r["no"] if r else None
 
     def table_orders(self, table_no, token):

@@ -322,7 +322,7 @@ UI(추천 조합 카드 표시) → U/views/ai.py log_recommendation → ctx.REP
 
 - [x] 더미 주석처리: `log_recommendation`의 `dummy.recommendation_logged()`, `B/dummy/recommend_data.py`의 `recommendation_logged`·`"POST /api/recommendations"` 줄.
 - [x] `add_recommendation`, `recommendation_count` 구현(파일 안 TODO). 새 경로 `/api/v1/ai/recommendations`를 `B/routers/ai.py`에 연결하고 기존 경로 별칭도 유지했다.
-- [ ] `orders.recommendation_event_id`로 주문과 추천을 연결하는 부분은 4-3에서.
+- [x] `orders.recommendation_event_id`로 주문과 추천을 연결한다(AI 조합을 담은 주문에 마지막 추천 기록 id 저장).
 
 ### 4-3. 추천 조합 계산과 제미나이 분석을 서버로
 

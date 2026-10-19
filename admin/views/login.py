@@ -15,6 +15,20 @@ def login():
                 '<div class="sb-logo" style="width:56px;height:56px;border-radius:16px;font-size:30px;margin:0 auto 14px">🍺</div>'
                 '<div style="font-size:26px;font-weight:800;letter-spacing:-.02em">F&B Growth 관리자</div>'
                 '<div style="color:#8a857e;font-size:14px;margin-top:6px">사장님 전용 관리 화면이에요</div></div>')
+        if repo_mod.owner_login_enabled():
+            # 사장님 계정(Supabase)으로 로그인. 개발용 토큰 입력은 아래 접이식에 둔다.
+            with st.container(border=True):
+                email = st.text_input("이메일", placeholder="owner@example.com")
+                password = st.text_input("비밀번호", type="password")
+                if st.button("사장님 로그인", type="primary", width="stretch"):
+                    result = repo_mod.connect_owner(email, password)
+                    if result.error:
+                        st.error(result.error)
+                    else:
+                        ss["owner"], ss["repo"], ss["token"], ss["notice"] = True, result.repo, result.token, result.notice
+                        st.rerun()
+            st.caption("사장님으로 등록된 계정만 들어올 수 있어요.")
+            return
         with st.container(border=True):
             token = st.text_input("관리자 토큰", type="password", placeholder="토큰을 입력하세요")
             if st.button("로그인", type="primary", width="stretch"):

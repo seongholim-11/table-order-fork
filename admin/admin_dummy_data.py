@@ -320,6 +320,7 @@ class DummyBackend:
         for o in self.orders_:
             for l in o["lines"]:
                 counts[l["name"]] = counts.get(l["name"], 0) + l["qty"]
+        drinks = {m["name"] for m in self.menus_ if m["cat"] in ("beer", "soju")}  # 주류 메뉴 이름
         ai = sum(1 for o in self.orders_ if o["ai_combo"])
         shown = len(self.orders_) * 2  # 더미: 추천 노출 수
         age: dict[str, int] = {k: 0 for k in AGE_GROUPS}
@@ -332,6 +333,11 @@ class DummyBackend:
                 "returning_customers": sum(1 for g in grades.values() if g in ("재방문", "단골")),
                 "age_groups": age, "genders": gender,
                 "popular_menus": [{"name": n, "qty": q} for n, q in sorted(counts.items(), key=lambda kv: -kv[1])[:10]],
+                # 서버와 같은 규칙: 맥주·소주 카테고리는 주류, 나머지는 음식
+                "popular_food": [{"name": n, "qty": q} for n, q in sorted(counts.items(), key=lambda kv: -kv[1])
+                                 if n not in drinks][:10],
+                "popular_drinks": [{"name": n, "qty": q} for n, q in sorted(counts.items(), key=lambda kv: -kv[1])
+                                   if n in drinks][:10],
                 "ai": {"recommendations": shown, "ai_orders": ai, "hit_rate": round(ai / shown, 3),
                        "definition": "AI 조합이 포함된 주문 수 / 추천이 노출된 횟수 (임시 기준)"}}
 

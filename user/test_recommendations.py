@@ -71,6 +71,30 @@ class RecommendationTests(unittest.TestCase):
         line = next(iter(app.session_state["cart"].values()))
         self.assertEqual(line["unit"], line["original_unit"])
 
+    def test_recommendation_is_kept_after_adding_combo(self):
+        # 조합을 담아 화면이 다시 그려져도 추천은 그대로이고 추천 계산(제미나이 호출 포함)은 한 번만 일어난다
+        import user.views.ai as ai_view
+        calls = []
+        real = ai_view.recommend_with_ai
+        def counting(params, lines):
+            calls.append(1)
+            return real(params, lines)
+        with patch.object(ai_view, "recommend_with_ai", counting):
+            app = AppTest.from_file(APP)
+            app.run()
+            app.button(key="start_btn").click().run()
+            app.button(key="cat_ai").click().run()
+            before = [h.value for h in app.html if "combo-heading" in h.value]
+            for _ in range(2):
+                app.button(key="add_combo_1").click().run()
+            after = [h.value for h in app.html if "combo-heading" in h.value]
+            self.assertEqual(before, after)
+            self.assertEqual(len(calls), 1)
+            # 다른 카테고리로 나갔다 돌아오면 새로 계산한다
+            app.button(key="cat_best").click().run()
+            app.button(key="cat_ai").click().run()
+            self.assertEqual(len(calls), 2)
+
     def test_empty_results_for_impossible_budget(self):
         self.assertEqual(recommend_combos(people=6, budget=1), [])
 

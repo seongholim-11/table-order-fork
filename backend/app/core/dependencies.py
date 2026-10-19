@@ -7,11 +7,25 @@ from app.services import tokens
 
 
 def require_admin(
+    request: Request,
     authorization: str = Header(default=""),
     settings: Settings = Depends(get_settings),
 ) -> None:
-    if authorization != f"Bearer {settings.admin_token}":
-        raise HTTPException(status_code=401, detail="관리자 인증이 필요합니다.")
+    """관리자 인증. 사장님 로그인(Supabase 토큰)을 우선 지원하고, 개발용 ADMIN_TOKEN 도 받는다.
+
+    운영(APP_ENV=prod)에서 Supabase 가 설정돼 있으면 ADMIN_TOKEN 은 더 이상 받지 않는다.
+    Supabase 로 들어온 사장님의 id 는 request.state.owner_id 에 담아 챗봇 등이 쓴다.
+    """
+    legacy_allowed = not (settings.app_env == "prod" and settings.supabase_enabled)
+    if legacy_allowed and authorization == f"Bearer {settings.admin_token}":
+        return
+    token = authorization.removeprefix("Bearer ").strip()
+    if token and settings.supabase_enabled:
+        owner_id = request.app.state.owners.owner_id_from_token(token, request.app.state.supabase)
+        if owner_id:
+            request.state.owner_id = owner_id
+            return
+    raise HTTPException(status_code=401, detail="관리자 인증이 필요합니다.")
 
 
 def current_member(request: Request, authorization: str = Header(default=""),

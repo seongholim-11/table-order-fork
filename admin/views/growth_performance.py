@@ -95,15 +95,21 @@ def _performance_charts(result: dict) -> None:
     # 과거 일평균을 전체 날짜에 반복해 AI 도입 이후에도 비교 기준선이 이어지게 한다.
     # 월환산 지표와 같은 기준을 쓰되 일 매출 그래프이므로 30으로 나눈다.
     baseline_line = timeline[["일자"]].assign(매출=baseline / 30, 구간="AI 도입 전 일평균 매출")
-    post_line = timeline[timeline["일자"] >= adoption].assign(구간="AI 도입 이후 실제 일 매출")
-    comparison = pd.concat([baseline_line, post_line], ignore_index=True)
-    # 두 선에 같은 색상 척도를 사용해 범례와 실제 선의 색상을 일치시킨다.
+    post_line = timeline[timeline["일자"] >= adoption].sort_values("일자").assign(구간="AI 도입 이후 실제 일 매출")
+    # 도입 후 당일과 직전 6일(주문 없는 날의 0원 포함)을 평균낸다.
+    # 도입 전 매출이 섞이지 않도록 도입 후 7일이 쌓인 날부터 표시한다.
+    moving_average = post_line.assign(
+        매출=post_line["매출"].rolling(window=7, min_periods=7).mean(),
+        구간="AI 도입 이후 7일 이동평균",
+    ).dropna(subset=["매출"])
+    comparison = pd.concat([baseline_line, post_line, moving_average], ignore_index=True)
+    # 세 선에 같은 색상 척도를 사용해 범례와 실제 선의 색상을 일치시킨다.
     line = alt.Chart(comparison).mark_line(strokeWidth=3).encode(
         x=alt.X("일자:T", title="주문일"), y=alt.Y("매출:Q", title="일 매출(원)"),
         color=alt.Color(
             "구간:N",
-            scale=alt.Scale(domain=["AI 도입 전 일평균 매출", "AI 도입 이후 실제 일 매출"],
-                            range=["#2563eb", "#f97316"]),
+            scale=alt.Scale(domain=["AI 도입 전 일평균 매출", "AI 도입 이후 실제 일 매출", "AI 도입 이후 7일 이동평균"],
+                            range=["#2563eb", "#f97316", "#16a34a"]),
             legend=alt.Legend(title=None),
         ),
         detail="구간:N",
@@ -137,7 +143,7 @@ def _performance_charts(result: dict) -> None:
     left, right = st.columns([3, 2], gap="large")
     left.subheader("AI 마케팅 도입 전·후 매출 추세")
     left.altair_chart((line + rule + rule_label).properties(height=360), use_container_width=True)
-    left.caption("파란선: AI 도입 전 일평균을 전체 기간에 적용한 비교 기준 · 주황선: 도입 이후 실제 일 매출")
+    left.caption("파란선: AI 도입 전 일평균 비교 기준 · 주황선: 도입 이후 실제 일 매출 · 초록선: 당일 포함 최근 7일 평균(도입 후 7일째부터 표시, 주문 없는 날은 0원)")
     right.subheader("월평균 매출 증가")
     right.altair_chart((bars + labels).properties(height=360), use_container_width=True)
 

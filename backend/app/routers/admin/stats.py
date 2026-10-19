@@ -23,7 +23,8 @@ def dashboard(request: Request, settings: Settings = Depends(get_settings),
         raise HTTPException(422, "단골 기준은 재방문 기준보다 커야 합니다.")
     store = StatsStore(request.app.state.db)
     return stats_service.dashboard(store.orders(), request.app.state.members.all(),
-                                   store.recommendation_count(), datetime.now(KST).date(), rule)
+                                   store.recommendation_count(), datetime.now(KST).date(), rule,
+                                   drink_names=store.drink_names(stats_service.DRINK_CATEGORIES))
 
 
 # 각 세부 API는 같은 의존 함수로 집계해 계산 규칙이 서로 달라지지 않게 한다.

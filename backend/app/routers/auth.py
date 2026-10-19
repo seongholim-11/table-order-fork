@@ -36,6 +36,31 @@ def _public_member(m: dict) -> dict:
     return {"id": m["id"], "nickname": m["nickname"]}
 
 
+class OwnerLoginIn(BaseModel):
+    email: str = Field(min_length=3)
+    password: str = Field(min_length=1)
+
+
+@router.get("/owner/config")
+def owner_login_config(settings: Settings = Depends(get_settings)):
+    """관리자 화면이 사장님 로그인(이메일/비밀번호) 입력창을 보여줄지 알려 준다."""
+    return {"enabled": settings.supabase_enabled}
+
+
+@router.post("/owner/login")
+def owner_login(body: OwnerLoginIn, request: Request, settings: Settings = Depends(get_settings)):
+    """사장님 이메일/비밀번호 로그인. Supabase 로 확인하고, owners 에 등록된 계정만 토큰을 준다."""
+    if not settings.supabase_enabled:
+        raise HTTPException(503, "사장님 로그인은 Supabase 설정(SUPABASE_URL, SUPABASE_ANON_KEY)이 필요합니다.")
+    try:
+        session = request.app.state.supabase.sign_in_password(body.email.strip(), body.password)
+    except SupabaseAuthError as error:
+        raise HTTPException(401, str(error)) from error
+    if not request.app.state.owners.is_owner(session["user_id"]):
+        raise HTTPException(403, "사장님 계정으로 등록되지 않았습니다.")
+    return {"access_token": session["access_token"], "email": session["email"]}
+
+
 @router.post("/qr")
 async def create_qr(body: QrRequest, request: Request, settings: Settings = Depends(get_settings)):
     store = request.app.state.login_store

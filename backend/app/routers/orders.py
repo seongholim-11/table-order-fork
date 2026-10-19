@@ -24,6 +24,7 @@ class OrderIn(BaseModel):
     lines: list[OrderLine] = Field(min_length=1)
     total: int = Field(ge=0)
     coupon_ids: list[int] = []  # 이 주문에 쓴 쿠폰 (쿠폰함에서 '사용'한 것)
+    recommendation_event_id: int | None = None  # 주문의 바탕이 된 AI 추천 노출 기록 id (AI 추천 적중률 계산용)
 
 
 @router.post("/orders", status_code=201)
@@ -44,7 +45,8 @@ def create_order(body: OrderIn, request: Request, member: dict | None = Depends(
         problem = request.app.state.coupons.check_usable(body.coupon_ids, table_members, lines, body.total)
         if problem:
             raise HTTPException(409, problem)
-    saved = request.app.state.shop.add_order(body.table_no, lines, body.total, member["id"] if member else None)
+    saved = request.app.state.shop.add_order(body.table_no, lines, body.total, member["id"] if member else None,
+                                             body.recommendation_event_id)
     used_coupon_ids = []
     if body.coupon_ids:
         used_coupon_ids = request.app.state.coupons.use(body.coupon_ids, table_members, saved["id"])

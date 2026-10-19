@@ -262,5 +262,5 @@ UI(관리자 로그인 화면) → A/views/login.py → A/admin_repository.py co
 **상세 설명 / TODO**
 
 - [ ] 마지막 단계 전에는 코드를 바꾸지 않는다. 그동안 `ADMIN_TOKEN`은 운영에서 기본값(`change-me`)을 쓰지 않는다(`APP_ENV=prod`이면 서버가 거부한다).
-- [ ] 시작할 때: `B/routers/admin/owner.py`(신규), `require_admin`에서 Supabase 토큰 검증 추가, `A/views/login.py`·`connect()` 수정.
+- [x] 시작할 때: `B/routers/admin/owner.py`(신규), `require_admin`에서 Supabase 토큰 검증 추가, `A/views/login.py`·`connect()` 수정.
 - [ ] 챗봇의 임시 `CHAT_OWNER_ID`(4번)를 로그인한 사장님의 id로 교체하고 환경변수를 제거한다.

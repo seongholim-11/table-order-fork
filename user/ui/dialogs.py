@@ -34,8 +34,11 @@ def confirm_dialog():
         no = len(st.session_state.orders) + 1
         coupon_ids = pending_coupon_ids()
         total = cart_total()  # 쿠폰 할인이 빠진 합계. consume_applied() 가 할인율을 지우기 전에 한 번만 계산해 둔다
+        # AI 조합을 담은 주문이면 마지막으로 본 추천 기록과 연결한다(추천을 보고 주문했는지 통계에 쓴다)
+        has_combo = any(str(l.get("id", "")).startswith("combo:") for l in cart.values())
+        rec_event_id = st.session_state.get("last_rec_event_id") if has_combo else None
         server_no = ctx.REPO.create_order(st.session_state.table, [dict(l) for l in cart.values()], total,
-                                      st.session_state.access_token, coupon_ids)
+                                      st.session_state.access_token, coupon_ids, rec_event_id)
         if coupon_ids and server_no is None and ctx.REPO.source == "api":
             # 서버가 쿠폰을 받아들이지 않았다(이미 사용됨 등): 주문을 접수하지 않고 쿠폰함을 새로고침해 되돌린다
             load_coupons()

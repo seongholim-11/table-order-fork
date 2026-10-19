@@ -13,6 +13,17 @@ def _render_panel_grid(*cards):
     st.html('<div class="dashboard-panels">' + "".join(cards) + '</div>')
 
 
+def _popular_panels(s):
+    """인기 메뉴를 음식·주류 두 패널로 나눈다. 서버가 구분 필드를 안 주면 기존 한 패널로 보여 준다."""
+    if "popular_food" not in s:
+        return [panel("인기 메뉴 TOP 10", "주문 수량 기준",
+                      bars({m["name"]: m["qty"] for m in s["popular_menus"]}, "개", ranked=True,
+                           empty="아직 주문이 없어요."))]
+    return [panel(title, "주문 수량 기준",
+                  bars({m["name"]: m["qty"] for m in s[key]}, "개", ranked=True, empty="아직 주문이 없어요."))
+            for title, key in (("인기 메뉴 TOP 10 · 🍽️ 음식", "popular_food"), ("인기 메뉴 TOP 10 · 🍺 주류", "popular_drinks"))]
+
+
 def render_sales_insights(s, x, title="매출", subtitle="오늘 · 최근 7일 · 최근 30일을 한 번에 비교해요"):
     """주문·매출 지표와 매출 그래프만 한 영역에 모아 보여 준다."""
     sec_title(title, subtitle)
@@ -146,9 +157,7 @@ def _render_dashboard(repo, sub):
         render_today_sales(s, x)
         render_order_customers(x, s)
         sec_title("메뉴", "오늘 운영에 참고할 인기 메뉴예요")
-        st.html(panel("인기 메뉴 TOP 10", "주문 수량 기준",
-                      bars({menu["name"]: menu["qty"] for menu in s["popular_menus"]}, "개", ranked=True,
-                           empty="아직 주문이 없어요.")))
+        _render_panel_grid(*_popular_panels(s))
     elif sub == "오늘 · 매출":
         render_today_sales(s, x)
     elif sub == "매출 추이":
@@ -170,9 +179,7 @@ def _render_dashboard(repo, sub):
                 kpi("일반 주문 객단가", f"{x['plain_avg_ticket']:,}" if x["plain_avg_ticket"] is not None else "-",
                     "원" if x["plain_avg_ticket"] is not None else "", sub="최근 30일 주문 기준"),
             ])
-        _render_panel_grid(
-            panel("인기 메뉴 TOP 10", "주문 수량 기준",
-                  bars({m["name"]: m["qty"] for m in s["popular_menus"]}, "개", ranked=True, empty="아직 주문이 없어요.")),
-            '<div class="dashboard-menu-kpis">' + "".join(ai_cards) + '</div>',
-        )
+        # 음식·주류 순위를 나란히 보여 주고, AI 카드는 그 아래 한 묶음으로 둔다.
+        _render_panel_grid(*_popular_panels(s))
+        _render_panel_grid('<div class="dashboard-menu-kpis">' + "".join(ai_cards) + '</div>')
         render_menu_stock(repo)

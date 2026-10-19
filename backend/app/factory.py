@@ -20,6 +20,7 @@ from app.stores.grade_rules import GradeRuleStore
 from app.stores.ai_content import AiContentStore
 from app.stores.login_sessions import LoginSessionStore
 from app.stores.members import MemberStore
+from app.stores.owners import OwnerStore
 from app.stores.roulette_prizes import RoulettePrizeStore
 from app.stores.shop import ShopStore
 from app.stores.sms_logs import SmsLogStore
@@ -47,6 +48,7 @@ def create_app(settings: Settings | None = None, sms_clock=None, sms_http=None) 
     app.state.dev_test = DevTestStore(db)
     app.state.login_store = LoginSessionStore(settings.login_ttl_seconds)
     app.state.members = MemberStore(db)
+    app.state.owners = OwnerStore(db)  # 사장님 로그인(Supabase Auth) 허용 목록
     app.state.coupons = CouponStore(db)
     app.state.tablet_logins = TabletLoginStore(db, settings.jwt_expire_minutes)
     app.state.store_info = StoreInfoStore(db, settings)

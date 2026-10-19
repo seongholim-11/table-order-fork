@@ -2,8 +2,6 @@
 
 Supabase 에서는 orders(주문) / order_items(줄) / order_item_components(AI 조합 구성 메뉴) 세 테이블로 나뉜다.
 밖으로는 예전처럼 ts·lines 를 가진 주문 하나로 돌려준다.
-
-[뼈대] 시그니처와 스키마만 남겼다. 구현은 TODO 를 따라 채운다.
 """
 from datetime import datetime, timezone
 SCHEMA = """\
@@ -40,7 +38,8 @@ CREATE TABLE IF NOT EXISTS order_item_components (
 
 
 class OrderMixin:
-    def add_order(self, table_no: int, lines: list[dict], total: int, member_id: int | None) -> dict:
+    def add_order(self, table_no: int, lines: list[dict], total: int, member_id: int | None,
+                  recommendation_event_id: int | None = None) -> dict:
         """주문을 저장하고 order() 모양({id, table_no, member_id, total, ai_combo, ts, lines, ...})을 돌려준다.
 
         메뉴가 아직 seed되지 않은 개발 환경도 주문할 수 있도록, 실제 menus에 있는 id만 연결한다.
@@ -55,11 +54,16 @@ class OrderMixin:
                 f"SELECT id FROM menus WHERE id IN ({placeholders})", tuple(menu_ids))}
 
         ai_combo = any(line["id"].startswith("combo:") for line in lines)
+        # 어떤 AI 추천을 보고 주문했는지 연결한다. 없는 추천 id 가 오면 주문은 막지 않고 연결만 비운다.
+        if recommendation_event_id is not None and not self.db.one(
+                "SELECT id FROM recommendation_events WHERE id=?", (recommendation_event_id,)):
+            recommendation_event_id = None
         created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
         with self.db.transaction():
             order_id = self._insert_id(
-                "INSERT INTO orders (table_no, member_id, total, ai_combo, created_at) VALUES (?,?,?,?,?)",
-                (table_no, member_id, total, ai_combo, created_at))
+                "INSERT INTO orders (table_no, member_id, total, ai_combo, recommendation_event_id, created_at) "
+                "VALUES (?,?,?,?,?,?)",
+                (table_no, member_id, total, ai_combo, recommendation_event_id, created_at))
             for line in lines:
                 is_combo = line["id"].startswith("combo:")
                 item_id = self._insert_id(

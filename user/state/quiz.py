@@ -8,6 +8,7 @@ from user.state.session import go
 
 
 def open_quiz():
+    st.session_state.pop("rec_cache", None)  # 질문을 새로 시작하면 이전 추천 캐시를 지운다
     st.session_state.quiz = {"step": 0, "answers": {}}
     go("ai_quiz")
 
@@ -51,4 +52,5 @@ def quiz_goto(step):
 
 
 def quiz_restart():
+    st.session_state.pop("rec_cache", None)
     st.session_state.quiz = {"step": 0, "answers": {}}

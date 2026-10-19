@@ -19,8 +19,21 @@ def order_time(value: str) -> datetime:
     return timestamp.astimezone(KST)
 
 
-def dashboard(orders: list[dict], members: list[dict], recommendations: int, today: date, rule: dict) -> dict:
-    """오늘 지표와 전체 기록 지표를 기존 화면의 응답 모양으로 돌려준다."""
+# 주류로 보는 메뉴 카테고리(맥주, 소주·막걸리). 음료·사이드 등 나머지는 모두 음식으로 센다.
+DRINK_CATEGORIES = ("beer", "soju")
+
+
+def _top_menus(popularity: Counter, names=None) -> list[dict]:
+    """판매 수량 TOP 10. names 가 있으면 그 이름들만 대상으로 한다."""
+    rows = [(name, qty) for name, qty in popularity.items() if names is None or name in names]
+    return [{"name": name, "qty": qty} for name, qty in sorted(rows, key=lambda item: (-item[1], item[0]))[:10]]
+
+
+def dashboard(orders: list[dict], members: list[dict], recommendations: int, today: date, rule: dict,
+              drink_names: set[str] | None = None) -> dict:
+    """오늘 지표와 전체 기록 지표를 기존 화면의 응답 모양으로 돌려준다.
+
+    drink_names(주류 메뉴 이름 모음)를 주면 popular_food·popular_drinks 도 함께 돌려준다."""
     todays = [order for order in orders if order_date(order["ts"]) == today]
     # 같은 회원이 여러 번 주문해도 고객 수는 한 명으로 센다. 비회원은 분류하지 않는다.
     customer_ids = {order["member_id"] for order in todays if order.get("member_id") is not None}
@@ -44,8 +57,11 @@ def dashboard(orders: list[dict], members: list[dict], recommendations: int, tod
         "returning_customers": grades["재방문"] + grades["단골"],
         "age_groups": {group: ages[group] for group in AGE_GROUPS},
         "genders": {gender: genders[gender] for gender in ("여", "남") if genders[gender]},
-        "popular_menus": [{"name": name, "qty": qty} for name, qty in
-                          sorted(popularity.items(), key=lambda item: (-item[1], item[0]))[:10]],
+        "popular_menus": _top_menus(popularity),
+        # 기존 popular_menus 는 그대로 두고, 음식·주류 따로 본 순위를 추가 필드로 준다(없으면 화면이 한 목록으로 표시).
+        **({} if drink_names is None else {
+            "popular_food": _top_menus(Counter({n: q for n, q in popularity.items() if n not in drink_names})),
+            "popular_drinks": _top_menus(popularity, drink_names)}),
         "ai": {"recommendations": recommendations, "ai_orders": ai_orders,
                "hit_rate": ai_orders / recommendations if recommendations else None,
                "definition": "전체 AI 조합이 포함된 주문 수 / 전체 추천 노출 횟수 (임시 기준)"},

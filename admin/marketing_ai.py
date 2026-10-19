@@ -2,10 +2,6 @@
 
 화면(app.py)은 여기서 `build_context`, `recommend`, `get_client().reply` 세 가지만 쓴다.
 지금은 LLM API 키 없이 동작하도록 규칙 기반(RuleBasedClient)으로 답한다.
-
-실제 Claude API 로 바꾸는 지점: ClaudeClient.reply (아래) 한 곳. 컨텍스트 dict 를 `context_to_text` 로
-프롬프트에 넣고 대화 기록(history)과 함께 보내면 된다. 그 뒤 get_client() 가 ClaudeClient 를 돌려주게만 바꾸면
-화면 코드는 그대로다.
 """
 import os
 from concurrent.futures import ThreadPoolExecutor
@@ -30,7 +26,7 @@ def recommend(ctx: dict) -> list[dict]:
 
 
 def context_to_text(ctx: dict) -> str:
-    """실제 LLM 에 넘길 때 시스템 프롬프트에 붙일 컨텍스트 요약 (ClaudeClient 에서 사용)."""
+    """실제 LLM 에 넘길 때 시스템 프롬프트에 붙일 컨텍스트 요약 ."""
     m, o, mn = ctx["members"], ctx["orders"], ctx["menus"]
     return (f"회원 {m['total']}명(등급 {m['grades']}), 문자 발송 가능 {m['sendable']}명, 수신거부 {m['opted_out']}명. "
             f"주문 {o['count']}건, 매출 {o['revenue']}원, 평균 {o['avg']}원, 피크 시간 {o['peak_hours']}, 인기 메뉴 {o['top_items']}. "
@@ -75,19 +71,8 @@ class RuleBasedClient:
                 "‘언제 손님이 많아?’, ‘문자 언제 보내면 좋아?’")
 
 
-class ClaudeClient:
-    """TODO(실제 연동): Claude API 호출 지점. 지금은 연결하지 않았다.
-
-    구현 방법: anthropic SDK 로 messages.create(system=context_to_text(ctx) 포함 프롬프트,
-    messages=history + [질문]) 를 호출해 텍스트를 돌려준다. API 키는 환경 변수로 받고 화면에 노출하지 않는다.
-    """
-
-    def reply(self, question: str, ctx: dict, history: list[dict] | None = None) -> str:
-        raise NotImplementedError("Claude API 연동은 아직 구현되지 않았습니다.")
-
-
 def get_client():
-    """챗봇 응답기. Claude API 를 붙일 때 여기서 ClaudeClient() 를 돌려주도록 바꾼다."""
+    """챗봇 응답기. 규칙 기반으로 답한다(실제 챗봇은 서버 services/chat.py 의 Gemini)."""
     return RuleBasedClient()
 
 

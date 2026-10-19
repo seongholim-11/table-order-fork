@@ -79,3 +79,15 @@ def test_top_ten_and_empty_demographics():
     assert [menu["name"] for menu in result["popular_menus"]] == [f"menu-{i:02}" for i in range(10)]
     assert result["age_groups"] == dict.fromkeys(AGE_GROUPS, 0)
     assert result["genders"] == {} and result["ai"]["hit_rate"] is None
+
+
+def test_popular_menus_split_into_food_and_drinks():
+    # 주류 이름 모음을 주면 음식·주류 순위를 따로 주고, 기존 popular_menus 는 그대로다.
+    orders = [{"ts": "2026-10-16T00:00:00+09:00", "member_id": None, "total": 0, "ai_combo": False,
+               "lines": [{"name": "생맥주", "qty": 5}, {"name": "통닭", "qty": 3}, {"name": "참이슬", "qty": 2}]}]
+    result = dashboard(orders, [], 0, date(2026, 10, 16), {}, drink_names={"생맥주", "참이슬"})
+    assert [m["name"] for m in result["popular_drinks"]] == ["생맥주", "참이슬"]
+    assert [m["name"] for m in result["popular_food"]] == ["통닭"]
+    assert len(result["popular_menus"]) == 3
+    # 주류 정보를 안 주면 새 필드는 없다(호환 유지).
+    assert "popular_food" not in dashboard(orders, [], 0, date(2026, 10, 16), {})

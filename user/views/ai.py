@@ -21,7 +21,30 @@ def log_recommendation(params, combos):
     key = (tuple(sorted(params.items(), key=lambda kv: kv[0])), tuple(c["id"] for c in combos))
     if combos and ss.get("last_rec_key") != key:
         ss.last_rec_key = key
-        ctx.REPO.log_recommendation(ss.table, params, [c["id"] for c in combos], ss.access_token)
+        # 돌려받은 추천 기록 id 를 세션에 기억해 두었다가, AI 조합을 담아 주문할 때 주문에 연결한다.
+        event_id = ctx.REPO.log_recommendation(ss.table, params, [c["id"] for c in combos], ss.access_token)
+        if event_id:
+            ss.last_rec_event_id = event_id
+
+
+def recommend_cached(scope, params, lines):
+    """같은 화면(scope)·같은 답변이면 처음 계산한 추천을 세션에 저장해 그대로 돌려준다.
+
+    조합을 담으면 화면이 다시 그려지는데, 그때마다 새로 계산하면 장바구니 내용이 바뀌어
+    추천이 달라지고 제미나이 호출(토큰)도 반복된다. 그래서 화면에 들어왔을 때 한 번만 계산한다.
+    캐시는 다른 카테고리로 나가거나 AI 질문을 시작/다시 시작할 때, '새로 추천받기'를 누를 때 지워진다.
+    """
+    ss = st.session_state
+    key = (scope, tuple(sorted((k, str(v)) for k, v in params.items() if k != "hour")))
+    cache = ss.get("rec_cache")
+    if not cache or cache["key"] != key:
+        combos, source = recommend_with_ai(params, lines)
+        cache = ss.rec_cache = {"key": key, "combos": combos, "source": source}
+    return cache["combos"], cache["source"]
+
+
+def reset_recommendation_cache():
+    st.session_state.pop("rec_cache", None)
 
 
 def recommend_with_ai(params, lines):
@@ -81,13 +104,14 @@ def render_recommendations():
     people, budget, spicy, drink = DEFAULT_PREFERENCES  # 조건 선택 영역 없이 기본 조건으로 추천한다 (세부 조건은 AI 질문에서)
     lines = list(st.session_state.cart.values()) + [line for order in st.session_state.orders for line in order["lines"]]
     params = {"people": people, "budget": budget, "spicy": spicy, "drink": drink}
-    combos, source = recommend_with_ai(params, lines)
+    combos, source = recommend_cached("ai", params, lines)
     log_recommendation({"people": people, "budget": budget, "spicy": spicy, "drink": drink}, combos)
     st.html(f'<div class="section-title ai-results-title">나에게 맞는 추천 <span>{len(combos)}</span>'
             f'<small>{people}명 · {won(budget)} 이하</small></div>')
     if not combos:
         st.info("지금 추천할 수 있는 조합이 없어요. AI 질문으로 조건을 바꿔 보세요.")
     render_combo_cards(combos)
+    st.button("🔄 새로 추천받기", key="ai_refresh", on_click=reset_recommendation_cache, width="stretch")
     st.caption("DB의 메뉴·재고·추천 규칙을 제미나이가 분석한 추천입니다. 조합 할인은 회원에게만 적용됩니다."
                if source == "gemini" else
                "AI 서버를 사용할 수 없어 규칙 기반 추천을 표시하고 있습니다. 조합 할인은 회원에게만 적용됩니다.")
@@ -123,7 +147,7 @@ def render_quiz_result():
     w_label, w_icon = ctx.WEATHER["types"][weather]["label"], ctx.WEATHER["types"][weather]["icon"]
     lines = list(ss.cart.values()) + [line for order in ss.orders for line in order["lines"]]
     params = {**a, "drink": "맥주", "hour": hour, "weather": weather}
-    combos, source = recommend_with_ai(params, lines)
+    combos, source = recommend_cached("quiz", params, lines)
     log_recommendation(params, combos)
     st.html('<div class="ai-hero"><div class="ai-eyebrow">✨ AI 질문 결과</div><h2>맞춤 메뉴 조합이 완성됐어요</h2>'
             f'<p>답변해 주신 {len(ctx.QUESTIONS)}가지와 오늘의 상황을 반영했어요.</p></div>')

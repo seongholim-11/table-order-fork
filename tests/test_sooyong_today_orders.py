@@ -64,9 +64,6 @@ def test_today_order_card_uses_database_and_refreshes(server, monkeypatch):
 
 def test_today_order_card_shows_zero_even_without_order_history(server, monkeypatch):
     # 주문 목록 자체가 비어 있을 때도 빈 화면 안내와 0건 카드를 함께 표시해야 한다.
-    from app import dummy
-
-    monkeypatch.setattr(dummy, "orders", lambda: [])
     screen = open_dashboard(monkeypatch)
     assert displayed_today_orders(screen) == 0
     assert any("아직 주문이 없어요." in element.value for element in screen.get("html"))

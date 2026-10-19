@@ -39,10 +39,7 @@ def test_server_matches_original_screen_calculation(guest_only):
 
 
 def test_api_dashboard_ignores_dummy_orders_and_refreshes(server, monkeypatch):
-    from app import dummy
-
     # 주문 목록과 3번의 그래프가 모두 실제 DB 주문을 읽어야 한다.
-    monkeypatch.setattr(dummy, "orders", lambda: [])
     now = datetime.now(timezone.utc)
     server.app.state.db.run("INSERT INTO orders (table_no, total, created_at) VALUES (?, ?, ?)",
                             (7, 12345, now.isoformat()))

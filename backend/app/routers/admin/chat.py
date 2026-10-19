@@ -18,10 +18,11 @@ class MessageIn(BaseModel):
 
 
 def _store(request: Request, settings: Settings) -> ChatStore:
-    """CHAT_OWNER_ID 가 비어 있으면 대화방 주인을 정할 수 없으므로 500 대신 안내 오류를 돌려준다."""
-    if not settings.chat_owner_id:
+    """대화방 주인은 로그인한 사장님이다. ADMIN_TOKEN 으로 들어왔다면 CHAT_OWNER_ID 를 쓰고, 그것도 없으면 안내 오류를 돌려준다."""
+    owner_id = getattr(request.state, "owner_id", None) or settings.chat_owner_id
+    if not owner_id:
         raise HTTPException(503, "CHAT_OWNER_ID 설정이 필요합니다.")
-    return ChatStore(request.app.state.db, settings.chat_owner_id)
+    return ChatStore(request.app.state.db, owner_id)
 
 
 def _session(store: ChatStore, session_id: str) -> dict:

@@ -149,3 +149,12 @@ def test_user_spin_follows_weights():
     assert {pick_prize_index(prizes) for _ in range(50)} == {1}
     assert {pick_prize_index([{}, {}, {}]) for _ in range(200)} == {0, 1, 2}  # weight 없으면 같은 확률(기존 동작)
     assert pick_prize_index([{"weight": 0}, {"weight": 0}]) in (0, 1)
+
+
+def test_slice_angles_proportional_to_weight():
+    """룰렛 칸 각도는 weight 비율 x 360도이고 12시부터 빈틈없이 이어진다."""
+    from user.state.roulette import slice_angles
+    angles = slice_angles([{"weight": 50}, {"weight": 49}, {"weight": 1}])
+    assert [round(w, 1) for _, w in angles] == [180.0, 176.4, 3.6]
+    assert [round(s, 1) for s, _ in angles] == [0.0, 180.0, 356.4]
+    assert [w for _, w in slice_angles([{}, {}, {}, {}])] == [90, 90, 90, 90]  # weight 없으면 균등

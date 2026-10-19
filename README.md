@@ -297,7 +297,7 @@ flowchart TB
 
 ```
 table-order
-├── backend/   → FastAPI 서버 (core / routers / services / stores / dummy / seed)
+├── backend/   → FastAPI 서버 (core / routers / services / stores / seed)
 ├── user/      → 손님 Streamlit 화면
 ├── admin/     → 관리자 Streamlit 화면
 ├── shared/    → 두 화면이 같이 쓰는 API 호출 코드
@@ -355,14 +355,12 @@ python -m pytest tests -q        # 화면·통합 (저장소 루트에서)
 
 ## 📊 구현 현황
 
-팀원 5명이 기능별로 더미 응답을 실제 DB 구현으로 바꾸는 중입니다.
+더미 응답은 모두 실제 DB 구현으로 바뀌었습니다.
 
 | 상태 | 기능 |
 |---|---|
 | ✅ 실제 DB 연동 | QR 로그인·회원, 문자 발송(솔라피), 고객 목록·등급·수신거부, 대시보드 통계, 메뉴 품절 조회, 단골 응대 제안, 손님 메뉴 목록, 룰렛 칸 설정, 관리자 AI 챗봇 |
-| 🧪 더미 응답 | 매장 정보, 화면 콘텐츠, 관리자 메뉴 목록·수정, 룰렛 당첨 저장·쿠폰함, 주문 저장·이력, 직원 호출, AI 추천 기록 |
 
-- 아직 더미인 API 목록은 `backend/app/dummy/`의 `DUMMY_ENDPOINTS`, 라우터에서는 `grep -rn "dummy\." backend/app/routers`로 찾습니다.
 - 담당별 최신 진행 상태는 [`docs/todo/TODO_*.md`](docs/todo)를 보세요.
 - 위 GIF는 손님 화면은 로컬 서버(SQLite), 관리자 화면은 더미 데이터 모드(`DATA_SOURCE=dummy`)로 촬영했습니다. 그래서 AI 챗봇 GIF의 답은 Gemini가 아닌 규칙 기반 모의 응답이고, 문자는 DRY RUN으로 처리됐습니다.
 

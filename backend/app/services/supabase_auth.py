@@ -35,6 +35,29 @@ class SupabaseAuthClient:
     def base(self) -> str:
         return self.s.supabase_url.rstrip("/") + "/auth/v1"
 
+    def sign_in_password(self, email: str, password: str) -> dict:
+        """사장님 이메일/비밀번호 로그인. 성공하면 {access_token, user_id, email} 을 돌려준다."""
+        try:
+            r = httpx.post(f"{self.base}/token", params={"grant_type": "password"},
+                           headers={"apikey": self.s.supabase_anon_key}, json={"email": email, "password": password},
+                           timeout=10)
+        except httpx.HTTPError as e:
+            raise SupabaseAuthError("Supabase 에 연결할 수 없습니다.") from e
+        data = r.json() if r.status_code == 200 else {}
+        user = data.get("user") or {}
+        if not data.get("access_token") or not user.get("id"):
+            raise SupabaseAuthError("이메일 또는 비밀번호가 올바르지 않습니다.")
+        return {"access_token": data["access_token"], "user_id": user["id"], "email": user.get("email", email)}
+
+    def get_user_id(self, access_token: str) -> str | None:
+        """Supabase 가 발급한 액세스 토큰이 유효하면 사용자 id(uuid 문자열), 아니면 None."""
+        try:
+            r = httpx.get(f"{self.base}/user", headers={"apikey": self.s.supabase_anon_key,
+                                                         "Authorization": f"Bearer {access_token}"}, timeout=10)
+        except httpx.HTTPError:
+            return None
+        return (r.json().get("id") if r.status_code == 200 else None) or None
+
     def callback_url(self, token: str) -> str:
         # 쿼리스트링 대신 경로에 토큰을 넣는다: Supabase Redirect URLs 의 `/**` 와일드카드로 허용된다.
         return f"{self.s.public_base_url}/api/auth/supabase/callback/{token}"

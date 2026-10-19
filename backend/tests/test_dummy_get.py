@@ -1,8 +1,7 @@
-"""더미로 돌려주는 엔드포인트(app/dummy.py, GET 과 쓰기)가 화면이 쓰는 모양을 유지하는지 확인한다.
+"""더미로 돌려주는 엔드포인트(GET 과 쓰기)가 화면이 쓰는 모양을 유지하는지 확인한다.
 
 실제 DB 로 바꾼 엔드포인트는 여기서 빼고 자기 테스트를 만든다."""
 
-from app import dummy
 from tests.conftest import ADMIN, login
 
 
@@ -27,12 +26,6 @@ def test_admin_get_dummies(client):
     assert [c["id"] for c in menus["categories"]] == ["chicken", "anju", "soup", "beer", "soju", "side"] and menus["menus"]
 
 
-def test_every_listed_dummy_function_exists():
-    for names in dummy.DUMMY_ENDPOINTS.values():
-        for n in names.split(" / "):
-            assert callable(getattr(dummy, n))
-
-
 # ---- 쓰기(POST/PUT/DELETE)도 저장 없이 화면이 깨지지 않는 성공 응답을 돌려준다 ----
 def test_user_write_dummies(client):
     h = login(client, "가")
@@ -46,6 +39,6 @@ def test_admin_write_dummies(client):
     assert client.put("/admin/api/menus/new1", headers=ADMIN, json={"name": "신메뉴", "cat": "anju", "price": 9000}).json()["name"] == "신메뉴"
     assert client.put("/admin/api/menus/c2", headers=ADMIN, json={"weight": 101}).status_code == 422  # 스키마 검증은 그대로
     assert client.delete("/admin/api/menus/c2", headers=ADMIN).status_code == 204
-    assert client.put("/admin/api/content/staff_calls", headers=ADMIN, json=["💧 물"]).json() == ["💧 물"]
+    assert client.put("/admin/api/content/staff_calls", headers=ADMIN, json=["💧 물"]).status_code in (404, 405)  # 옛 콘텐츠 PUT 은 없어졌다
     for method, path in (("put", "/admin/api/menus/c2"), ("delete", "/admin/api/menus/c2")):
         assert getattr(client, method)(path).status_code in (401, 422)  # 인증은 그대로

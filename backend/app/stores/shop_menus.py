@@ -1,4 +1,4 @@
-"""메뉴 저장소 (shop.py 의 ShopStore 가 합쳐 쓴다). [뼈대] 시그니처와 스키마만 남겼다."""
+"""메뉴 저장소 (shop.py 의 ShopStore 가 합쳐 쓴다). """
 
 import json
 from pathlib import Path
@@ -119,9 +119,7 @@ class MenuMixin:
         )
 
     def seed_menus(self) -> None:
-        """메뉴 테이블이 비어 있을 때만 seed/menu.json 을 넣는다.
-
-        TODO: menus 가 비어 있으면 seed/menu.json 을 읽어 save_menu(id, menu, sort=순번) 로 넣는다."""
+        """메뉴 테이블이 비어 있을 때만 seed/menu.json 을 넣는다."""
         if not self.menus():
             # Postgres의 menus.category_id 외래 키가 있으므로 카테고리를 먼저 준비한다.
             self._seed_categories()
@@ -134,8 +132,7 @@ class MenuMixin:
                 self.save_menu(menu_id=menu["id"], fields={**menu, "is_event": menu["id"] in EVENT_DEFAULT_IDS}, sort=sort)
 
     def menus(self) -> list[dict]:
-        """TODO: 정렬(sort_order, id)된 전체 메뉴. 컬럼 category_id→cat, description→desc, is_soldout→soldout 로 이름을 바꿔
-        내보내고 tags 는 db.from_list, soldout·set_ok 는 bool 로 만든다."""
+        """정렬(sort_order, id)된 전체 메뉴. DB 컬럼명을 API 필드명(cat·desc·soldout)으로 바꿔 돌려준다."""
         rows = self.db.all(f"SELECT {self._menu_columns()} FROM menus ORDER BY sort_order, id")
         # DB 컬럼명을 기존 API 필드명으로 바꾸고, 화면에서 쓰기 좋은 자료형으로 변환한다.
         return [self._menu_from_row(row) for row in rows]

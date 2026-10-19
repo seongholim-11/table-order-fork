@@ -4,7 +4,6 @@ from app.factory import create_app
 from tests.conftest import ADMIN, login, set_profile, settings
 
 
-# @pytest.mark.skip(reason="로직을 지우고 더미 응답만 돌려주는 상태라 저장·검증이 일어나지 않음 - 해당 엔드포인트를 DB 로 구현하면 이 skip 을 지운다")
 def test_menu_seeded_and_admin_edits_reach_users(client):
     menus = client.get("/api/menus").json()
     assert len(menus) == 60 and {"id", "name", "price", "soldout", "weight", "spicy", "set_ok", "tags"} <= menus[0].keys()
@@ -14,7 +13,6 @@ def test_menu_seeded_and_admin_edits_reach_users(client):
     assert c2["soldout"] is False and c2["price"] == 20000 and c2["weight"] == 50
 
 
-@pytest.mark.skip(reason="로직을 지우고 더미 응답만 돌려주는 상태라 저장·검증이 일어나지 않음 - 해당 엔드포인트를 DB 로 구현하면 이 skip 을 지운다")
 def test_admin_menu_create_delete_and_validation(client):
     body = {"name": "신메뉴", "cat": "anju", "price": 9000}
     assert client.put("/admin/api/menus/new1", headers=ADMIN, json=body).status_code == 200

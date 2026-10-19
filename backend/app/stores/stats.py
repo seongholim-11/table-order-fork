@@ -20,6 +20,12 @@ class StatsStore:
         """메뉴 관리의 더미 응답 대신 현재 DB의 이름과 품절 상태를 읽는다."""
         return self.db.all("SELECT id, name, is_soldout FROM menus ORDER BY sort_order, id")
 
+    def drink_names(self, categories: tuple[str, ...]) -> set[str]:
+        """주류 카테고리에 속한 메뉴 이름 모음. 대시보드가 음식·주류를 나눌 때 쓴다."""
+        marks = ",".join("?" * len(categories))
+        rows = self.db.all(f"SELECT name FROM menus WHERE category_id IN ({marks})", tuple(categories))
+        return {row["name"] for row in rows}
+
     def menu_sales(self) -> list[dict]:
         """일반 메뉴와 조합 구성 메뉴를 실제 판매 수량으로 합칠 자료를 읽는다."""
         # 조합 2세트에 같은 메뉴가 3개씩 있으면 6개 판매로 센다. 조합 줄 자체는 제외한다.

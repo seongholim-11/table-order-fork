@@ -1,4 +1,4 @@
-"""이벤트 화면 (왼쪽 이벤트 목록 + 오른쪽 설정, 메뉴 관리와 같은 구성). 지금은 룰렛 하나.
+"""이벤트 화면. 지금은 룰렛 하나라 카테고리(이벤트 목록) 없이 룰렛 설정만 바로 보여 준다.
 """
 
 from html import escape
@@ -10,28 +10,18 @@ from admin.ui.widgets import page_head, sec_title
 from admin_repository import ALL_MENU_LABEL, ROULETTE_COLUMNS, ROULETTE_KINDS, ROULETTE_MAX_SLOTS, ROULETTE_MIN_SLOTS, CategoryError
 
 ss = st.session_state
-EVENTS = {"roulette": "🎰  행운의 룰렛"}
-
-
-def select_event(event_id):
-    ss["event_sel"] = event_id
-
-
-def render_event_panel():
-    """왼쪽: 이벤트 목록(클릭해서 선택)."""
-    with st.container(border=True, key="mcat_panel"):
-        st.html('<div class="mcat-title">🎉 이벤트</div>')
-        for event_id, name in EVENTS.items():
-            st.button(name, key=f"mcat_ev_{event_id}", width="stretch",
-                      type="primary" if ss["event_sel"] == event_id else "secondary", on_click=select_event, args=(event_id,))
-        st.html('<div class="mcat-hint">손님 첫 화면의 이벤트를 여기서 설정해요.</div>')
 
 
 def wheel_preview(table, odds):
-    """칸 색을 이은 원 미리보기 + 칸별 확률 목록 (손님 화면 룰렛은 칸이 모두 같은 크기이고 확률만 다르다)."""
-    n = len(table)
-    stops = ", ".join(f"{c if isinstance(c, str) and c.startswith('#') else '#888'} {i * 100 / n:.2f}% {(i + 1) * 100 / n:.2f}%"
-                      for i, c in enumerate(table["색상"]))
+    """칸 색을 이은 원 미리보기 + 칸별 확률 목록 (손님 화면 룰렛처럼 칸 크기가 확률에 비례한다)."""
+    # 칸 크기 = 확률(%) 그대로. 누적 합으로 각 칸의 시작 위치를 구한다 (확률 합이 100이 되도록 odds 는 이미 비율이다).
+    total = sum(odds) or 1
+    stops, pos = [], 0.0
+    for c, o in zip(table["색상"], odds):
+        end = pos + 100 * o / total
+        stops.append(f"{c if isinstance(c, str) and c.startswith('#') else '#888'} {pos:.2f}% {end:.2f}%")
+        pos = end
+    stops = ", ".join(stops)
     rows = "".join(f'<div class="bar-row"><span class="n">{escape(str(r["이모지"]))} {escape(str(r["표시 문구"]))}</span>'
                    f'<span class="t"><i style="width:{max(o, 1.5):.0f}%"></i></span><span class="c">{o:g}%</span></div>'
                    for (_, r), o in zip(table.iterrows(), odds))
@@ -146,10 +136,5 @@ def _roulette_buttons(repo, new):
 def page_events(repo):
     page_head("이벤트", "손님 화면에 보이는 이벤트를 설정하세요")
     ss.setdefault("roulette_editor_v", 0)
-    ss.setdefault("event_sel", "roulette")
-    left, right = st.columns([1.15, 3.6], gap="large")
-    with left:
-        render_event_panel()
-    with right:
-        if ss["event_sel"] == "roulette":
-            render_roulette_panel(repo)
+    # 이벤트가 룰렛뿐이므로 왼쪽 목록 없이 전체 너비로 룰렛 설정을 보여 준다.
+    render_roulette_panel(repo)

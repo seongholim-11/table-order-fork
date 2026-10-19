@@ -225,5 +225,5 @@ UI(메뉴/추천 가중치 표 편집 · 저장·삭제) → AdminRepository.sav
 ## 5. 정리 (마지막)
 
 - [ ] `B/seed/content.json`에 남은 키가 없으면 `B/routers/admin/content.py`, `GET /api/content`, `dummy.content()`/`content_item()`을 삭제하고 `U/user_repository.py _fetch_content`가 새 경로만 쓰는지 확인한다.
-- [ ] `B/dummy/`의 `*_data.py`가 모두 비면(그때 `dummy/` 폴더 자체를 지운다) `AGENTS.md`의 "더미 상태" 섹션을 삭제한다(PR에 AGENTS.md 변경 포함, 팀에 알림).
+- [x] `B/dummy/`의 `*_data.py`가 모두 비면(그때 `dummy/` 폴더 자체를 지운다) `AGENTS.md`의 "더미 상태" 섹션을 삭제한다(PR에 AGENTS.md 변경 포함, 팀에 알림).
 - [ ] `docs/DB_설계.md`와 `docs/db/*.sql`을 바꿨다면 두 문서를 같이 고치고 팀에 알린다.

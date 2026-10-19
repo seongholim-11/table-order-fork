@@ -31,6 +31,21 @@ def test_create_order_saves_guest_member_and_combo_rows(client):
     assert len(components) == 2 and {row["menu_id"] for row in components} == {"test-c1", "test-b1"}
 
 
+def test_order_links_ai_recommendation_event(client):
+    """주문에 추천 기록 id 를 보내면 orders.recommendation_event_id 에 저장된다. 없는 id 는 주문을 막지 않고 비운다."""
+    event = client.post("/api/v1/ai/recommendations", json={"table_no": 4, "params": {}, "combo_ids": ["classic"]}).json()["id"]
+    linked = client.post("/api/v1/orders", json={"table_no": 4, "lines": [line()], "total": 18000,
+                                                 "recommendation_event_id": event})
+    unknown = client.post("/api/v1/orders", json={"table_no": 4, "lines": [line()], "total": 18000,
+                                                  "recommendation_event_id": 99999})
+    plain = client.post("/api/v1/orders", json={"table_no": 4, "lines": [line()], "total": 18000})
+    assert linked.status_code == unknown.status_code == plain.status_code == 201
+    rows = {row["id"]: row for row in client.app.state.shop.orders()}
+    assert rows[linked.json()["no"]]["recommendation_event_id"] == event
+    assert rows[unknown.json()["no"]]["recommendation_event_id"] is None
+    assert rows[plain.json()["no"]]["recommendation_event_id"] is None
+
+
 def test_order_lines_are_required(client):
     assert client.post("/api/orders", json={"table_no": 1, "lines": [], "total": 0}).status_code == 422
 

@@ -4,7 +4,7 @@
 import streamlit as st
 
 from user.state import context as ctx
-from user.state.roulette import spin_roulette, spins_left
+from user.state.roulette import slice_angles, spin_roulette, spins_left
 from user.ui.login import login_dialog
 
 
@@ -16,13 +16,21 @@ def render_roulette():
     ss = st.session_state
     prizes, spun = ctx.ROULETTE_PRIZES, ss.roulette
     n = len(prizes)
-    seg = 360 / n
-    gap = 1.2
-    stops = ",".join(f'{p["color"]} {i * seg}deg {(i + 1) * seg - gap}deg,#fff {(i + 1) * seg - gap}deg {(i + 1) * seg}deg'
-                     for i, p in enumerate(prizes))
-    labels = "".join(
-        f'<div class="rw-label" style="transform:rotate({i * seg}deg)"><span style="transform:rotate(calc({-i * seg}deg - var(--to, 0deg)))">'
-        f'{p["label"]}<em>{p["emoji"]}</em></span></div>' for i, p in enumerate(prizes))
+    angles = slice_angles(prizes)  # 칸 크기 = 당첨 확률에 비례한 각도
+    stops = []
+    for p, (start, width) in zip(prizes, angles):
+        gap = min(1.2, width * 0.3)  # 칸 사이 흰 선. 아주 작은 칸에서는 선도 얇게
+        stops.append(f'{p["color"]} {start:.2f}deg {start + width - gap:.2f}deg,#fff {start + width - gap:.2f}deg {start + width:.2f}deg')
+    stops = ",".join(stops)
+    labels = ""
+    for p, (start, width) in zip(prizes, angles):
+        if width < 8:  # 너무 좁은 칸은 글자가 깨지므로 라벨을 생략한다 (색과 확률 목록으로만 구분)
+            continue
+        mid = start + width / 2  # 라벨은 칸의 가운데 각도에 놓는다
+        text = f'{p["label"]}<em>{p["emoji"]}</em>' if width >= 20 else f'<em>{p["emoji"]}</em>'  # 좁으면 이모지만
+        scale = min(1, width / 60)  # 좁은 칸일수록 글자를 줄인다
+        labels += (f'<div class="rw-label" style="transform:rotate({mid:.2f}deg)"><span style="--rw-fs:{round(4 * min(1, 5.5 / n) * scale, 2)};'
+                   f'transform:rotate(calc({-mid:.2f}deg - var(--to, 0deg)))">{text}</span></div>')
     dots = "".join(f'<div class="rw-dot" style="transform:rotate({k * 360 / 16}deg)"><i></i></div>' for k in range(16))
     conf = "".join(f'<div class="rw-conf" style="left:{x}%;top:{y}%;width:{w}px;height:{h}px;background:{col};transform:rotate({r}deg)"></div>'
                    for x, y, w, h, col, r in CONFETTI)
@@ -36,7 +44,7 @@ def render_roulette():
     with st.container(key="rw_box"):
         st.html('<div class="rw-stage"><div class="rw-stand"></div><div class="rw-ring"></div>'
                 f'{dots}<div class="rw-pin"></div>'
-                f'<div class="rw-wheel{cls}" style="--rw-fs:{fs};{to}background:conic-gradient(from {-seg / 2}deg,{stops})">{labels}</div>'
+                f'<div class="rw-wheel{cls}" style="--rw-fs:{fs};{to}background:conic-gradient(from 0deg,{stops})">{labels}</div>'
                 f'{conf}<div class="rw-star" style="left:-8%;top:10%">⭐</div><div class="rw-star" style="right:-9%;top:28%">⭐</div>'
                 '<div class="rw-bubble l">오늘의<br>작은 행운!<br>어떤 선물이<br>기다리고 있을까요?</div>'
                 '<div class="rw-bubble r">맛있는 식사와<br>특별한 혜택을<br>함께! <span class="heart">♥</span></div></div>')

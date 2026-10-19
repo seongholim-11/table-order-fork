@@ -13,7 +13,7 @@ from user.ui.common import mini_buttons, thumb_html, won
 from user.state.coupons import usable
 from user.ui.coupons import coupons_dialog
 from user.ui.dialogs import orders_dialog, staff_dialog
-from user.views.ai import render_recommendations
+from user.views.ai import render_recommendations, reset_recommendation_cache
 
 
 def go_popular():
@@ -60,6 +60,7 @@ def render_menu():
     if cat == "ai":
         render_recommendations()
         return
+    reset_recommendation_cache()  # AI 추천 조합 화면을 벗어나면 저장해 둔 추천을 지워, 다시 들어올 때 새로 계산한다
     items = [m for m in ctx.MENU if "BEST" in m["tags"]] if cat == "best" else [m for m in ctx.MENU if m["cat"] == cat]
     category = ctx.CATEGORY_BY_ID[cat]
     entries = group_spicy_variants(items)
