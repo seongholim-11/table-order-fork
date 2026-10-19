@@ -122,15 +122,22 @@ def test_sms_recommendation_moves_to_sms_and_prefills_targets_and_body():
 
 
 def test_each_sms_button_is_rendered_with_its_own_numbered_card():
-    """네 버튼을 별도 행에 모으지 않고 각 번호 카드와 같은 열에서 바로 이어 그린다."""
+    """문자 추천에만 실행 버튼을 붙이고 기타 추천과 손님 응대 제안을 순서대로 표시한다."""
     app = open_marketing("AI 추천")
     recommendation_cards = [html.value for html in app.get("html")
                             if 'class="rec recommendation-card"' in html.value]
     execute_buttons = [button for button in app.button if button.key and button.key.startswith("mk_execute_")]
-    assert len(recommendation_cards) == 4 and len(execute_buttons) == 4
-    assert all(f'<div class="rt">{index}.' in recommendation_cards[index - 1] for index in range(1, 5))
-    assert all(button.help.startswith(f"{index}번 추천 실행:")
-               for index, button in enumerate(execute_buttons, 1))
+    groups = app.session_state["repo"].opportunities(0)["groups"]
+    sms, guides = groups["sms"]["items"], groups["guide"]["items"]
+    assert len(recommendation_cards) == len(sms) + len(guides)
+    assert len(execute_buttons) == len(sms)
+    assert all(button.help == f"{index}번 추천 실행: {card['title']}"
+               for index, (button, card) in enumerate(zip(execute_buttons, sms), 1))
+    html = " ".join(h.value for h in app.get("html"))
+    assert html.index("1. AI 문자 추천") < html.index("2. 기타 AI 추천") < html.index("손님 응대 제안")
+    for group in (sms, guides):
+        assert all(any(f'<div class="rt">{index}. {card["title"]}</div>' in value
+                       for value in recommendation_cards) for index, card in enumerate(group, 1))
 
 
 def test_keyword_recipients_and_combos():

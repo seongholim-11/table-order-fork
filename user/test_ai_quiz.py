@@ -1,10 +1,13 @@
 import unittest
+from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
 from ai_quiz_data import QUESTIONS
 from menu_data import MENU_BY_ID
 from recommendations import recommend_combos
+
+APP = str(Path(__file__).resolve().with_name("app.py"))
 
 # 질문마다 고른 선택지 번호 (hunger, stress, people, gender, kind, spicy, intent, budget)
 PICKS = [1, 2, 2, 0, 2, 1, 1, 1]
@@ -80,7 +83,7 @@ class QuizRecommendationTests(unittest.TestCase):
 
 class QuizScreenTests(unittest.TestCase):
     def open_quiz(self):
-        app = AppTest.from_file("app.py", default_timeout=30).run()
+        app = AppTest.from_file(APP, default_timeout=30).run()
         app.button(key="start_btn").click().run()
         app.button(key="open_quiz").click().run()
         return app
@@ -164,7 +167,7 @@ class QuizScreenTests(unittest.TestCase):
         self.assertEqual(app.session_state["page"], "menu")
 
     def test_weather_query_param_is_reflected(self):
-        app = AppTest.from_file("app.py", default_timeout=30)
+        app = AppTest.from_file(APP, default_timeout=30)
         app.query_params["weather"] = "rain"
         app.run()
         app.button(key="start_btn").click().run()

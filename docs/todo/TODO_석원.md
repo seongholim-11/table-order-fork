@@ -220,6 +220,7 @@ UI(마케팅 > AI 추천 탭 · 🔄 재추천) → A/views/marketing.py marketi
 - [x] 화면: `A/views/marketing.py`의 `marketing_recommend_tab`, `next_rec_round`, `pick_recommendations`만 수정한다. 서버가 닿으면 서버 카드, 아니면 기존 로컬 계산(`DATA_SOURCE=auto`의 폴백).
 - [x] `A/admin_repository.py ApiBackend`와 `A/admin_dummy_data.py DummyBackend`에 `opportunities` 메서드 추가(같은 이름·같은 반환 모양).
 - [x] `A/marketing_ai.py`의 기존 문자 후보 함수는 건드리지 않고, 추천·컨텍스트는 성격별 모듈과 공통 규칙 엔진으로 분리해 충돌을 피했다.
+- [x] AI 추천을 `1. AI 문자 추천`과 `2. 기타 AI 추천`으로 분리했다. 감사 혜택·재방문·휴면 복귀·생일 안내에만 문자 실행을 제공하고, 취향·시간대·메뉴·운영 추천은 현장 활용 문구로 변경했다. 카테고리별 네 개 순환·문자 대상/초안 연결·맨 아래 손님 응대 제안 유지까지 관련 화면 33개와 API 10개 테스트로 확인했다.
 - [x] 2026-10-19 최종 전체 테스트: 서버 **293 passed, 1 skipped**, 화면·통합 **153 passed, 9 skipped**. 현재 반영된 채팅 세션 정렬 수정도 통과했다. 운영 Supabase 검증 범위는 아래에 별도로 기록한다.
 
 ### 3-2. 마케팅 DB 연동 점검 (2026-10-19)

@@ -1,10 +1,13 @@
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from streamlit.testing.v1 import AppTest
 
 from menu_data import MENU_BY_ID
 from recommendations import combo_cart_line, ordered_counts, recommend_combos
+
+APP = str(Path(__file__).resolve().with_name("app.py"))
 
 
 class RecommendationTests(unittest.TestCase):
@@ -59,7 +62,7 @@ class RecommendationTests(unittest.TestCase):
 
     @patch.dict("os.environ", {"APP_ENV": "test"})
     def test_guest_sees_full_price_and_login_hint(self):
-        app = AppTest.from_file("app.py").run()
+        app = AppTest.from_file(APP).run()
         app.button(key="start_btn").click().run()
         app.button(key="cat_ai").click().run()
         html = " ".join(h.value for h in app.get("html"))
@@ -72,7 +75,7 @@ class RecommendationTests(unittest.TestCase):
         self.assertEqual(recommend_combos(people=6, budget=1), [])
 
     def test_cart_and_order_preserve_discount(self):
-        app = AppTest.from_file("app.py")
+        app = AppTest.from_file(APP)
         app.session_state["member"] = {"id": 1, "nickname": "회원"}  # 조합 할인은 회원 전용
         app.run()
         app.button(key="start_btn").click().run()

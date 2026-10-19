@@ -1,11 +1,14 @@
 import unittest
+from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
+
+APP = str(Path(__file__).resolve().with_name("app.py"))
 
 
 class DirectCartTests(unittest.TestCase):
     def setUp(self):
-        self.app = AppTest.from_file("app.py").run()
+        self.app = AppTest.from_file(APP).run()
         self.app.button(key="start_btn").click().run()
 
     def test_direct_add_repeated_add_and_separate_variants(self):
@@ -49,7 +52,7 @@ if __name__ == "__main__":
 
 class SpicyBadgeTests(unittest.TestCase):
     def test_spicy_badge_shows_chili_count_of_selected_level(self):
-        app = AppTest.from_file("app.py").run()
+        app = AppTest.from_file(APP).run()
         app.button(key="start_btn").click().run()
         app.button(key="cat_anju").click().run()
         html = lambda: " ".join(e.proto.body for e in app.get("html"))
@@ -64,7 +67,7 @@ class SpicyBadgeTests(unittest.TestCase):
 
 class SpicyGroupTests(unittest.TestCase):
     def setUp(self):
-        self.app = AppTest.from_file("app.py").run()
+        self.app = AppTest.from_file(APP).run()
         self.app.button(key="start_btn").click().run()
         self.app.button(key="cat_anju").click().run()
 

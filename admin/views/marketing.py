@@ -300,7 +300,7 @@ def _render_regular_preferences(repo):
 
 
 def marketing_recommend_tab(repo):
-    sec_title("사장님을 위한 AI 마케팅 추천", "회원·방문·주문·메뉴 데이터를 조합해 네 가지씩 제안해요")
+    sec_title("사장님을 위한 AI 마케팅 추천", "문자로 방문을 유도할 추천과 현장에서 활용할 추천을 나눠 제안해요")
     round_no = ss.get("mk_rec_round", 0)
     try:
         # API는 실제 DB, 더미 모드는 1,000명 시연 자료를 같은 추천 계약으로 돌려준다.
@@ -308,24 +308,32 @@ def marketing_recommend_tab(repo):
     except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable) as e:
         st.error(f"DB 기반 마케팅 추천을 불러오지 못했어요: {e}")
         return
-    recs, page, pages = result["items"], result["page"], result["pages"]
-    # 카드와 실행 버튼을 같은 열에서 바로 이어 그린다. 별도 버튼 행을 만들면 화면 폭에 따라
-    # 버튼이 다른 번호의 카드 아래처럼 보일 수 있으므로, 각 버튼은 해당 추천 카드에 붙인다.
-    card_columns = st.columns(len(recs))
-    for index, recommendation in enumerate(recs):
-        with card_columns[index]:
-            st.html(f'<div class="rec recommendation-card"><div class="rt">{index + 1}. {escape(recommendation["title"])}</div>'
-                    f'<div class="rw">{escape(recommendation["why"])}</div>'
-                    f'<div class="ra">👉 {escape(recommendation["action"])}</div></div>')
-            if recommendation.get("action_type") == "sms":
-                st.button("✉️ AI 문자로 실행", key=f"mk_execute_{round_no}_{index}", width="stretch",
-                          on_click=execute_sms_recommendation, args=(repo, recommendation),
-                          help=f"{index + 1}번 추천 실행: {recommendation['title']}")
-    c_btn, c_note = st.columns([1, 4], vertical_alignment="center")
-    c_btn.button("🔄 재추천", key="mk_rerecommend", on_click=next_rec_round, width="stretch",
-                 help="다른 마케팅 방법을 추천받아요")
-    c_note.caption(f"추천 {page}/{pages} · 전체 {result.get('total', len(recs))}개 분석 중 다른 네 가지를 확인해요" if pages > 1
-                   else "지금은 추천할 방법이 이것뿐이에요. 데이터가 쌓이면 더 다양해져요.")
+    # 각 목록을 따로 순환하므로 문자 추천과 현장 운영 추천을 한 화면에서 모두 확인할 수 있다.
+    for kind, title, description in (
+        ("sms", "1. AI 문자 추천", "감사 혜택·재방문·휴면 복귀·생일처럼 방문 계기가 분명한 추천이에요"),
+        ("guide", "2. 기타 AI 추천", "취향에 맞춘 방문 응대와 메뉴·재고·매장 운영에 활용하세요"),
+    ):
+        sec_title(title, description)
+        group = result["groups"][kind]
+        recs = group["items"]
+        if not recs:
+            st.info("현재 문자로 안내할 추천이 없어요. 데이터와 발송 가능한 고객이 쌓이면 제안해 드려요."
+                    if kind == "sms" else "현재 현장 응대·운영에 활용할 추가 추천이 없어요.")
+            continue
+        # 실행 버튼은 해당 문자 추천 카드와 같은 열에 붙여 대상을 혼동하지 않게 한다.
+        card_columns = st.columns(len(recs))
+        for index, recommendation in enumerate(recs):
+            with card_columns[index]:
+                st.html(f'<div class="rec recommendation-card"><div class="rt">{index + 1}. {escape(recommendation["title"])}</div>'
+                        f'<div class="rw">{escape(recommendation["why"])}</div>'
+                        f'<div class="ra">👉 {escape(recommendation["action"])}</div></div>')
+                if kind == "sms":
+                    st.button("✉️ AI 문자로 실행", key=f"mk_execute_{round_no}_{index}", width="stretch",
+                              on_click=execute_sms_recommendation, args=(repo, recommendation),
+                              help=f"{index + 1}번 추천 실행: {recommendation['title']}")
+        st.caption(f"추천 {group['page']}/{group['pages']} · 전체 {group['total']}개 · 한 번에 최대 네 가지를 보여드려요")
+    st.button("🔄 재추천", key="mk_rerecommend", on_click=next_rec_round,
+              help="두 카테고리의 다음 추천을 확인해요")
     _render_regular_preferences(repo)
 
 

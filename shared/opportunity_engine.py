@@ -165,13 +165,14 @@ def recommend(ctx: dict) -> list[dict]:
     segments = members["segments"]
     cards: list[dict] = []
 
-    def add(title, why, action, ids=None, body="", action_type="sms"):
+    def add(title, why, action, ids=None, body="", action_type="guide"):
         ids = list(ids or [])
         sendable = [member_id for member_id in ids if member_id in members["sendable_ids"]]
         grades = sorted({rows[i].get("grade") for i in sendable if rows[i].get("grade")})
         cards.append({"title": title, "why": why, "action": action,
                       "action_type": action_type if sendable and body else "guide",
-                      "target_grades": grades, "member_ids": sendable, "sms_body": body if sendable else ""})
+                      "target_grades": grades, "member_ids": sendable,
+                      "sms_body": body if action_type == "sms" and sendable else ""})
 
     def ids(name):
         return segments.get(name, [])
@@ -181,15 +182,15 @@ def recommend(ctx: dict) -> list[dict]:
         ("신규", "첫 방문 감사", "첫 방문의 좋은 기억이 식기 전에 두 번째 방문 이유를 만들어야 해요.",
          "첫 방문 감사와 다음 방문 혜택을 문자로 안내하세요.", "첫 방문 감사드려요. 다음 방문 때 보여주시면 음료 1잔을 서비스로 드릴게요."),
         ("신규", "신규 고객 메뉴 안내", "아직 매장의 대표 메뉴를 충분히 경험하지 못한 고객층이에요.",
-         "인기 메뉴와 잘 맞는 조합을 짧게 알려 주세요.", "첫 방문 감사드려요. 다음에는 인기 안주와 시원한 생맥주 조합도 즐겨 보세요."),
+         "다음 방문 시 대표 메뉴를 경험했는지 확인하고 잘 맞는 조합을 현장에서 제안하세요.", ""),
         ("재방문", "세 번째 방문 유도", "두 번째 방문까지 이어진 고객은 단골로 전환될 가능성이 높은 구간이에요.",
          "다음 방문 시 작은 서비스로 단골 전환을 유도하세요.", "다시 찾아주셔서 감사해요. 다음 방문에는 작은 서비스 안주를 준비해 둘게요."),
         ("재방문", "재방문 고객 취향 확인", "반복 주문이 쌓이기 시작해 개인 취향 추천의 정확도를 높일 수 있어요.",
-         "최근 인기 메뉴를 취향 확인용으로 제안하세요.", "지난 방문 감사드려요. 이번에는 요즘 반응 좋은 메뉴도 편하게 추천받아 보세요."),
+         "다음 방문 시 이전 주문을 참고해 선호하는 맛과 메뉴를 확인하고 응대에 반영하세요.", ""),
         ("단골", "단골 감사 혜택", "방문 횟수가 높은 핵심 고객은 유지가 신규 유치만큼 중요해요.",
          "단골 전용 감사 서비스를 안내하세요.", "늘 찾아주셔서 감사해요. 방문하시면 음료 1잔을 서비스로 드릴게요."),
         ("단골", "신메뉴 선공개", "매장을 잘 아는 단골의 반응은 새 메뉴 검증에도 좋은 근거가 돼요.",
-         "신메뉴를 먼저 맛보고 의견을 달라고 초대하세요.", "단골 고객님께 새 메뉴를 먼저 소개해 드려요. 방문하셔서 솔직한 의견도 들려주세요."),
+         "실제 신메뉴가 준비되면 방문한 단골에게 먼저 소개하고 반응을 기록하세요.", ""),
         ("휴면", "휴면 고객 복귀", "마지막 방문 후 휴면 기준을 넘겨 자연 재방문 가능성이 낮아진 고객층이에요.",
          "부담 없는 복귀 혜택과 함께 다시 초대하세요.", "오랜만에 뵙고 싶어요. 이번 주 방문하시면 안주 10% 할인해 드릴게요."),
         ("휴면", "휴면 원인 확인", "최근 방문이 끊겼다는 사실만으로 원인을 단정할 수는 없어요. 혜택·메뉴·경험 중 무엇이 문제였는지 가볍게 확인해야 해요.",
@@ -198,7 +199,9 @@ def recommend(ctx: dict) -> list[dict]:
     for grade, title, reason, action, body in lifecycle:
         group = ids(f"grade:{grade}")
         if group:
-            add(f"{title} · {len(group)}명", reason, action, group, body)
+            # 감사 혜택·재방문·휴면 복귀처럼 구체적인 방문 계기가 있는 경우에만 문자를 제안한다.
+            add(f"{title} · {len(group)}명", reason, action, group, body,
+                action_type="sms" if body else "guide")
 
     dormant_rules = [
         ("dormant_once", "한 번 방문 후 멈춘 휴면 고객", "첫 경험이 두 번째 방문의 충분한 이유로 이어지지 않았을 가능성이 커요.",
@@ -210,20 +213,20 @@ def recommend(ctx: dict) -> list[dict]:
     ]
     for key, title, reason, action, body in dormant_rules:
         if ids(key):
-            add(f"{title} · {len(ids(key))}명", reason, action, ids(key), body)
+            add(f"{title} · {len(ids(key))}명", reason, action, ids(key), body, action_type="sms")
 
     if ids("birthday_30"):
         add(f"30일 안에 생일인 고객 · {len(ids('birthday_30'))}명", "회원가입 때 동의해 제공한 생일이 가까운 고객이에요.",
             "생일 축하와 방문 혜택을 미리 안내하세요.", ids("birthday_30"),
-            "생일을 미리 축하드려요! 생일이 있는 달에 방문하시면 작은 축하 서비스를 준비해 드릴게요.")
+            "생일을 미리 축하드려요! 생일이 있는 달에 방문하시면 작은 축하 서비스를 준비해 드릴게요.",
+            action_type="sms")
 
     # 인구통계는 취향을 단정하지 않고 실제 주문 반응을 실험할 모수로만 쓴다.
     for key, label in [("age:20대", "20대"), ("age:30대", "30대"), ("age:40대", "40대"),
                        ("age:50대 이상", "50대 이상"), ("gender:남", "남성"), ("gender:여", "여성")]:
         if ids(key):
             add(f"{label} 고객 반응 실험 · {len(ids(key))}명", f"현재 {label} 고객이 {len(ids(key))}명 있어 충분한 표본으로 반응을 비교할 수 있어요. 성별·연령만으로 취향을 단정하지는 않아요.",
-                "같은 혜택의 문구 두 가지를 나눠 보내 실제 클릭·방문 반응을 비교하세요.", ids(key),
-                "고객님께 더 잘 맞는 혜택을 준비하고 있어요. 이번 주 방문하시면 작은 서비스를 드릴게요.")
+                "연령·성별만으로 문자를 보내기보다 실제 주문 메뉴와 방문 반응을 비교해 현장 추천을 조정하세요.", ids(key))
 
     category_labels = {"chicken": "치킨", "anju": "안주", "soup": "탕", "beer": "맥주",
                        "soju": "소주", "side": "사이드", "기타": "다양한 메뉴"}
@@ -232,61 +235,56 @@ def recommend(ctx: dict) -> list[dict]:
         if group:
             label = category_labels.get(category, category)
             add(f"{label} 선호 고객 · {len(group)}명", f"회원별 주문 수량의 절반 이상이 {label} 카테고리에 모인 고객층이에요.",
-                f"{label}와 잘 맞는 메뉴를 교차 추천하세요.", group,
-                f"평소 즐겨 드신 {label}와 잘 맞는 메뉴를 준비했어요. 이번 방문 때 함께 추천해 드릴게요.")
+                f"다음 방문 시 이전 주문을 참고해 {label}와 잘 맞는 곁들임 메뉴를 현장에서 제안하세요.", group)
 
     for name, _quantity in orders["top_items"][:5]:
         group = ids(f"favorite:{name}")
         if group:
             add(f"‘{name}’ 선호 고객 · {len(group)}명", f"회원별 주문 수량의 절반 이상이 ‘{name}’에 모인 고객층이에요.",
-                "좋아하던 메뉴를 기억하는 문구와 새로운 곁들임 메뉴를 함께 제안하세요.", group,
-                f"자주 드시던 ‘{name}’이 생각나실 때 들러 주세요. 잘 어울리는 새 조합도 함께 추천해 드릴게요.")
+                f"다음 방문 시 ‘{name}’의 판매 가능 여부를 확인하고 어울리는 곁들임 메뉴를 제안하세요.", group)
 
-    for key, title, reason, body in [
+    for key, title, reason, action in [
         ("spicy", "매운맛 선호 고객", "매운 정도 2단계 이상 메뉴의 주문 비중이 더 높아요.",
-         "매콤한 메뉴를 즐겨 찾으셔서 잘 맞을 만한 메뉴를 골라 두었어요. 이번 방문에 추천해 드릴게요."),
+         "다음 방문 시 매운맛 선호를 확인한 뒤, 주문 메뉴의 맵기를 취향에 맞춰 준비할 수 있는지 안내하세요."),
         ("mild", "순한맛 선호 고객", "맵지 않은 메뉴 주문이 매운 메뉴보다 두 배 이상 많아요.",
-         "편하게 즐기기 좋은 순한 메뉴 조합을 준비했어요. 이번 방문에 추천해 드릴게요."),
+         "다음 방문 시 순한맛 선호를 확인하고 맵지 않은 메뉴나 조절 가능한 맵기를 안내하세요."),
     ]:
         if ids(key):
-            add(f"{title} · {len(ids(key))}명", reason, "확인된 맵기 취향에 맞춰 메뉴를 추천하세요.", ids(key), body)
+            add(f"{title} · {len(ids(key))}명", reason, action, ids(key))
 
     for name in menus["soldout"]:
         group = ids(f"dormant_soldout:{name}")
         if group:
             add(f"선호 메뉴 품절 후 휴면 가능성 · {len(group)}명", f"휴면 고객의 이전 주문에 ‘{name}’이 있지만 지금은 품절입니다. 품절이 이탈 원인이라고 단정할 수는 없지만 확인할 가치가 있어요.",
-                "대체 메뉴나 재입고 소식을 개인화해 안내하세요.", group,
-                f"전에 드셨던 ‘{name}’과 비슷한 메뉴를 새로 추천해 드리고 싶어요. 편한 때 다시 들러 주세요.")
+                "실제 재입고나 대체 메뉴가 준비됐는지 확인한 뒤 복귀 안내를 보내세요.", group,
+                f"전에 드셨던 ‘{name}’의 판매 상황과 대체 메뉴를 안내해 드리고 싶어요. 방문 전에 편하게 문의해 주세요.",
+                action_type="sms")
 
     special_segments = [
         ("high_value", "객단가가 높은 고객", "주문 2건 이상이며 개인 평균 주문금액이 전체 평균보다 30% 이상 높아요.",
-         "가격 할인보다 신메뉴 선공개나 프리미엄 서비스를 제안하세요.", "고객님께 먼저 소개해 드리고 싶은 메뉴가 있어요. 방문하시면 취향에 맞춰 추천해 드릴게요."),
+         "다음 방문 시 선호 메뉴를 확인하고 신메뉴 시식이나 세심한 서비스를 제안하세요.", ""),
         ("pair_pattern", "데이트·2인 방문 가능성 높은 고객", "저녁 주문 중 메뉴 수량 2~4개 패턴이 절반 이상입니다. 연인 여부를 저장한 것은 아니며 2인 방문 가능성에 대한 추정이에요.",
-         "2인 세트나 조용한 시간대 혜택을 제안하세요.", "두 분이 함께 즐기기 좋은 메뉴 조합을 준비했어요. 편한 시간에 방문해 주세요."),
+         "실제 방문 인원을 확인한 뒤 2인에게 적당한 메뉴 수량과 조합을 현장에서 제안하세요.", ""),
         ("late_night", "늦은 시간 방문 고객", "회원 주문의 절반 이상이 22시 이후에 발생했어요.",
-         "늦은 시간에 어울리는 가벼운 안주 조합을 안내하세요.", "늦은 시간 가볍게 즐기기 좋은 안주와 음료 조합을 준비했어요."),
+         "늦은 시간 방문에 대비해 가벼운 안주와 빠르게 준비할 수 있는 메뉴를 점검하세요.", ""),
         ("weekend", "주말 중심 방문 고객", "회원 주문의 절반 이상이 토·일요일에 발생했어요.",
-         "주말 방문 전에 예약성 알림을 보내세요.", "이번 주말에도 편하게 들러 주세요. 인기 메뉴를 미리 안내해 드릴게요."),
+         "주말 방문 수요에 맞춰 선호 메뉴의 재고와 좌석·인력 준비를 점검하세요.", ""),
     ]
     for key, title, reason, action, body in special_segments:
         if ids(key):
             add(f"{title} · {len(ids(key))}명", reason, action, ids(key), body)
 
     # 매장 전체 주문 패턴도 여러 관점으로 나눠 운영 제안에 사용한다.
-    all_ids = [row["id"] for row in members["rows"]]
     for rank, (name, quantity) in enumerate(orders["top_items"][:5], 1):
         add(f"인기 메뉴 {rank}위 ‘{name}’ 활용", f"누적 판매 수량 {quantity}개로 실제 주문 반응이 확인됐어요.",
-            "해당 메뉴와 함께 주문할 조합을 문자로 제안하세요.", all_ids,
-            f"요즘 많이 찾으시는 ‘{name}’와 잘 맞는 메뉴 조합을 준비했어요. 이번 방문에 즐겨 보세요.")
+            "메뉴판과 현장 추천에 인기 메뉴 조합을 반영하고 재고를 충분히 준비하세요.")
     for hour in orders["peak_hours"][:3]:
         add(f"{hour}시 주문 집중 완화", f"전체 주문 기록에서 {hour}시가 상위 혼잡 시간대예요.",
-            "혼잡 시간 직전 또는 반대 시간대 방문 혜택을 알리세요.", all_ids,
-            f"{hour}시 혼잡을 피해 조금 일찍 방문하시면 더 여유롭게 즐기실 수 있어요.")
+            "혼잡 시간대의 인력·재료를 미리 준비하고 주문 동선을 점검하세요.")
     for weekday, count in orders["weekdays"][:3]:
         label = WEEKDAYS[weekday]
         add(f"{label}요일 방문 수요 활용", f"{label}요일 주문이 {count}건으로 상위권이에요.",
-            "해당 요일 방문을 미리 떠올리게 하는 알림을 보내세요.", all_ids,
-            f"이번 {label}요일, 시원한 한잔과 인기 안주 어떠세요? 편하게 들러 주세요.")
+            "해당 요일의 좌석·인력·인기 메뉴 재고를 미리 준비하세요.")
 
     for name in menus["high_weight"][:3]:
         add(f"추천 가중치 메뉴 ‘{name}’ 검증", "현재 추천 가중치가 높은 메뉴라 노출 대비 주문 반응을 확인할 필요가 있어요.",
@@ -325,7 +323,7 @@ def recommend(ctx: dict) -> list[dict]:
     return unique
 
 
-def pick_recommendations(cards: list[dict], round_no: int) -> dict:
+def _recommendation_page(cards: list[dict], round_no: int) -> dict:
     """네 장씩 겹치지 않게 보여 주고, 모든 추천을 본 뒤에만 처음으로 돌아간다."""
     pages = max(1, -(-len(cards) // PAGE_SIZE))
     page_index = round_no % pages
@@ -334,3 +332,14 @@ def pick_recommendations(cards: list[dict], round_no: int) -> dict:
     # 같은 추천이 다시 나오지 않고, 모든 추천을 확인한 다음 묶음에서만 처음으로 돌아간다.
     chosen = cards[start:start + PAGE_SIZE]
     return {"items": chosen, "page": page_index + 1, "pages": pages, "total": len(cards)}
+
+
+def pick_recommendations(cards: list[dict], round_no: int) -> dict:
+    """기존 목록과 함께 문자·기타 추천을 각각 네 장씩 순환할 수 있게 제공한다."""
+    result = _recommendation_page(cards, round_no)
+    # 분류 후 페이지를 나눠야 문자 추천이 많은 경우에도 기타 추천을 바로 볼 수 있다.
+    result["groups"] = {
+        kind: _recommendation_page([card for card in cards if card.get("action_type") == kind], round_no)
+        for kind in ("sms", "guide")
+    }
+    return result

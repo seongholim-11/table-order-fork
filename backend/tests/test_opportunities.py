@@ -18,6 +18,8 @@ def test_empty_data_returns_one_guide_card_and_requires_admin(client):
             "action": "주문이 쌓이면 이곳에 맞춤 마케팅 방법이 나타나요.",
         }]
     assert result["page"] == result["pages"] == 1
+    assert result["groups"]["sms"]["items"] == []
+    assert result["groups"]["guide"]["items"] == result["items"]
     assert result["summary"]["members"]["total"] == 0
     assert result["summary"]["orders"] == {
         "count": 0, "revenue": 0, "avg": 0, "peak_hours": [], "top_items": []}
@@ -70,6 +72,11 @@ def test_cards_use_db_facts_and_round_cycles_four_at_a_time(client):
     assert first["summary"]["members"]["total"] == 3
     assert first["summary"]["members"]["sendable"] == 2
     assert first["summary"]["orders"]["revenue"] == 18000
+    # 실제 API에서도 발송 대상이 있는 문자와 현장 활용 추천을 별도로 내려준다.
+    assert all(card["action_type"] == "sms" and card["member_ids"]
+               for card in first["groups"]["sms"]["items"])
+    assert all(card["action_type"] == "guide" and not card["sms_body"]
+               for card in first["groups"]["guide"]["items"])
 
 
 def test_summary_reflects_one_thousand_db_members_and_real_sendable_rule(client):
