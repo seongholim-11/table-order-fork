@@ -269,53 +269,43 @@ def _poll_live_activity(repo, preferences):
     ss["mk_seen_suggestions"] = set(keys)
     new_tables = sorted({table for key, table in keys.items() if seen is not None and key not in seen})
     if new_tables:
-        ss["mk_table_new"], ss["mk_table_sel"] = set(new_tables), new_tables[0]  # 새 제안 테이블을 자동으로 보여 준다
+        ss["mk_table_new"] = set(new_tables)  # 새 제안 테이블은 목록 맨 위에 NEW 로 보여 준다
         st.toast("새 응대 제안: " + ", ".join(f"{n}번 테이블" for n in new_tables), icon="💡")
 
 
-def _pick_table(number):
-    """배치도에서 눌린 테이블을 기억해 옆 패널에 그 테이블의 제안을 보여 준다."""
-    ss["mk_table_sel"] = number
-    ss.get("mk_table_new", set()).discard(number)  # 확인한 테이블은 NEW 표시를 지운다
-
-
 def _render_table_map(repo, preferences):
-    """매장 테이블 배치도(SVG). 제안이 있는 테이블만 강조하고, 선택한 테이블의 제안을 옆에 보여 준다."""
+    """매장 테이블 배치도(SVG)와, 제안이 있는 테이블의 응대 제안 목록(오른쪽)을 보여 준다."""
     try:
         total = int(repo.store()["tables"])
     except (KeyError, TypeError, ValueError, repo_mod.api.ApiError, repo_mod.api.ApiUnavailable):
         total = 30  # 매장 정보를 못 읽어도 배치도는 보이도록 기본 테이블 수를 쓴다
     suggestions = table_suggestions(preferences)
     fresh = ss.get("mk_table_new", set()) & set(suggestions)  # 방금 새로 생긴 제안의 테이블
-    selected = ss.get("mk_table_sel")
-    if selected not in suggestions:
-        selected = next(iter(sorted(suggestions)), None)  # 처음에는 제안이 있는 첫 테이블을 보여 준다
+    # 새 제안을 맨 위에 두고, 그 테이블에 핀을 꽂는다
+    order = sorted(suggestions, key=lambda number: (number not in fresh, number))
     left, right = st.columns([3, 2], gap="large")
     with left.container(key="mk_table_map"):
         # st.html/markdown 은 보안상 <svg> 를 제거해 그림이 안 보이므로, SVG 를 이미지로 표시한다.
-        st.image(table_map_svg(total, set(suggestions), selected), width="stretch")
-        # SVG 는 눌러도 반응하지 않으므로, 제안이 있는 테이블만 버튼으로 골라 보게 한다
-        if suggestions:
-            st.caption("💡 제안이 있는 테이블을 눌러 내용을 확인하세요.")
-            cols = st.columns(min(len(suggestions), TABLE_MAP_COLUMNS))
-            for index, number in enumerate(sorted(suggestions)):
-                cols[index % len(cols)].button(f"💡 {number}번" + (" NEW" if number in fresh else ""), key=f"mk_table_{number}", width="stretch",
-                                              type="primary" if number == selected else "secondary",
-                                              on_click=_pick_table, args=(number,), help="응대 제안 보기")
+        st.image(table_map_svg(total, set(suggestions), order[0] if fresh else None), width="stretch")
     with right:
-        if selected is None:
+        if not suggestions:
             st.info("오늘은 응대 제안이 있는 테이블이 없어요.")
             return
-        tip = suggestions[selected]
 
         def line(label, text):
             """라벨은 굵게, 내용은 한 줄로 보여 주는 한 행 (DB 텍스트는 이스케이프)."""
             return f'<div class="ts-row"><b>{label}</b> {escape(text)}</div>' if text else ""
 
-        st.html('<div class="rec table-suggestion"><div class="rt">' + escape(f"{selected}번 테이블 · {tip['nickname']}님")
-                + (f' <span class="tag ok">{escape(tip["tag"])}</span>' if tip["tag"] else "") + '</div>'
-                + line("방문", tip["visit"]) + line("오늘 주문", tip["order"]) + line("취향", tip["taste"])
-                + line("근거", tip["reason"]) + line("추천 행동", tip["action"]) + line("멘트", f"“{tip['note']}”") + '</div>')
+        # 제안이 많아도 화면이 길어지지 않게 오른쪽 영역 안에서 스크롤한다
+        with st.container(height=460, border=False):
+            for number in order:
+                tip = suggestions[number]
+                badges = (' <span class="tag bad">NEW</span>' if number in fresh else "") \
+                    + (f' <span class="tag ok">{escape(tip["tag"])}</span>' if tip["tag"] else "")
+                st.html('<div class="rec table-suggestion"><div class="rt">' + escape(f"{number}번 테이블 · {tip['nickname']}님")
+                        + badges + '</div>' + line("방문", tip["visit"]) + line("오늘 주문", tip["order"])
+                        + line("취향", tip["taste"]) + line("근거", tip["reason"])
+                        + line("추천 행동", tip["action"]) + line("멘트", f"“{tip['note']}”") + '</div>')
 
 
 @st.fragment(run_every=POLL_SECONDS)  # 이 영역만 POLL_SECONDS 초마다 다시 실행해 새 로그인·주문을 확인한다

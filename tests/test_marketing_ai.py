@@ -278,13 +278,13 @@ def test_server_chat_new_button_creates_room_and_list_switches(monkeypatch):
 
 
 def test_recommend_tab_shows_table_map_with_highlight():
-    """AI 추천 화면의 손님 응대 제안에 테이블 배치도가 보이고, 제안이 있는 테이블만 눌러 볼 수 있다."""
+    """AI 추천 화면의 손님 응대 제안에 테이블 배치도가 보이고, 제안은 오른쪽 목록에만 나온다(버튼 없음)."""
     app = open_marketing("AI 추천")
-    buttons = {b.key: b for b in app.button if b.key and b.key.startswith("mk_table_")}
-    assert buttons, "제안이 있는 테이블 버튼이 있어야 한다"
-    assert _has_table_map(app)  # 아이소메트릭 SVG 배치도
-    list(buttons.values())[-1].click().run()
     assert not app.exception
+    assert _has_table_map(app)  # 아이소메트릭 SVG 배치도
+    cards = [h.value for h in app.get("html") if h.value.startswith('<div class="rec table-suggestion"')]
+    assert cards and all("멘트</b>" in c for c in cards)
+    assert not [b for b in app.button if b.key and b.key.startswith("mk_table_")]  # 배치도 아래 버튼은 없다
 
 
 def test_polling_toasts_new_login_and_order(monkeypatch):
@@ -305,7 +305,7 @@ def test_polling_toasts_new_login_and_order(monkeypatch):
 
 
 def test_polling_announces_new_suggestion_table(monkeypatch):
-    """폴링으로 새 응대 제안이 생기면 알림이 뜨고 그 테이블이 NEW 로 선택된다."""
+    """폴링으로 새 응대 제안이 생기면 알림이 뜨고 그 테이블이 목록 맨 위에 NEW 로 나온다."""
     base = repo_mod.AdminRepository.regular_preferences
     extra = {}
     monkeypatch.setattr(repo_mod.AdminRepository, "regular_preferences",
@@ -316,5 +316,5 @@ def test_polling_announces_new_suggestion_table(monkeypatch):
     extra["pref"] = {**first, "member_id": 999999, "current_order_id": 999999, "today_table": 29, "nickname": "새단골"}
     app.run()
     assert any("새 응대 제안: 29번 테이블" in t.value for t in app.toast)
-    assert any(b.label == "💡 29번 NEW" for b in app.button)
-    assert app.session_state["mk_table_sel"] == 29
+    cards = [h.value for h in app.get("html") if h.value.startswith('<div class="rec table-suggestion"')]
+    assert "29번 테이블 · 새단골님" in cards[0] and "NEW" in cards[0]  # 새 제안이 맨 위

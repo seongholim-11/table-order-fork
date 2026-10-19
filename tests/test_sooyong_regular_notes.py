@@ -18,18 +18,13 @@ def html_of(screen):
 
 
 def panel_html(screen):
-    """배치도 오른쪽에 보이는 응대 제안 패널(선택한 테이블 한 곳)."""
-    return next(element.value for element in screen.get("html") if "table-suggestion" in element.value)
+    """배치도 오른쪽 응대 제안 목록의 첫 번째 카드."""
+    return all_panels(screen)[0]
 
 
 def all_panels(screen):
-    """제안이 있는 테이블 버튼을 차례로 눌러 각 테이블의 패널 내용을 모은다."""
-    keys = [button.key for button in screen.button if button.key and button.key.startswith("mk_table_")]
-    panels = []
-    for key in keys:
-        screen.button(key=key).click().run()
-        panels.append(panel_html(screen))
-    return panels
+    """배치도 오른쪽에 보이는 테이블별 응대 제안 카드들(제안이 있는 모든 테이블)."""
+    return [element.value for element in screen.get("html") if element.value.startswith('<div class="rec table-suggestion"')]
 
 
 def open_customers(monkeypatch):
@@ -178,7 +173,7 @@ def test_original_cards_and_pagination_are_preserved_above_added_preferences(ser
     screen.button(key="mk_rerecommend").click().run()  # 추천은 [AI 추천 받기]를 눌러야 만들어진다
     sections = [element.value for element in screen.get("html")]
     original = [html for html in sections if 'class="rec recommendation-card"' in html]
-    addition = next(html for html in sections if "table-suggestion" in html)
+    addition = next(html for html in sections if html.startswith('<div class="rec table-suggestion"'))
     assert len(original) == 4
     assert all("주문 기억 손님" not in html for html in original)
     assert "주문 기억 손님" in addition and "자주 드세요" in addition
@@ -188,7 +183,7 @@ def test_original_cards_and_pagination_are_preserved_above_added_preferences(ser
     sections = [element.value for element in screen.get("html")]
     after = [html for html in sections if 'class="rec recommendation-card"' in html]
     assert after != original
-    assert next(html for html in sections if "table-suggestion" in html) == addition
+    assert next(html for html in sections if html.startswith('<div class="rec table-suggestion"')) == addition
 
 
 def test_preference_api_failure_does_not_break_original_recommendations(server, monkeypatch):
