@@ -22,7 +22,7 @@
 | 1 | 1. 매장 정보 | `GET /api/v1/store` | 완료 |
 | 2 | 2. 주문 저장 · 테이블 누적 · 주문 이력 | `POST /api/v1/orders`, `GET /api/v1/tables/{id}/orders`, `GET /api/v1/owner/orders` | 완료 |
 | 3 | 3. 룰렛 · 쿠폰함 | `roulette/status·plays`, `tables/{n}/logins/prize`, `coupons`, `tables/{n}/coupons`, `POST /api/orders`(쿠폰 사용) | 완료 |
-| 4 | 4. AI 질문 · 추천 · 날씨 · 규칙 | `ai/questions`, `ai/recommendations`, `weather/current`, `ai/recommendation-rules` | 완료(4-3 선택 제외) |
+| 4 | 4. AI 질문 · 추천 · 날씨 · 규칙 | `ai/questions`, `ai/recommendations`, `ai/recommendations/generate`, `weather/current`, `ai/recommendation-rules` | 완료 |
 
 **다른 팀원과 겹치는 지점**
 
@@ -267,9 +267,9 @@ UI(주문하기) → U/state/coupons.py pending_coupon_ids → create_order(coup
 
 ## 4. AI 질문 · 추천 · 날씨 · 규칙
 
-현재 구조: 질문·날씨·규칙은 DB 기반의 개별 API에서 받고, **추천 조합 계산은 화면 코드**(`U/recommendations.py recommend_combos`)가 한다. 서버는 노출 기록을 `recommendation_events`에 저장한다(`POST /api/v1/ai/recommendations`, 기존 경로 별칭 유지).
+현재 구조: 질문·날씨·규칙은 DB 기반의 개별 API에서 받고, 추천 조합은 서버의 `ai_recommendation` 서비스가 DB 메뉴·주문·규칙을 제미나이에 전달해 고른 뒤 가격·수량·품절·예산을 검증한다. 제미나이 호출이 불가능하면 화면의 규칙 기반 추천으로 대체하고, 서버는 노출 기록도 `recommendation_events`에 저장한다.
 
-**단계로 나눠 진행한다**: ① 읽기 API 3개 ② 노출 기록 저장 ③ (선택) 추천 계산을 서버로.
+**단계로 나눠 진행한다**: ① 읽기 API 3개 ② 노출 기록 저장 ③ DB 기반 제미나이 추천 계산과 검증.
 
 ### 4-1. `GET /api/v1/ai/questions`, `GET /api/v1/weather/current`, `GET /api/v1/ai/recommendation-rules`
 
@@ -324,18 +324,18 @@ UI(추천 조합 카드 표시) → U/views/ai.py log_recommendation → ctx.REP
 - [x] `add_recommendation`, `recommendation_count` 구현(파일 안 TODO). 새 경로 `/api/v1/ai/recommendations`를 `B/routers/ai.py`에 연결하고 기존 경로 별칭도 유지했다.
 - [ ] `orders.recommendation_event_id`로 주문과 추천을 연결하는 부분은 4-3에서.
 
-### 4-3. (선택) 추천 조합 계산을 서버로
+### 4-3. 추천 조합 계산과 제미나이 분석을 서버로
 
-**목표**: `POST /api/v1/ai/recommendations`가 답변(인원·예산·맵기·음료 등)과 시간대·날씨로 **조합을 계산해 돌려준다**. 지금은 화면에서 계산하므로 시연에는 필수가 아니다. 1~2단계가 끝난 뒤 여유가 있을 때만 한다.
+**목표**: `POST /api/v1/ai/recommendations/generate`가 DB 메뉴·재고·추천 규칙·테이블 주문과 답변(인원·예산·맵기·음료 등)을 제미나이에 제공하고, 선택 결과를 서버에서 검증해 조합으로 돌려준다.
 
-**테스트 방법**: `user/test_recommendations.py`의 기존 케이스와 같은 입력으로 서버 결과가 같은 조합 id를 돌려준다.
+**테스트 방법**: 가짜 제미나이 응답으로 DB 후보·가격 재계산·API 키 없음 대체 경로를 확인한다.
 
-**중요 이론**: 규칙 기반 추천 = 후보 만들기 → 조건(예산·맵기·인원) 필터 → 점수 계산(메뉴 `weight`, 시간대·날씨 가산) → 상위 N개. 점수 규칙이 데이터(`recommendation_rules`)에 있으면 코드를 안 고쳐도 조정된다. 서준의 `menus.weight`(추천 가중치)를 읽는다.
+**중요 이론**: 생성형 추천 = DB 자료를 안전한 JSON으로 요약 → 제미나이가 후보 조합과 이유를 선택 → 서버가 메뉴 ID·품절·세트 가능 여부·예산·가격·수량을 재검증 → 최대 3개 반환. API 키가 없거나 실패하면 기존 규칙 기반 추천을 화면에서 사용한다.
 
 **상세 설명 / TODO**
 
-- [ ] `U/recommendations.py`의 계산 로직을 `B/services/recommend.py`(신규)로 옮기되 화면쪽 원본은 대체 경로로 남긴다.
-- [ ] 완료 기준: 같은 입력에서 화면 계산과 서버 계산 결과가 같다는 테스트.
+- [x] `B/services/ai_recommendation.py`에서 DB 자료를 제미나이에 전달하고 검증된 조합을 반환한다. 화면은 API 실패 시 기존 규칙 추천으로 대체한다.
+- [x] 완료 기준: 가짜 제미나이 응답으로 DB 후보·가격 재계산·API 키 없음 대체 경로를 테스트한다.
 
 ### 4-4. 추천 방식 후보 (담당자가 1개 고름)
 
@@ -349,6 +349,6 @@ UI(추천 조합 카드 표시) → U/views/ai.py log_recommendation → ctx.REP
 
 **고르는 기준(제안)**: 시연 안정성이 최우선이면 B에서 시작해 A로 확장하고, C는 A·B 위에 "추천 이유 문구"만 붙이는 선택 기능으로 둔다.
 
-- [x] 담당자가 방식 A(규칙 기반 점수)를 선택했다.
+- [x] 담당자가 방식 C(LLM 보조)를 선택했다. 기존 방식 A는 제미나이 장애 시 대체 경로로 유지한다.
 - [x] 고른 방식에 필요한 질문과 규칙 키를 정하고, 시드와 `U/ai_quiz_data.py`·`U/recommendation_data.py`를 같은 내용으로 맞췄다. 규칙이 가리키는 메뉴 id는 기존 `menus` 시드의 id를 사용한다.
 - [x] 질문 수는 기존 8단계를 유지해 화면의 단계 표시와 `user/test_ai_quiz.py`를 변경하지 않았다.

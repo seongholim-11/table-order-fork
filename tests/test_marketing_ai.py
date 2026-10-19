@@ -285,3 +285,36 @@ def test_recommend_tab_shows_table_map_with_highlight():
     assert _has_table_map(app)  # 아이소메트릭 SVG 배치도
     list(buttons.values())[-1].click().run()
     assert not app.exception
+
+
+def test_polling_toasts_new_login_and_order(monkeypatch):
+    """주기 확인(폴링)에서 번호가 늘면 새 로그인·주문 알림이 뜬다. 처음 열 때는 알리지 않는다."""
+    state = {"login_id": 1, "order_id": 1, "recent": []}
+    monkeypatch.setattr(repo_mod.AdminRepository, "live_activity", lambda self: dict(state), raising=False)
+    app = open_marketing("AI 추천")
+    assert not app.exception and not app.toast  # 첫 확인은 기준만 기억한다
+    state.update(login_id=2, order_id=2, recent=[
+        {"kind": "login", "id": 2, "table_no": 5, "nickname": "새손님", "at": "x"},
+        {"kind": "order", "id": 2, "table_no": 5, "nickname": "새손님", "at": "x"},
+        {"kind": "order", "id": 1, "table_no": 9, "nickname": "옛손님", "at": "x"}])
+    app.run()
+    texts = [t.value for t in app.toast]
+    assert not app.exception
+    assert any("5번 테이블 새손님님 로그인" in t for t in texts) and any("5번 테이블 새손님님 주문" in t for t in texts)
+    assert not any("9번" in t for t in texts)  # 이미 알았던 옛 주문은 알리지 않는다
+
+
+def test_polling_announces_new_suggestion_table(monkeypatch):
+    """폴링으로 새 응대 제안이 생기면 알림이 뜨고 그 테이블이 NEW 로 선택된다."""
+    base = repo_mod.AdminRepository.regular_preferences
+    extra = {}
+    monkeypatch.setattr(repo_mod.AdminRepository, "regular_preferences",
+                        lambda self: base(self) + ([extra["pref"]] if extra else []))
+    app = open_marketing("AI 추천")
+    assert not app.exception and not app.toast
+    first = base(app.session_state["repo"])[0]
+    extra["pref"] = {**first, "member_id": 999999, "current_order_id": 999999, "today_table": 29, "nickname": "새단골"}
+    app.run()
+    assert any("새 응대 제안: 29번 테이블" in t.value for t in app.toast)
+    assert any(b.label == "💡 29번 NEW" for b in app.button)
+    assert app.session_state["mk_table_sel"] == 29

@@ -70,7 +70,8 @@
 | 채택 | 메서드 | 경로 | 설명 | 성공 응답 | 구분 | 구현 현황 | 실제 경로 · 비고 |
 |---|---|---|---|---|---|---|---|
 | ☐ | GET | `/api/v1/ai/questions` | 추천 질문 목록(단계별 선택지) | 200 | 유지 | 더미 | `GET /api/content/quiz_questions` |
-| ☐ | POST | `/api/v1/ai/recommendations` | 답변 + 시간대·날씨로 메뉴 조합 추천, 추천 기록 저장 | 200 | 유지 | 더미 | `POST /api/recommendations` · 노출 기록 저장 제거, 응답만 더미. 조합 계산은 화면에서 함 |
+| ☐ | POST | `/api/v1/ai/recommendations` | 추천 조합 노출 기록 저장 | 201 | 유지 | 구현 | `POST /api/recommendations` · `recommendation_events`에 저장 |
+| ☐ | POST | `/api/v1/ai/recommendations/generate` | DB 메뉴·재고·주문·추천 규칙을 제미나이가 분석해 조합 추천 | 200 | 추가(화면 있음) | 구현 | 제미나이는 조합 ID·이유만 반환하고 서버가 가격·수량·품절·예산을 검증 |
 | ☐ | GET | `/api/v1/weather/current` | 현재 날씨(화면에 "날씨 ○○" 표시) | 200 | 추가(화면 있음) | 더미 | `GET /api/content/weather` (고정 값, 실제 날씨 API 아님) |
 | ☐ | GET | `/api/v1/ai/recommendation-rules` | 추천 규칙(조합 할인율, 메뉴 짝·음료 구성, 매운맛 조합 구분, 표시 이름) | 200 | 추가(화면 있음) | 더미 | `GET /api/content/rules` |
 | ☐ | GET | `/api/v1/ai/preferences/me` | 내 취향·방문 이력 | 200 | 추가(추천) | - | 범위에서 제외 또는 미착수 |

@@ -238,11 +238,45 @@ def pick_recommendations(recs, round_no):
 
 
 TABLE_MAP_COLUMNS = 6  # 배치도 한 줄에 놓을 테이블 수
+POLL_SECONDS = 10      # 새 로그인·주문을 확인하는 주기(초)
+
+
+def _poll_live_activity(repo, preferences):
+    """주기적으로(폴링) 새 로그인·주문과 새 응대 제안이 생겼는지 확인해 알림을 띄운다.
+
+    처음 화면을 열 때는 현재 상태만 기억하고 알리지 않는다. 그 뒤 번호가 바뀌면 새 일이 생긴 것이다.
+    """
+    try:
+        activity = repo.live_activity()
+    except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable):
+        activity = None  # 조회 실패는 조용히 넘기고 다음 주기에 다시 확인한다
+    if activity is not None:
+        last = ss.get("mk_live_last")
+        ss["mk_live_last"] = (activity["login_id"], activity["order_id"])
+        if last is not None:
+            for event in activity["recent"]:
+                # 지난번 확인한 번호보다 큰 로그인/주문만 새 일이다
+                if event["id"] > last[0 if event["kind"] == "login" else 1]:
+                    who = f" {event['nickname']}님" if event.get("nickname") else ""
+                    st.toast(f"{event['table_no']}번 테이블{who} " + ("로그인" if event["kind"] == "login" else "주문"),
+                             icon="🔔" if event["kind"] == "login" else "🧾")
+    # 응대 제안은 (손님, 주문) 단위로 비교해, 새로 생긴 제안의 테이블을 알린다.
+    keys = {}
+    for pref in preferences or []:
+        if pref.get("today_table") is not None and pref.get("delivery_menu"):
+            keys[(pref.get("member_id"), pref.get("current_order_id"))] = int(pref["today_table"])
+    seen = ss.get("mk_seen_suggestions")
+    ss["mk_seen_suggestions"] = set(keys)
+    new_tables = sorted({table for key, table in keys.items() if seen is not None and key not in seen})
+    if new_tables:
+        ss["mk_table_new"], ss["mk_table_sel"] = set(new_tables), new_tables[0]  # 새 제안 테이블을 자동으로 보여 준다
+        st.toast("새 응대 제안: " + ", ".join(f"{n}번 테이블" for n in new_tables), icon="💡")
 
 
 def _pick_table(number):
     """배치도에서 눌린 테이블을 기억해 옆 패널에 그 테이블의 제안을 보여 준다."""
     ss["mk_table_sel"] = number
+    ss.get("mk_table_new", set()).discard(number)  # 확인한 테이블은 NEW 표시를 지운다
 
 
 def _render_table_map(repo, preferences):
@@ -252,6 +286,7 @@ def _render_table_map(repo, preferences):
     except (KeyError, TypeError, ValueError, repo_mod.api.ApiError, repo_mod.api.ApiUnavailable):
         total = 30  # 매장 정보를 못 읽어도 배치도는 보이도록 기본 테이블 수를 쓴다
     suggestions = table_suggestions(preferences)
+    fresh = ss.get("mk_table_new", set()) & set(suggestions)  # 방금 새로 생긴 제안의 테이블
     selected = ss.get("mk_table_sel")
     if selected not in suggestions:
         selected = next(iter(sorted(suggestions)), None)  # 처음에는 제안이 있는 첫 테이블을 보여 준다
@@ -264,7 +299,7 @@ def _render_table_map(repo, preferences):
             st.caption("💡 제안이 있는 테이블을 눌러 내용을 확인하세요.")
             cols = st.columns(min(len(suggestions), TABLE_MAP_COLUMNS))
             for index, number in enumerate(sorted(suggestions)):
-                cols[index % len(cols)].button(f"💡 {number}번", key=f"mk_table_{number}", width="stretch",
+                cols[index % len(cols)].button(f"💡 {number}번" + (" NEW" if number in fresh else ""), key=f"mk_table_{number}", width="stretch",
                                               type="primary" if number == selected else "secondary",
                                               on_click=_pick_table, args=(number,), help="응대 제안 보기")
     with right:
@@ -278,12 +313,14 @@ def _render_table_map(repo, preferences):
                 f'{escape("“" + tip["note"] + "”")}</div></div>')
 
 
+@st.fragment(run_every=POLL_SECONDS)  # 이 영역만 POLL_SECONDS 초마다 다시 실행해 새 로그인·주문을 확인한다
 def _render_regular_preferences(repo):
     """오늘 주문한 단골·주간 반복 방문·특별일 고객의 응대 제안을 표시한다. 배치도는 데이터가 없어도 항상 보인다."""
     try:
         preferences = repo.regular_preferences()
     except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable):
         preferences = None  # 조회 실패: 아래에서 안내만 하고 배치도는 그대로 보여 준다
+    _poll_live_activity(repo, preferences)
     cards = regular_preference_cards(preferences or [])
     if preferences is None:
         sec_title("손님 응대 제안")

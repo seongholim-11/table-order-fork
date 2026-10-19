@@ -475,6 +475,12 @@ class AdminRepository:
             return self.backend.regular_preferences()
         return api.get("/admin/api/marketing/regular-preferences", self.backend.token)["preferences"]
 
+    def live_activity(self) -> dict:
+        """새 로그인·주문 확인용 폴링 조회. 더미 모드는 변화가 없는 고정 값을 돌려준다."""
+        if self.source != "api":
+            return {"login_id": 0, "order_id": 0, "recent": []}
+        return api.get("/admin/api/marketing/live-activity", self.backend.token)
+
     def customer_grades(self, rule: dict | None = None) -> dict:
         """화면에서 다시 세지 않고 백엔드가 집계한 등급별 인원을 사용한다."""
         return self.backend.customer_grades(rule if rule is not None else self.customer_grade_rules())

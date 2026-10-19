@@ -162,3 +162,21 @@ def test_refresh_regenerates_instead_of_using_cache(monkeypatch):
     assert service.refine_with_gemini(_result(), settings)["items"][0]["sms_body"] == "첫 문구"  # 캐시
     assert service.refine_with_gemini(_result(), settings, refresh=True)["items"][0]["sms_body"] == "새 문구"
     assert service.refine_with_gemini(_result(), settings)["items"][0]["sms_body"] == "새 문구"  # 새 결과가 캐시됨
+
+
+def test_live_activity_changes_when_login_or_order_arrives(client):
+    """폴링용 조회: 새 로그인·주문이 생기면 번호가 늘고 최근 사건에 나온다."""
+    url = "/admin/api/marketing/live-activity"
+    assert client.get(url).status_code == 401
+    before = client.get(url, headers=ADMIN).json()
+    assert before["login_id"] == before["order_id"] == 0 and before["recent"] == []
+    headers = login(client, "폴링손님", agree=True)
+    member_id = client.get("/api/members/me", headers=headers).json()["id"]
+    client.app.state.db.run(
+        "INSERT INTO orders (table_no, member_id, total, ai_combo, created_at) VALUES (?, ?, ?, ?, ?)",
+        (7, member_id, 9000, 0, datetime.now(KST).isoformat()))
+    after = client.get(url, headers=ADMIN).json()
+    assert after["login_id"] > before["login_id"] and after["order_id"] > before["order_id"]
+    assert {event["kind"] for event in after["recent"]} == {"login", "order"}
+    assert any(event["kind"] == "order" and event["table_no"] == 7 and event["nickname"] == "폴링손님"
+               for event in after["recent"])

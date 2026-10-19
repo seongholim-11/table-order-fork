@@ -7,6 +7,7 @@ from app.core.settings import Settings, get_settings
 from app.routers import admin, ai, auth, content, coupons, dev, menus, orders, roulette, roulette_prizes, staff_calls, store, user
 from app.routers.admin.categories import guest_router as guest_categories_router
 from app.services.external_info import ExternalInfoService
+from app.services.ai_recommendation import AiRecommendationService
 from app.services.kakao import KakaoClient
 from app.services.supabase_auth import SupabaseAuthClient
 from app.services.sms import SmsService
@@ -51,6 +52,7 @@ def create_app(settings: Settings | None = None, sms_clock=None, sms_http=None) 
     app.state.store_info = StoreInfoStore(db, settings)
     app.state.ai_content = AiContentStore(db)
     app.state.shop = ShopStore(db)
+    app.state.ai_recommendation = AiRecommendationService(settings, app.state.shop, app.state.ai_content)
     app.state.roulette_prizes = RoulettePrizeStore(db)
     app.state.sms_logs = SmsLogStore(db)
     app.state.sms = SmsService(settings, app.state.members, app.state.sms_logs, clock=sms_clock, http=sms_http)

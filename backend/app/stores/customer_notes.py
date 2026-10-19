@@ -36,3 +36,15 @@ class CustomerNotesStore:
     def menus(self) -> list[dict]:
         """현재 메뉴 ID·분류·품절 여부를 근거로 안주를 구분한다."""
         return self.db.all("SELECT id, name, category_id, is_soldout FROM menus ORDER BY id")
+
+    def activity(self, limit: int = 5) -> dict:
+        """폴링용: 가장 최근 로그인·주문 번호와 최근 사건 몇 건을 읽는다. 번호가 바뀌면 새 로그인/주문이 생긴 것이다."""
+        login = self.db.one("SELECT COALESCE(MAX(id), 0) AS last FROM table_logins")["last"]
+        order = self.db.one("SELECT COALESCE(MAX(id), 0) AS last FROM orders")["last"]
+        logins = self.db.all(
+            "SELECT 'login' AS kind, l.id, l.table_no, m.nickname, l.logged_in_at AS at "
+            "FROM table_logins l JOIN members m ON m.id=l.member_id ORDER BY l.id DESC LIMIT ?", (limit,))
+        orders = self.db.all(
+            "SELECT 'order' AS kind, o.id, o.table_no, m.nickname, o.created_at AS at "
+            "FROM orders o LEFT JOIN members m ON m.id=o.member_id ORDER BY o.id DESC LIMIT ?", (limit,))
+        return {"login_id": login, "order_id": order, "recent": logins + orders}

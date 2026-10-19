@@ -66,6 +66,14 @@ router.add_api_route("/customers", list_members, methods=["GET"])
 router.add_api_route("/customers/{member_id}/opt-out", member_opt_out, methods=["POST"])
 
 
+@router.get("/marketing/live-activity")
+def live_activity(request: Request) -> dict:
+    """새 로그인·주문이 있는지 화면이 주기적으로(폴링) 확인하는 가벼운 조회."""
+    from app.stores.customer_notes import CustomerNotesStore
+
+    return CustomerNotesStore(request.app.state.db).activity()
+
+
 @router.get("/marketing/regular-preferences")
 async def regular_preferences(request: Request, settings: Settings = Depends(get_settings)):
     """오늘 주문한 단골·주간 반복 방문·생일·첫 방문 기념일 고객의 응대 제안을 조회한다."""

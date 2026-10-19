@@ -24,6 +24,22 @@ def log_recommendation(params, combos):
         ctx.REPO.log_recommendation(ss.table, params, [c["id"] for c in combos], ss.access_token)
 
 
+def recommend_with_ai(params, lines):
+    """API 모드에서는 DB 기반 제미나이 추천을 먼저 쓰고, 실패하면 기존 규칙 추천을 쓴다."""
+    ss = st.session_state
+    if getattr(ctx.REPO, "source", "dummy") == "api":
+        result = ctx.REPO.generate_recommendations(ss.table, params, lines, ss.access_token)
+        if result and result.get("combos"):
+            return result["combos"], result.get("source", "gemini")
+    return recommend_combos(
+        params["people"], params["budget"], params["spicy"], params["drink"], lines,
+        menu_by_id=ctx.MENU_BY_ID, rules=ctx.RULES, member=bool(ss.member),
+        hour=params.get("hour"), weather=params.get("weather"), hunger=params.get("hunger", "적당해요"),
+        stress=params.get("stress", "보통"), kind=params.get("kind", "any"),
+        intent=params.get("intent"), gender=params.get("gender"),
+    ), "rules"
+
+
 def render_combo_cards(combos):
     """추천 조합 카드와 '담기' 버튼 (AI 추천 조합 화면과 AI 질문 결과가 함께 쓴다).
     조합 할인은 회원에게만 적용되므로 비회원 카드는 정가로 보이고 로그인 안내를 붙인다."""
@@ -42,10 +58,10 @@ def render_combo_cards(combos):
                 pricing = (f'<div class="combo-price-main"><strong>{won(combo["price"])}</strong></div>'
                            f'<small class="combo-member-note">🔒 회원 로그인 시 {ctx.DISCOUNT_PERCENT}% 할인</small>')
             st.html(f'<div class="combo-heading"><span class="combo-rank rank-{rank}">{rank}위</span>'
-                    f'<h3>{combo["name"]}</h3>{"<span class=\"combo-top\">가장 추천해요</span>" if rank == 1 else ""}</div>'
+                    f'<h3>{escape(str(combo["name"]))}</h3>{"<span class=\"combo-top\">가장 추천해요</span>" if rank == 1 else ""}</div>'
                     f'<div class="combo-section-label">구성 메뉴</div>'
                     f'<div class="combo-items">{contents}</div>'
-                    f'<div class="combo-reason"><strong>✨ 이 조합을 추천한 이유</strong><p>{combo["reason"]}</p></div>'
+                    f'<div class="combo-reason"><strong>✨ 이 조합을 추천한 이유</strong><p>{escape(str(combo["reason"]))}</p></div>'
                     f'<div class="combo-pricing">{pricing}</div>')
             if st.button(f"{rank}위 조합 담기 · {won(combo['price'])}", key=f"add_combo_{rank}",
                          type="primary" if rank == 1 else "secondary", width="stretch"):
@@ -64,15 +80,17 @@ def render_recommendations():
                else f'<span class="ai-offer">회원 전용 · QR 로그인하면 조합 {ctx.DISCOUNT_PERCENT}% 할인</span></div>'))
     people, budget, spicy, drink = DEFAULT_PREFERENCES  # 조건 선택 영역 없이 기본 조건으로 추천한다 (세부 조건은 AI 질문에서)
     lines = list(st.session_state.cart.values()) + [line for order in st.session_state.orders for line in order["lines"]]
-    combos = recommend_combos(people, budget, spicy, drink, lines, menu_by_id=ctx.MENU_BY_ID, rules=ctx.RULES,
-                              member=bool(st.session_state.member))
+    params = {"people": people, "budget": budget, "spicy": spicy, "drink": drink}
+    combos, source = recommend_with_ai(params, lines)
     log_recommendation({"people": people, "budget": budget, "spicy": spicy, "drink": drink}, combos)
     st.html(f'<div class="section-title ai-results-title">나에게 맞는 추천 <span>{len(combos)}</span>'
             f'<small>{people}명 · {won(budget)} 이하</small></div>')
     if not combos:
         st.info("지금 추천할 수 있는 조합이 없어요. AI 질문으로 조건을 바꿔 보세요.")
     render_combo_cards(combos)
-    st.caption("현재는 취향과 주문 정보를 반영한 데모 추천입니다. 조합 할인은 회원에게만, 세트 단위로 적용됩니다.")
+    st.caption("DB의 메뉴·재고·추천 규칙을 제미나이가 분석한 추천입니다. 조합 할인은 회원에게만 적용됩니다."
+               if source == "gemini" else
+               "AI 서버를 사용할 수 없어 규칙 기반 추천을 표시하고 있습니다. 조합 할인은 회원에게만 적용됩니다.")
 
 
 def render_quiz_question(step):
@@ -104,10 +122,9 @@ def render_quiz_result():
     weather = current_weather(ctx.WEATHER, st.query_params.get("weather"))
     w_label, w_icon = ctx.WEATHER["types"][weather]["label"], ctx.WEATHER["types"][weather]["icon"]
     lines = list(ss.cart.values()) + [line for order in ss.orders for line in order["lines"]]
-    combos = recommend_combos(a["people"], a["budget"], a["spicy"], "맥주", lines, menu_by_id=ctx.MENU_BY_ID, rules=ctx.RULES,
-                              hour=hour, weather=weather, hunger=a["hunger"], stress=a["stress"], kind=a["kind"],
-                              intent=a["intent"], gender=a["gender"], member=bool(ss.member))
-    log_recommendation({**a, "hour": hour, "weather": weather}, combos)
+    params = {**a, "drink": "맥주", "hour": hour, "weather": weather}
+    combos, source = recommend_with_ai(params, lines)
+    log_recommendation(params, combos)
     st.html('<div class="ai-hero"><div class="ai-eyebrow">✨ AI 질문 결과</div><h2>맞춤 메뉴 조합이 완성됐어요</h2>'
             f'<p>답변해 주신 {len(ctx.QUESTIONS)}가지와 오늘의 상황을 반영했어요.</p></div>')
     with st.container(horizontal=True, key="quiz_answers"):
@@ -125,7 +142,9 @@ def render_quiz_result():
     c1, c2 = st.columns(2)
     c1.button("🔄 처음부터 다시 질문", key="quiz_restart", on_click=quiz_restart, width="stretch")
     c2.button("🍽️ 메뉴 보러가기", key="quiz_to_menu", on_click=go, args=("menu",), type="primary", width="stretch")
-    st.caption("현재는 더미 데이터와 임시 규칙으로 만든 데모 추천입니다. 조합 할인은 회원에게만, 세트 단위로 적용됩니다.")
+    st.caption("DB의 메뉴·재고·추천 규칙과 답변·오늘의 상황을 제미나이가 분석한 추천입니다. 조합 할인은 회원에게만 적용됩니다."
+               if source == "gemini" else
+               "AI 서버를 사용할 수 없어 규칙 기반 추천을 표시하고 있습니다. 조합 할인은 회원에게만 적용됩니다.")
 
 
 def quiz_at_result():

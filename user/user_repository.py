@@ -40,6 +40,7 @@ ENDPOINTS = {
     "table_orders": "/api/v1/tables/{table_no}/orders",  # GET
     "calls": "/api/v1/staff-calls",           # POST
     "recommendations": "/api/v1/ai/recommendations",  # POST (추천 노출 기록)
+    "recommendation_generate": "/api/v1/ai/recommendations/generate",  # POST (제미나이 조합 추천)
 }
 CONTENT_KEYS = ("categories",)
 MODES = ("dummy", "api", "auto")
@@ -113,6 +114,9 @@ class DummyRepository:
     def log_recommendation(self, table_no, params, combo_ids, token):
         return None
 
+    def generate_recommendations(self, table_no, params, lines, token):
+        return None
+
     def db_test(self):
         return {"result": 0, "error": "더미 데이터 모드에서는 DB에 연결하지 않습니다."}
 
@@ -169,6 +173,11 @@ class ApiRepository:
                              json={"table_no": table_no, "params": params, "combo_ids": combo_ids})
         return r["id"] if r else None
 
+    def generate_recommendations(self, table_no, params, lines, token):
+        """DB와 제미나이를 사용하는 서버 추천을 요청한다. 실패하면 화면이 규칙 추천으로 대체한다."""
+        return server.safe_call(api.post, ENDPOINTS["recommendation_generate"], token,
+                                json={"table_no": table_no, "params": params, "lines": lines})
+
     def db_test(self):
         """개발 전용 API를 호출한다. 오류는 화면에서 이유를 표시할 수 있도록 그대로 전달한다."""
         return api.post("/api/dev/db-test")
@@ -203,6 +212,9 @@ class AutoRepository:
 
     def log_recommendation(self, *a, **kw):
         return self._api.log_recommendation(*a, **kw) if self.source == "api" else None
+
+    def generate_recommendations(self, *a, **kw):
+        return self._api.generate_recommendations(*a, **kw) if self.source == "api" else None
 
     def db_test(self):
         # 콘텐츠가 더미로 전환됐더라도 이 버튼은 실제 서버·DB 연결을 직접 확인해야 한다.
