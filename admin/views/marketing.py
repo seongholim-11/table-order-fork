@@ -11,6 +11,7 @@ import marketing_ai
 from admin.marketing.config import RECOMMENDATION_PAGE_SIZE
 from admin.marketing.recommendations import pick_recommendations as pick_recommendation_page
 from admin.marketing.recommendations import regular_preference_cards, regular_preference_preview_cards, table_suggestions
+from admin.marketing.table_map import table_map_svg
 from admin.ui.widgets import kpi, page_head, sec_title
 from admin.views.growth_performance import page_growth_performance
 from admin_dummy_data import Unsupported
@@ -21,37 +22,6 @@ ss = st.session_state
 
 STATUS_LABEL = {"sent": ("발송됨", "ok"), "dry_run": ("테스트(DRY RUN)", "warn"), "failed": ("실패", "bad"),
                 "scheduled": ("예약됨", "ok"), "canceled": ("취소됨", "warn")}
-
-
-def make_ai_candidates(repo):
-    """[AI 문자 생성]: 수신자와 문구를 내부적으로 만들어 후보 버튼으로 보여 준다."""
-    if repo.source == "api":
-        # 서버가 매장 데이터·오늘 날씨/행사를 반영해 후보를 만든다 (AI 키가 없으면 템플릿)
-        try:
-            ss["ai_candidates"] = repo.sms_candidates()
-        except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable) as e:
-            # 콜백에서 예외가 나면 화면이 'error' 로 멈추므로, 실패 이유를 알리고 후보만 비운다
-            ss["ai_candidates"] = []
-            st.toast(f"AI 문자 후보를 만들지 못했습니다: {e}", icon="⚠️")
-    else:
-        # 서버 없이 더미로 볼 때는 예전처럼 화면에서 직접 만든다
-        ctx = marketing_ai.build_context(repo, ss["grade_rule"])
-        ss["ai_candidates"] = marketing_ai.suggest_candidates(ctx, *marketing_ai.external_context())
-    ss["ai_picked"] = None
-
-
-def pick_ai_candidate(i):
-    c = ss["ai_candidates"][i]
-    ss["sms_grades"], ss["sms_body"], ss["ai_picked"] = c["grades"], c["body"], i
-    ss["sms_excluded"] = set()  # 제외 체크는 새 후보를 고를 때마다 초기화
-    ss.pop("sms_recommendation_member_ids", None)  # 새 문자 후보 선택은 등급 전체 대상 방식으로 돌아간다.
-    ss["sms_editor_v"] = ss.get("sms_editor_v", 0) + 1
-
-
-def candidate_label(c, pool_by_grade):
-    n = sum(pool_by_grade.get(g, 0) for g in c["grades"])
-    icons = "".join(marketing_ai.KEYWORD_ICON[k] for k in c["keywords"])
-    return f"{icons} {' + '.join(c['keywords'])} · {n}명"
 
 
 def recipient_editor(pool, grades):
@@ -153,19 +123,6 @@ def marketing_dashboard(repo):
         left, right = st.columns([3, 2], gap="large")
         compose = left.container(key="sms_compose")
     with compose:
-        st.button("✨ AI 문자 생성", key="ai_sms_generate", type="secondary", width="stretch",
-                  on_click=make_ai_candidates, args=(repo,),
-                  help="수신 대상과 문구를 AI가 만들어 후보 버튼으로 보여줘요 (AI 키가 없으면 템플릿 문구)")
-        cands = ss.get("ai_candidates")
-        if cands:
-            by_grade_pool = pool["등급"].value_counts().to_dict()
-            st.html('<div class="tpl-label">추천 문자 — 고르면 아래에 수신자와 내용이 채워져요</div>')
-            for i, c in enumerate(cands):
-                st.button(candidate_label(c, by_grade_pool), key=f"ai_cand_{i}", width="stretch",
-                          type="primary" if ss.get("ai_picked") == i else "secondary",
-                          on_click=pick_ai_candidate, args=(i,))
-            if ss.get("ai_picked") is not None and cands[ss["ai_picked"]]["source"] == "template":
-                st.caption("AI 키가 없거나 호출에 실패해 템플릿 문구로 만들었어요.")
         ss.setdefault("sms_grades", ["휴면"])
         ss.setdefault("sms_body", "오랜만이에요! 이번 주 방문하시면 안주 10% 할인해 드려요.")
         by_grade = pool["등급"].value_counts()
@@ -245,6 +202,7 @@ REC_PAGE_SIZE = RECOMMENDATION_PAGE_SIZE  # 기존 테스트·호출부에서 �
 
 def next_rec_round():
     ss["mk_rec_round"] = ss.get("mk_rec_round", 0) + 1
+    ss["mk_rec_refresh"] = True  # 재추천은 캐시를 건너뛰고 제미나이가 문구를 새로 만들게 한다
 
 
 def execute_sms_recommendation(repo, recommendation):
@@ -280,31 +238,26 @@ def _pick_table(number):
 
 
 def _render_table_map(repo, preferences):
-    """매장 테이블 배치도. 제안이 있는 테이블만 강조(눌러서 선택)하고, 선택한 테이블의 제안을 옆에 보여 준다."""
+    """매장 테이블 배치도(SVG). 제안이 있는 테이블만 강조하고, 선택한 테이블의 제안을 옆에 보여 준다."""
     try:
         total = int(repo.store()["tables"])
     except (KeyError, TypeError, ValueError):
         return
     suggestions = table_suggestions(preferences)
-    # 테이블 좌표 정보가 없으므로 번호 순서대로 격자에 놓는다. 제안은 매장 테이블 수를 넘는 번호여도 놓치지 않게 포함한다.
-    last = max([total, *suggestions])
     selected = ss.get("mk_table_sel")
     if selected not in suggestions:
         selected = next(iter(sorted(suggestions)), None)  # 처음에는 제안이 있는 첫 테이블을 보여 준다
     left, right = st.columns([3, 2], gap="large")
     with left.container(key="mk_table_map"):
-        st.caption("💡 표시된 테이블에 응대 제안이 있어요. 눌러서 내용을 확인하세요.")
-        for start in range(1, last + 1, TABLE_MAP_COLUMNS):
-            cols = st.columns(TABLE_MAP_COLUMNS)
-            for offset, col in enumerate(cols):
-                number = start + offset
-                if number > last:
-                    break
-                has = number in suggestions
-                col.button(f"💡 {number}" if has else str(number), key=f"mk_table_{number}", width="stretch",
-                           type="primary" if number == selected else "secondary", disabled=not has,
-                           on_click=_pick_table, args=(number,),
-                           help="응대 제안 보기" if has else "제안 없음")
+        st.html(table_map_svg(total, set(suggestions), selected))
+        # SVG 는 눌러도 반응하지 않으므로, 제안이 있는 테이블만 버튼으로 골라 보게 한다
+        if suggestions:
+            st.caption("💡 제안이 있는 테이블을 눌러 내용을 확인하세요.")
+            cols = st.columns(min(len(suggestions), TABLE_MAP_COLUMNS))
+            for index, number in enumerate(sorted(suggestions)):
+                cols[index % len(cols)].button(f"💡 {number}번", key=f"mk_table_{number}", width="stretch",
+                                              type="primary" if number == selected else "secondary",
+                                              on_click=_pick_table, args=(number,), help="응대 제안 보기")
     with right:
         if selected is None:
             st.info("오늘은 응대 제안이 있는 테이블이 없어요.")
@@ -352,7 +305,8 @@ def marketing_recommend_tab(repo):
     round_no = ss.get("mk_rec_round", 0)
     try:
         # API는 실제 DB, 더미 모드는 1,000명 시연 자료를 같은 추천 계약으로 돌려준다.
-        result = repo.opportunities(round_no)
+        # AI 추천 화면에 들어오면 서버가 제미나이로 문자 내용·기타 추천을 만든다(같은 입력은 캐시). 재추천이면 새로 만든다.
+        result = repo.opportunities(round_no, refresh=ss.pop("mk_rec_refresh", False))
     except (repo_mod.api.ApiError, repo_mod.api.ApiUnavailable) as e:
         st.error(f"DB 기반 마케팅 추천을 불러오지 못했어요: {e}")
         return

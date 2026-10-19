@@ -170,10 +170,10 @@ class ApiBackend:
     def sms_logs(self):
         return api.get(f"{ENDPOINTS['sms']}/logs", self.token)
 
-    def opportunities(self, round_no=0):
-        """서버가 DB 자료로 계산한 네 장의 마케팅 추천을 읽는다."""
+    def opportunities(self, round_no=0, refresh=False):
+        """서버가 DB 자료로 계산한 네 장의 마케팅 추천을 읽는다. refresh=True 면 제미나이가 문구를 새로 만든다."""
         # 서버가 제미나이로 문구를 다듬는 동안 기다릴 수 있게 시간을 넉넉히 둔다
-        return api.get(ENDPOINTS["opportunities"], self.token, params={"round": round_no}, timeout=30)
+        return api.get(ENDPOINTS["opportunities"], self.token, params={"round": round_no, "refresh": refresh}, timeout=30)
 
     def growth_performance(self):
         # backend/app/services/growth_performance.py가 orders·members DB를 읽어 계산한다.
@@ -529,8 +529,10 @@ class AdminRepository:
 
         return menu_alerts(self.menus(), self.stats()["popular_menus"])
 
-    def opportunities(self, round_no: int = 0) -> dict:
-        """API·더미 백엔드에서 같은 추천 페이지 응답을 받는다."""
+    def opportunities(self, round_no: int = 0, refresh: bool = False) -> dict:
+        """API·더미 백엔드에서 같은 추천 페이지 응답을 받는다. (AI 문구는 API 에서만 새로 만든다)"""
+        if self.source == "api":
+            return self.backend.opportunities(round_no, refresh)
         return self.backend.opportunities(round_no)
 
     def growth_performance(self, rule: dict | None = None) -> dict:

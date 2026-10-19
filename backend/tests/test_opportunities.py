@@ -147,3 +147,18 @@ def test_refine_with_gemini_batches_once_caches_and_falls_back(monkeypatch):
     monkeypatch.setattr(service, "_ask_gemini_batch", lambda s, c: (_ for _ in ()).throw(ValueError("x")))
     failed = service.refine_with_gemini(_result(), settings)
     assert failed["items"][0]["sms_body"] == "원래 문구" and failed["items"][0]["source"] == "rule"
+
+
+def test_refresh_regenerates_instead_of_using_cache(monkeypatch):
+    """재추천(refresh)이면 같은 입력이라도 제미나이를 다시 불러 새 문구를 받는다."""
+    from types import SimpleNamespace
+    from app.services import opportunities as service
+
+    service._REFINE_CACHE.clear()
+    answers = iter([{0: "첫 문구", 1: "첫 할 일"}, {0: "새 문구", 1: "새 할 일"}])
+    monkeypatch.setattr(service, "_ask_gemini_batch", lambda settings, cards: next(answers))
+    settings = SimpleNamespace(gemini_api_key="k", gemini_model="m")
+    assert service.refine_with_gemini(_result(), settings)["items"][0]["sms_body"] == "첫 문구"
+    assert service.refine_with_gemini(_result(), settings)["items"][0]["sms_body"] == "첫 문구"  # 캐시
+    assert service.refine_with_gemini(_result(), settings, refresh=True)["items"][0]["sms_body"] == "새 문구"
+    assert service.refine_with_gemini(_result(), settings)["items"][0]["sms_body"] == "새 문구"  # 새 결과가 캐시됨

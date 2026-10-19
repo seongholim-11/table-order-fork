@@ -16,7 +16,7 @@ router = APIRouter()
 
 
 @router.get("/marketing/opportunities")
-def opportunities(request: Request, round: int = Query(default=0, ge=0),
+def opportunities(request: Request, round: int = Query(default=0, ge=0), refresh: bool = False,
                   settings: Settings = Depends(get_settings)) -> dict:
     """같은 DB 입력이면 같은 카드가 나오며 round로 네 장씩 순환한다."""
     rule = grade_rule(settings, db=request.app.state.db)
@@ -29,7 +29,7 @@ def opportunities(request: Request, round: int = Query(default=0, ge=0),
     result = opportunity_service.opportunities(
         orders, members, request.app.state.shop.menus(), stats, today, rule, round)
     # 규칙 엔진이 고른 카드만 제미나이로 다듬는다 (키가 없거나 실패하면 규칙 문구 그대로)
-    return opportunity_service.refine_with_gemini(result, settings)
+    return opportunity_service.refine_with_gemini(result, settings, refresh)
 
 
 @router.get("/marketing/growth-performance")

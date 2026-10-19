@@ -177,20 +177,12 @@ def test_suggest_candidates_gives_up_to_five_with_recipients(monkeypatch):
     assert all(c["grades"] and c["body"] and c["source"] == "template" for c in cands)
 
 
-def test_ai_button_shows_candidates_and_editable_recipients(monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+def test_ai_sms_page_has_no_generate_button(monkeypatch):
+    """AI 문자 생성은 AI 추천 화면(제미나이)으로 옮겨서, AI 문자 페이지에는 생성 버튼이 없다."""
     app = open_marketing("AI 문자")
-    assert not [b for b in app.button if b.label.startswith("🆕") or b.label.startswith("💤 휴면 복귀")]  # 빠른 문구 제거
-    app.button(key="ai_sms_generate").click().run()
     assert not app.exception
-    assert 4 <= len([b for b in app.button if b.key and b.key.startswith("ai_cand_")]) <= 5
-    app.button(key="ai_cand_1").click().run()  # 두 번째 후보: 수신자·본문이 채워진다
-    cand = app.session_state["ai_candidates"][1]
-    assert app.multiselect(key="sms_grades").value == cand["grades"]
-    assert app.text_area(key="sms_body").value == cand["body"]
-    ids = [int(i) for i in app.session_state["repo"].members(app.session_state["grade_rule"]).query(
-        "`마케팅 수신 동의` and not 수신거부 and 등급 in @cand['grades']")["customer_id"]]
-    assert ids  # 수신자 목록이 비어 있지 않다
+    assert not [b for b in app.button if b.key == "ai_sms_generate"]
+    assert app.multiselect(key="sms_grades") and app.text_area(key="sms_body")  # 수신자·본문 입력은 그대로
 
 
 def test_removing_a_recipient_shrinks_send_target(monkeypatch):
@@ -203,21 +195,6 @@ def test_removing_a_recipient_shrinks_send_target(monkeypatch):
     assert full == len(ids) >= 2
     assert repo.sms_preview(["휴면"], "문구", member_ids=ids[1:])["targets"] == full - 1
     assert repo.sms_preview(["휴면"], "문구", member_ids=[])["ok"] is False
-
-
-def test_ai_candidates_error_is_shown_instead_of_crashing():
-    """서버가 시간 초과/오류로 답해도 버튼 콜백이 예외로 끝나 화면이 멈추면 안 된다."""
-    from admin.views import marketing
-
-    class BrokenRepo:
-        source = "api"
-
-        def sms_candidates(self):
-            raise repo_mod.api.ApiUnavailable("timed out")
-
-    marketing.ss["ai_candidates"] = ["old"]
-    marketing.make_ai_candidates(BrokenRepo())
-    assert marketing.ss["ai_candidates"] == [] and marketing.ss["ai_picked"] is None
 
 
 class FakeChatServer:
@@ -278,8 +255,7 @@ def test_recommend_tab_shows_table_map_with_highlight():
     """AI 추천 화면의 손님 응대 제안에 테이블 배치도가 보이고, 제안이 있는 테이블만 눌러 볼 수 있다."""
     app = open_marketing("AI 추천")
     buttons = {b.key: b for b in app.button if b.key and b.key.startswith("mk_table_")}
-    assert buttons, "테이블 배치도 버튼이 있어야 한다"
-    enabled = [b for b in buttons.values() if not b.disabled]
-    assert enabled and len(enabled) < len(buttons)  # 제안이 있는 테이블만 활성화
-    enabled[0].click().run()
+    assert buttons, "제안이 있는 테이블 버튼이 있어야 한다"
+    assert any("<svg" in e.value and "매장 테이블 배치도" in e.value for e in app.get("html"))  # 아이소메트릭 SVG 배치도
+    list(buttons.values())[-1].click().run()
     assert not app.exception

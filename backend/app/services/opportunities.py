@@ -81,8 +81,10 @@ def _ask_gemini_batch(settings, cards: list[dict]) -> dict[int, str]:
     return {int(row["i"]): str(row["text"]).strip() for row in rows if str(row.get("text", "")).strip()}
 
 
-def refine_with_gemini(result: dict, settings) -> dict:
-    """추천 카드의 문자 본문(sms)·할 일(guide)을 제미나이로 다듬는다. 각 카드에 source('ai'|'rule')를 붙인다."""
+def refine_with_gemini(result: dict, settings, refresh: bool = False) -> dict:
+    """추천 카드의 문자 본문(sms)·할 일(guide)을 제미나이로 다듬는다. 각 카드에 source('ai'|'rule')를 붙인다.
+
+    refresh=True(재추천)면 저장해 둔 결과를 버리고 새로 만든다."""
     # items 와 groups 는 같은 카드 객체를 공유한다. 두 목록의 카드를 모두 모으되 같은 카드는 한 번만 센다.
     cards = list({id(c): c for c in [*result["items"], *(c for k in ("sms", "guide") for c in result["groups"][k]["items"])]}.values())
     for card in cards:
@@ -94,6 +96,8 @@ def refine_with_gemini(result: dict, settings) -> dict:
                 "draft": c["sms_body"] if c["action_type"] == "sms" and c["sms_body"] else c["action"]}
                for n, c in enumerate(cards)]
     key = hashlib.sha256(json.dumps(payload, ensure_ascii=False).encode()).hexdigest()
+    if refresh:
+        _REFINE_CACHE.pop(key, None)
     try:
         if key not in _REFINE_CACHE:
             if len(_REFINE_CACHE) >= _REFINE_CACHE_MAX:
