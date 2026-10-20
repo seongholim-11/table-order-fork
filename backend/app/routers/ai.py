@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from app.core.dependencies import optional_member
 from app.core.settings import get_settings
 from app.services.ai_recommendation import AiRecommendationUnavailable
+from app.services.external_info import weather_type
 
 router = APIRouter(prefix="/api", tags=["사용자"])
 
@@ -31,10 +32,21 @@ def questions(request: Request):
     return request.app.state.ai_content.questions()
 
 
+def real_weather_shape(request: Request) -> dict:
+    """관리자 화면과 같은 날씨 API(Open-Meteo, 하루 한 번 저장)로 현재 날씨를 채운다.
+    가져오지 못하면 DB에 저장된 날씨를 그대로 쓴다. 가져왔으면 `text`에 "맑은 18도 날씨" 문구를 함께 담는다."""
+    shape = request.app.state.ai_content.weather_shape()
+    text = request.app.state.external.today_weather()
+    code = weather_type(text)
+    if code in shape["types"]:
+        return {**shape, "current": code, "text": text}
+    return shape
+
+
 @router.get("/v1/weather/current")
 def current_weather(request: Request):
-    """외부 API 연동 전까지 DB에 저장된 마지막 날씨를 반환한다."""
-    return request.app.state.ai_content.weather_shape()
+    """오늘 날씨(날씨 API). 날씨 API가 실패하면 DB에 저장된 마지막 날씨를 반환한다."""
+    return real_weather_shape(request)
 
 
 @router.get("/v1/ai/recommendation-rules")
@@ -54,9 +66,11 @@ def generate_recommendations(
     since = request.app.state.tablet_logins.first_valid_login_at(body.table_no)
     table_orders = request.app.state.shop.table_orders(body.table_no, since)
     history_lines = [line for order in table_orders for line in order["lines"]]
+    # 답변에 날씨가 없으면(AI 추천 조합 화면) 오늘 실제 날씨를 근거로 쓴다
+    params = {"weather": real_weather_shape(request)["current"], **body.params}
     try:
         return request.app.state.ai_recommendation.generate(
-            body.params,
+            params,
             [*body.lines, *history_lines],
             member=bool(member),
         )

@@ -7,7 +7,7 @@ import streamlit as st
 
 from ai_quiz_data import answer_label, current_weather, time_slot
 from menu_images import menu_image_html
-from recommendations import recommend_combos
+from recommendations import expand_combo, recommend_combos
 from user.state import context as ctx
 from user.state.cart import add_combo
 from user.state.quiz import quiz_answer, quiz_back, quiz_goto, quiz_restart, first_unanswered, reachable_steps
@@ -50,17 +50,23 @@ def reset_recommendation_cache():
 def recommend_with_ai(params, lines):
     """API 모드에서는 DB 기반 제미나이 추천을 먼저 쓰고, 실패하면 기존 규칙 추천을 쓴다."""
     ss = st.session_state
+    combos, source = [], "rules"
     if getattr(ctx.REPO, "source", "dummy") == "api":
         result = ctx.REPO.generate_recommendations(ss.table, params, lines, ss.access_token)
         if result and result.get("combos"):
-            return result["combos"], result.get("source", "gemini")
-    return recommend_combos(
-        params["people"], params["budget"], params["spicy"], params["drink"], lines,
-        menu_by_id=ctx.MENU_BY_ID, rules=ctx.RULES, member=bool(ss.member),
-        hour=params.get("hour"), weather=params.get("weather"), hunger=params.get("hunger", "적당해요"),
-        stress=params.get("stress", "보통"), kind=params.get("kind", "any"),
-        intent=params.get("intent"), gender=params.get("gender"),
-    ), "rules"
+            combos, source = list(result["combos"]), result.get("source", "gemini")
+    if len(combos) < 3:
+        # 제미나이가 조합을 1~2개만 주면(또는 실패하면) 규칙 추천으로 3개까지 채운다
+        rule_combos = recommend_combos(
+            params["people"], params["budget"], params["spicy"], params["drink"], lines,
+            menu_by_id=ctx.MENU_BY_ID, rules=ctx.RULES, member=bool(ss.member),
+            hour=params.get("hour"), weather=params.get("weather"), hunger=params.get("hunger", "적당해요"),
+            stress=params.get("stress", "보통"), kind=params.get("kind", "any"),
+            intent=params.get("intent"), gender=params.get("gender"))
+        have = {c["id"] for c in combos}
+        combos += [c for c in rule_combos if c["id"] not in have][:3 - len(combos)]
+    # 인원·배고픔에 비해 안주가 적은 조합은 서로 다른 메뉴를 예산 안에서 더해 푸짐하게 만든다
+    return [expand_combo(c, params, ctx.MENU_BY_ID, ctx.RULES, bool(ss.member), lines) for c in combos], source
 
 
 def render_combo_cards(combos):
@@ -156,7 +162,10 @@ def render_quiz_result():
             st.button(answer_label(ctx.QUESTIONS, q["id"], a[q["id"]]), key=f"quiz_review_{q['id']}", on_click=quiz_goto, args=(i,),
                       help=f"{q['title']} 다시 고르기")
     st.caption("답변을 누르면 해당 질문으로 돌아가 수정할 수 있어요.")
-    st.html(f'<div class="qz-auto">자동 반영 · 🕒 {slot} ({hour}시) · {w_icon} 날씨 {w_label} <small>(날씨는 더미 데이터)</small></div>')
+    # 서버가 날씨 API(관리자 화면과 같은 값)로 받은 문구가 있으면 보여 주고, 없으면 더미 날씨임을 알린다
+    real_text = ctx.WEATHER.get("text") if weather == ctx.WEATHER.get("current") else None
+    weather_note = escape(real_text) if real_text else f"{w_label} <small>(날씨는 더미 데이터)</small>"
+    st.html(f'<div class="qz-auto">자동 반영 · 🕒 {slot} ({hour}시) · {w_icon} 날씨 {weather_note}</div>')
     if not combos:
         st.info("선택한 조건에 맞는 조합이 없어요. 예산이나 인원을 바꿔서 다시 골라 보세요.")
         st.button("💵 예산 다시 고르기", key="quiz_edit_budget", on_click=quiz_goto, args=(len(ctx.QUESTIONS) - 1,))

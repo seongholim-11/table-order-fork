@@ -5,7 +5,8 @@ from unittest.mock import patch
 from streamlit.testing.v1 import AppTest
 
 from menu_data import MENU_BY_ID
-from recommendations import combo_cart_line, ordered_counts, recommend_combos
+from recommendation_data import RULES
+from recommendations import combo_cart_line, expand_combo, ordered_counts, recommend_combos, target_dish_count
 
 APP = str(Path(__file__).resolve().with_name("app.py"))
 
@@ -94,6 +95,32 @@ class RecommendationTests(unittest.TestCase):
             app.button(key="cat_best").click().run()
             app.button(key="cat_ai").click().run()
             self.assertEqual(len(calls), 2)
+
+    def test_target_dish_count_grows_with_people_and_hunger(self):
+        self.assertEqual(target_dish_count(2, "적당해요"), 2)
+        self.assertEqual(target_dish_count(5, "적당해요"), 4)
+        self.assertEqual(target_dish_count(5, "매우 배고파요"), 5)
+
+    def test_expand_combo_adds_distinct_dishes_within_budget(self):
+        params = {"people": 5, "budget": 100000, "spicy": "매콤하게", "drink": "맥주", "hunger": "매우 배고파요", "kind": "any"}
+        base = recommend_combos(5, 100000, "매콤하게", "맥주")[0]
+        combo = expand_combo(base, params, MENU_BY_ID, RULES, member=True)
+        dishes = [c for c in combo["components"] if MENU_BY_ID[c["id"]]["cat"] not in ("beer", "soju")]
+        self.assertGreater(len(combo["components"]), len(base["components"]))
+        self.assertEqual(len(dishes), 5)
+        self.assertEqual(len({c["id"].split("-")[0] for c in combo["components"]}), len(combo["components"]))
+        self.assertLessEqual(combo["price"], 100000)
+        self.assertGreater(combo["price"], base["price"])
+        self.assertEqual(combo["original"], sum(c["unit"] * c["qty"] for c in combo["components"]))
+        self.assertEqual(combo["price"], combo["original"] * 9 // 10)
+
+    def test_expand_combo_keeps_small_party_and_tight_budget(self):
+        params = {"people": 2, "budget": 40000, "spicy": "상관없어요", "drink": "맥주"}
+        for base in recommend_combos(2, 40000):
+            self.assertEqual(expand_combo(base, params, MENU_BY_ID, RULES), base)
+        tight = {"people": 5, "budget": 40000, "spicy": "상관없어요", "drink": "맥주", "hunger": "매우 배고파요"}
+        for base in recommend_combos(5, 40000):
+            self.assertLessEqual(expand_combo(base, tight, MENU_BY_ID, RULES)["price"], 40000)
 
     def test_empty_results_for_impossible_budget(self):
         self.assertEqual(recommend_combos(people=6, budget=1), [])

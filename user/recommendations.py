@@ -135,6 +135,75 @@ def recommend_combos(people=2, budget=40000, spicy="상관없어요", drink="맥
     return recommendations[:3]
 
 
+DISH_CATEGORIES = ("chicken", "anju", "soup")  # 안주로 더할 수 있는 카테고리 (술·음료·사이드는 제외)
+KIND_CATEGORY = {"fried": "chicken", "anju": "anju", "soup": "soup"}  # '어떤 종류가 끌리세요?' 답 → 메뉴 카테고리
+
+
+def target_dish_count(people, hunger):
+    """인원과 배고픔에 맞는 안주 가짓수. 1~2명 2개, 3~4명 3개, 5명 이상 4개, 매우 배고프면 1개 더(최대 6개)."""
+    count = 2 + (int(people) - 1) // 2
+    if hunger == "매우 배고파요":
+        count += 1
+    return min(count, 6)
+
+
+def expand_combo(combo, params, menu_by_id, rules, member=True, lines=()):
+    """조합의 안주가 인원·배고픔에 비해 적으면 서로 다른 메뉴를 더해 예산 안에서 푸짐하게 만든다.
+
+    같은 메뉴를 여러 개 담지 않고(수량은 1개 고정) 새 메뉴를 하나씩 더한다. 더한 뒤 가격이 예산을 넘는 메뉴는 고르지 않는다.
+    """
+    drink_ids = {item_id for item_id in rules["drinks"].values() if item_id}
+    components = [dict(c) for c in combo["components"]]
+    dishes = [c for c in components if c["id"] not in drink_ids]
+    drinks = [c for c in components if c["id"] in drink_ids]
+    target = target_dish_count(params.get("people", 2), params.get("hunger"))
+    if len(dishes) >= target:
+        return combo
+    budget = params.get("budget", 40000)
+    spicy = params.get("spicy", "상관없어요")
+    kind_category = KIND_CATEGORY.get(params.get("kind"))
+    percent = rules["discount_percent"] if member else 0
+    ordered = ordered_counts(lines)
+    used = {c["id"].split("-")[0] for c in components}  # 맵기 변형(a2-hot 등)도 같은 메뉴로 본다
+    categories = {menu_by_id[c["id"]]["cat"] for c in dishes if c["id"] in menu_by_id}
+    original = sum(c["unit"] * c["qty"] for c in components)
+    added = []
+    while len(dishes) + len(added) < target:
+        best = None
+        for item_id, base in menu_by_id.items():
+            if "-" in item_id or item_id in used or base["cat"] not in DISH_CATEGORIES:
+                continue
+            pick = f"{item_id}-hot" if spicy == "매콤하게" and item_id in ("a2", "a3") else item_id
+            item = menu_by_id.get(pick)
+            if item is None or item["soldout"] or not item.get("set_ok", True):
+                continue
+            if spicy == "맵지 않게" and item_spicy(item) >= 2:
+                continue
+            new_original = original + item["price"]
+            if new_original - new_original * percent // 100 > budget:
+                continue  # 더하면 예산을 넘는다
+            # 인기 메뉴·아직 없는 종류·원하는 종류를 먼저 고르고, 이미 주문한 메뉴는 뒤로 미룬다
+            score = (4 if "BEST" in item["tags"] else 0) + (3 if item["cat"] not in categories else 0)
+            score += 5 if item["cat"] == kind_category else 0
+            score += (item.get("weight", 50) - 50) * WEIGHT_STEP - (15 if ordered[pick] > 0 else 0)
+            if best is None or (score, item_id) > (best[0], best[1]):
+                best = (score, item_id, pick, item)
+        if best is None:
+            break  # 예산 안에서 더할 메뉴가 없다
+        _, item_id, pick, item = best
+        added.append({"id": pick, "name": item["name"], "emoji": item["emoji"], "qty": 1, "opt": "", "unit": item["price"]})
+        used.add(item_id)
+        categories.add(item["cat"])
+        original += item["price"]
+    if not added:
+        return combo
+    discount = original * percent // 100
+    names = ", ".join(c["name"] for c in added)
+    return {**combo, "components": dishes + added + drinks, "original": original, "discount": discount,
+            "price": original - discount,
+            "reason": combo["reason"] + f" {int(params.get('people', 2))}명이 푸짐하게 드실 수 있도록 {names}도 더했어요."}
+
+
 def combo_cart_line(combo):
     """구성/가격별 세트 행을 만들어 할인 금액을 주문까지 유지."""
     signature = ";".join(f"{c['id']}:{c['qty']}:{c['opt']}" for c in combo["components"])

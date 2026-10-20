@@ -3,10 +3,36 @@
 import sys
 from pathlib import Path
 
+import pytest
+
+from app.services.external_info import ExternalInfoService, weather_type
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "user"))
 import ai_quiz_data  # noqa: E402
 import recommendation_data  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def no_real_weather(monkeypatch):
+    """테스트가 실제 날씨 API를 부르지 않게 막는다(실패 상황 = DB에 저장된 더미 날씨를 쓴다)."""
+    monkeypatch.setattr(ExternalInfoService, "fetch_weather", lambda self: "")
+
+
+def test_weather_type_maps_text_to_code():
+    assert weather_type("맑은 18도 날씨") == "sunny"
+    assert weather_type("비 오는 18도 날씨") == "rain"
+    assert weather_type("이슬비 오는 10도 날씨") == "rain"
+    assert weather_type("눈 오는 -2도 날씨") == "snow"
+    assert weather_type("흐린 15도 날씨") == "cloudy"
+    assert weather_type("맑은 31도 날씨") == "hot"
+    assert weather_type("") is None
+
+
+def test_current_weather_uses_weather_api_text(client, monkeypatch):
+    monkeypatch.setattr(ExternalInfoService, "fetch_weather", lambda self: "비 오는 18도 날씨")
+    body = client.get("/api/v1/weather/current").json()
+    assert body["current"] == "rain" and body["text"] == "비 오는 18도 날씨"
+    assert body["types"] == ai_quiz_data.WEATHER["types"]
 
 
 def test_ai_content_endpoints_keep_frontend_shape(client):

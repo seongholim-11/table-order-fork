@@ -23,6 +23,20 @@ WEATHER_WORDS = {0: "맑은", 1: "대체로 맑은", 2: "구름 많은", 3: "흐
 EVENT_URL = "http://openapi.seoul.go.kr:8088/{key}/json/culturalEventInfo/1/200/%20/%20/{day}"
 
 
+def weather_type(text: str) -> str | None:
+    """"맑은 18도 날씨" 같은 문구를 손님 추천이 쓰는 날씨 코드(sunny/cloudy/rain/snow/hot)로 바꾼다. 모르면 None."""
+    degree = re.search(r"(-?\d+)도", text or "")
+    if degree and int(degree.group(1)) >= 30:
+        return "hot"
+    if any(word in text for word in ("비", "소나기", "천둥")):  # "이슬비 오는" 도 '비'가 들어 있다
+        return "rain"
+    if "눈" in text:
+        return "snow"
+    if any(word in text for word in ("흐린", "구름", "안개")):
+        return "cloudy"
+    return "sunny" if "맑" in text else None
+
+
 class ExternalInfoService:
     def __init__(self, settings: Settings, store: ExternalContextStore, clock=None):
         self.s, self.store = settings, store
@@ -48,6 +62,17 @@ class ExternalInfoService:
         event_note = "" if event else (self.notes["event"] or f"오늘 {self.s.store_gu} 행사가 없습니다")
         return {"day": day, "weather_text": weather, "event_text": event,
                 "weather_note": weather_note, "event_note": event_note}
+
+    def today_weather(self) -> str:
+        """오늘 날씨 문구만. 손님 화면용이라 행사 조회(느린 외부 호출)는 하지 않는다. 저장된 값이 있으면 그대로 쓴다."""
+        day = self.clock().strftime("%Y-%m-%d")
+        saved = self.store.get(day) or {"weather_text": "", "event_text": ""}
+        if saved["weather_text"]:
+            return saved["weather_text"]
+        weather = self.fetch_weather()
+        if weather:  # 가져왔을 때만 저장한다(행사 문구는 그대로 둔다)
+            self.store.save(day, weather, saved["event_text"])
+        return weather
 
     def fetch_weather(self) -> str:
         """매장 위치의 현재 날씨 한 줄. 실패하면 ''(이유는 self.notes 에 남긴다)."""
