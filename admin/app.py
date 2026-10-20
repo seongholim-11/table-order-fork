@@ -47,7 +47,7 @@ _reload_if_changed(admin_dummy_data, marketing_recommendations, marketing_ai, re
 from admin.views.customers import page_customers  # noqa: E402
 from admin.views.events import page_events  # noqa: E402
 from admin.views.dashboard import page_dashboard  # noqa: E402
-from admin.views.login import forget_token, login, remember_token, saved_token  # noqa: E402
+from admin.views.login import browser_token, forget_token, login, remember_token, saved_token  # noqa: E402
 from admin.views.marketing import page_marketing  # noqa: E402
 from admin.views.menu import page_menu  # noqa: E402
 from admin.views.orders import page_orders  # noqa: E402
@@ -96,14 +96,19 @@ if ss["repo"] is not None and type(ss["repo"]) is not repo_mod.AdminRepository:
 
 if not ss["owner"] and not ss.get("restore_tried"):
     # 새로고침하면 세션이 사라지므로, 사장님 로그인 때 저장해 둔 쿠키 토큰으로 다시 입장한다(세션마다 한 번만 시도).
-    ss["restore_tried"] = True
+    # 서버가 읽은 쿠키가 없으면 브라우저가 직접 읽어 알려 주는 값을 쓴다(첫 실행에는 아직 모르므로 None, 곧 다시 실행된다).
     _saved = saved_token()
-    if _saved:
-        _restored = repo_mod.connect(_saved)
-        if _restored.error:
-            forget_token()  # 만료됐거나 잘못된 토큰이면 쿠키를 지우고 로그인 화면으로 간다
-        else:
-            ss["owner"], ss["repo"], ss["token"], ss["notice"] = True, _restored.repo, _saved, _restored.notice
+    _browser = None if _saved else browser_token()
+    if _saved or _browser is not None:
+        ss["restore_tried"] = True
+        _saved = _saved or _browser
+        if _saved:
+            _restored = repo_mod.connect(_saved)
+            if _restored.error:
+                ss["restore_error"] = _restored.error  # 로그인 화면에 이유를 보여 준다
+                forget_token()  # 만료됐거나 잘못된 토큰이면 쿠키를 지우고 로그인 화면으로 간다
+            else:
+                ss["owner"], ss["repo"], ss["token"], ss["notice"] = True, _restored.repo, _saved, _restored.notice
 
 if not ss["owner"] and repo_mod.skip_token_login() and not ss.get("auto_login_failed"):
     # 임시: 토큰 입력 없이 입장. 실패하면 아래에서 기존 토큰 입력 화면을 보여준다. (ADMIN_SKIP_TOKEN=0 으로 끔)

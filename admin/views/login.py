@@ -28,6 +28,28 @@ def forget_token() -> None:
     _set_cookie("", 0)  # max-age=0 이면 브라우저가 쿠키를 지운다
 
 
+# 브라우저(JavaScript)가 쿠키를 직접 읽어 파이썬에 알려 주는 부품. 배포 환경(프록시)에서는 서버가 쿠키를 못 읽는 경우가 있어서 함께 쓴다.
+_READ_JS = """
+export default function(component) {
+    const { setStateValue } = component;
+    const found = document.cookie.split('; ').find((c) => c.startsWith('owner_token='));
+    setStateValue('token', found ? decodeURIComponent(found.split('=').slice(1).join('=')) : '');
+}
+"""
+_reader = None
+
+
+def browser_token() -> str | None:
+    """브라우저가 알려 준 저장 토큰. 없으면 '' 이고, 브라우저가 아직 알려 주지 않았으면(첫 실행) None."""
+    global _reader
+    try:
+        if _reader is None:
+            _reader = st.components.v2.component("owner_token_reader", js=_READ_JS)
+        return _reader(key="owner_token_reader", on_token_change=lambda: None).token
+    except Exception:  # 부품을 쓸 수 없는 환경이면 서버가 읽는 쿠키만 쓴다
+        return None
+
+
 def saved_token() -> str:
     """새로고침 전에 저장해 둔 사장님 토큰. 없거나 읽을 수 없으면 빈 문자열."""
     try:
@@ -37,6 +59,8 @@ def saved_token() -> str:
 
 
 def login():
+    if ss.get("restore_error"):  # 저장된 로그인으로 들어가지 못한 이유를 보여 준다(만료 등)
+        st.warning(f"저장된 로그인으로 입장하지 못했어요: {ss['restore_error']}")
     _, mid, _ = st.columns([1, 1.15, 1])
     with mid:
         st.html('<div style="height:8vh"></div><div style="text-align:center;margin-bottom:22px">'
