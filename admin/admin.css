@@ -320,6 +320,9 @@ button:focus-visible { outline: 3px solid rgba(232,89,12,.4) !important; outline
 [class*="st-key-mk_tip_card_"] { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 20px; box-shadow: var(--shadow); gap: 10px; margin-bottom: 12px; }
 [class*="st-key-mk_tip_card_"] .rec { border: 0; box-shadow: none; padding: 0; background: none; }
 /* 카드 안의 확인/되돌리기 버튼은 오른쪽 끝에 맞춘다 */
-[class*="st-key-mk_tip_card_"] .stButton { display: flex; justify-content: flex-end; }
+/* 버튼의 바깥 상자(st-key-mk_tip_ok_/undo_)가 글자 너비만큼만 차지해 왼쪽에 붙으므로, 카드 폭 전체로 늘린 뒤 오른쪽 끝에 놓는다 */
+[class*="st-key-mk_tip_ok_"], [class*="st-key-mk_tip_undo_"] { width: 100% !important; display: flex; justify-content: flex-end; }
+[class*="st-key-mk_tip_ok_"] .stButton, [class*="st-key-mk_tip_undo_"] .stButton { width: auto !important; }
+[class*="st-key-mk_tip_ok_"] button, [class*="st-key-mk_tip_undo_"] button { width: auto !important; }
 .table-suggestion .ts-row { font-size: 13.5px; line-height: 1.5; margin-top: 6px; color: var(--ink); }
 .table-suggestion .ts-row b { display: inline-block; min-width: 4.6em; color: var(--brand); font-weight: 700; }
