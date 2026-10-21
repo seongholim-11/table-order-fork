@@ -1,6 +1,6 @@
 # TODO 진행 중 예상 충돌·오류와 해결 방법
 
-팀원 5명이 `todo/TODO_*.md`를 동시에 진행할 때 걸리기 쉬운 것을 **증상 / 원인 / 해결** 표로 모았습니다. 코드는 `main`(2026-10-16) 기준으로 확인했고, 확인하지 못한 것은 **(추정)** 으로 표시했습니다.
+팀원 5명이 `todo/TODO_*.md`를 동시에 진행할 때 걸리기 쉬운 것을 **증상 / 원인 / 해결** 표로 모았습니다. 코드는 `main`(2026-10-21) 기준으로 확인했고, 확인하지 못한 것은 **(추정)** 으로 표시했습니다.
 
 - 담당 약자: **성** 성호(QR·문자·챗봇) / **재** 재현(주문·룰렛·쿠폰·AI·날씨) / **수** 수용(통계·등급·알림) / **준** 서준(메뉴·카테고리) / **석** 석원(직원호출·룰렛설정·관리자 AI추천) / **전** 전원
 - 이미 해결된 것은 뺐습니다. 예: `SERIAL_TABLES`에 `coupons`, `table_logins`, `staff_calls`, `orders`, `order_items`는 이미 들어 있습니다.
@@ -11,27 +11,21 @@
 
 | 번호 | 증상 | 원인 | 해결 | 담당 |
 |---|---|---|---|---|
-| G1 | PR 머지 때 `backend/app/dummy/` 충돌 | **분리 완료**: 담당별 `*_data.py`로 나뉘어 거의 겹치지 않음. 겹칠 수 있는 곳은 `content_data.py`(준·석·재)와 `order_data.py`의 `members`(재·수) | **내 `*_data.py`의 함수와 `ENDPOINTS` 줄만** 지운다. `dummy/__init__.py`는 고치지 않는다. PR을 작게 자주 보내고, 보내기 전에 `dev`를 먼저 받아 온다 | 재·수·준·석 |
 | G2 | `backend/app/routers/` 손님 API 충돌 | **분리 완료**: 기능별 파일(`menus.py`, `orders.py` 등)로 나뉨. 회원·로그인 기록은 `user.py`(성호) | 내 라우트 함수 안쪽만 고친다. 함수 순서 바꾸기·import 정렬 금지. 새 라우트는 파일 끝이 아니라 **관련 함수 바로 아래**에 추가하면 같은 위치 추가 충돌이 줄어든다 | 재·준·석 |
 | G3 | `factory.py`, `routers/admin/__init__.py` 충돌 | 새 라우터 등록 줄을 여러 명이 같은 위치에 추가 | 새 라우터 파일이 필요하면 **한 사람씩 순서대로** 머지한다. 분배 문서의 "선작업 PR"(빈 라우터 등록)이 머지되기 전에는 이 두 파일을 서로 알리고 수정 | 전 |
-| G4 | `PUT /admin/api/content/{name}`과 `seed/content.json`을 세 명이 고침 | `content`는 카테고리(준)·룰렛/직원호출 항목(석)·AI 질문/규칙(재)이 한 키 묶음 | 각자 **본인 키만** 지운다. 마지막에 남은 키가 없는지 한 사람이 정리한다 | 재·준·석 |
-| G5 | `user/user_repository.py`, `admin/admin_repository.py`의 `ENDPOINTS`/호출 목록 충돌 | 화면 호출 모음이 한 파일 | 내 호출 줄만 추가·수정. 응답 모양은 더미와 같게 유지(계약 테스트가 확인) | 전 |
-| G6 | `docs/DB_설계.md`, `docs/db/*.sql`, `AGENTS.md` 충돌 | 스키마·규칙 변경이 겹침 | 스키마를 바꾸는 사람은 한 명씩. 바꾸면 문서도 같은 PR에 넣고 팀에 알린다(AGENTS.md 금지 구역 규칙) | 전 |
+| G5 | `user/user_repository.py`, `admin/admin_repository.py`의 `ENDPOINTS`/호출 목록 충돌 | 화면 호출 모음이 한 파일 | 내 호출 줄만 추가·수정. 응답 모양은 서버와 예시 데이터가 같게 유지(계약 테스트가 확인) | 전 |
+| G6 | `docs/설계/DB_설계.md`, `docs/db/*.sql`, `AGENTS.md` 충돌 | 스키마·규칙 변경이 겹침 | 스키마를 바꾸는 사람은 한 명씩. 바꾸면 문서도 같은 PR에 넣고 팀에 알린다(AGENTS.md 금지 구역 규칙) | 전 |
 | G7 | 같은 이름의 새 테스트 파일 | TODO 예시가 `test_roulette.py` 등 같은 이름 | 테스트 파일명은 본인 기능 이름으로. 예: 수용 `test_stats_db.py`, 서준 `test_menus_db.py` | 전 |
 | G8 | PR을 `main`으로 보냄 | 포크 흐름 혼동 | PR은 본 리포 **`dev`로만**(내 포크 `main`에서 보낸다). `main` 반영은 SEONGHO | 전 |
 | G9 | 의존 순서가 어긋남 | 석원 룰렛 서비스 칸은 서준 메뉴, 수용 통계는 재현 주문, 성호 후보·챗봇은 수용·재현 데이터에 의존 | 순서: 서준 → 재현 → 수용·석원 → 성호. 아직 안 끝난 쪽 데이터는 "집계 전"/건너뛰기로 두고 TODO에 적힌 규칙을 따른다 | 전 |
 
 ---
 
-## 2. 더미 교체·테스트 규칙
+## 2. 테스트 규칙
 
 | 번호 | 증상 | 원인 | 해결 | 담당 |
 |---|---|---|---|---|
-| D1 | `dummy.xxx` 지웠더니 다른 라우터에서 `AttributeError` | 다른 라우터가 같은 더미를 같이 씀. 예: `routers/admin/orders.py`는 `dummy.members()`와 `dummy.orders()`, `routers/admin/menus.py`는 `dummy.content_item("categories")`를 씀 | 지우기 전에 `grep -rn "dummy\." backend/app`으로 **사용처를 전부** 찾아 함께 교체. 아직 못 바꾸는 쪽이 쓰는 함수는 남긴다 | 전 |
-| D2 | `test_dummy_get.py` 실패 | 더미를 지우거나 모양을 바꾸면 이 테스트가 옛 응답을 기대 | 교체한 엔드포인트의 케이스를 **실제 DB 응답 기준으로 고쳐 쓴다**(삭제·skip 금지). 응답 모양은 더미와 같게 | 전 |
-| D3 | skip 해제한 테스트가 깨짐 | `test_tablet_logins.py`(재), `test_coupons.py`(재), `test_shop_admin.py`(준) skip은 로직 구현 전제 | 구현을 끝낸 뒤 skip만 지운다. 안 맞으면 테스트를 지우지 말고 구현을 고친다. 구현 전에 skip을 지우면 `NotImplementedError`로 실패 | 재·준 |
 | D4 | 루트 `python -m pytest tests -q`만 깨짐 | 화면 계약 테스트(`tests/test_admin_data_source.py` 등)가 서버 응답 모양을 확인 | 서버만 돌리고 끝내지 말고 **두 명령 모두** 통과를 확인 | 전 |
-| D5 | `NotImplementedError` 500 | 라우터를 store 호출로 바꿨는데 store 뼈대가 아직 비어 있음 | store 메서드를 다 채운 뒤 라우터를 바꾼다. `ShopStore`는 메뉴·주문·호출·추천 믹스인을 합친 것이라 **같은 믹스인 파일은 한 명만** 맡는다 | 재·준·석 |
 | D6 | `user/test_*.py`는 완료 기준에서 빠짐 | 두 테스트 명령의 범위 밖 | `cd user && python -m unittest test_ai_quiz test_cart test_recommendations`를 따로 돌린다 | 전 |
 
 ---
@@ -54,10 +48,9 @@
 | P10 | `psycopg.errors.ForeignKeyViolation` | Supabase에는 FK가 있고 SQLite에는 없음. 메뉴를 쓰는 룰렛 서비스 칸(`roulette_prizes.menu_id`, RESTRICT), 메뉴가 남은 카테고리(`menus.category_id`, RESTRICT), 없는 `menu_id`로 쿠폰·주문 줄 INSERT | 삭제 전에 사용 여부를 조회해 **409와 안내 문구**로 거절하거나 예외를 잡아 변환. 시드는 순서 지키기: categories → menus → roulette_prizes | 준·석·재 |
 | P11 | `ai`/`best` 카테고리에 메뉴 저장 시 DB 예외 | `menus_virtual_check` 트리거가 가상 카테고리를 막음(SQLite에는 없음) | 라우터에서 **먼저 422**로 거절(DB 예외에 의존하지 않기) | 준 |
 | P12 | `check constraint` 위반 | Postgres에만 있는 체크: `weight 0~100`, `spicy 0~3`, `qty 1~99`, 룰렛 칸 `kind`별(할인=percent 필수·menu_id 없음 / 서비스=menu_id 필수) , 쿠폰 `kind`별 | 서버 검증(Pydantic `Field`)을 DB 체크와 **같은 범위**로 맞춘다 | 준·석·재 |
-| P13 | `DATABASE_URL`이 Postgres일 때만 로그인·문자 실패 | 현재 서버·테스트는 Supabase에서 한 번도 실행된 적이 없음(DB_설계.md 검증 이력 참고) | 개발 중 SQLite로 하더라도, **PR 전 한 번은 Supabase 연결로** 해당 기능을 수동 확인. 연결 문자열은 팀 비공개 채널로 공유하고 `backend/.env`에만 넣음(커밋 금지) | 성(스모크 테스트), 전 |
+| P13 | `DATABASE_URL`이 Postgres일 때만 로그인·문자 실패 | 서버 자동 테스트는 로컬 SQLite 기준이라 Postgres 전용 오류는 Supabase 연결에서만 드러남 | 개발 중 SQLite로 하더라도, **PR 전 한 번은 Supabase 연결로** 해당 기능을 수동 확인. 연결 문자열은 팀 비공개 채널로 공유하고 `backend/.env`에만 넣음(커밋 금지) | 성(스모크 테스트), 전 |
 | P14 | 서버 시작 때 `prepared statement` 오류 (추정) | Supabase 풀러 모드에 따라 다름. 코드는 `prepare_threshold=None`으로 대비함 | "Session pooler" 주소를 쓴다(`.env.example` 주석 참고) | 전 |
-| P15 | Supabase에 이미 있는 테이블과 SQLite `SCHEMA`의 칸이 다름 | `CREATE TABLE IF NOT EXISTS`는 이미 있는 테이블을 **고치지 않음**. SQLite 코드 칸이 Supabase에 없으면 `column does not exist` | 새 칸이 필요하면 SQL Editor에서 `alter table` 직접 실행 + `docs/DB_설계.md`·`docs/db/*.sql` 수정 + 팀 공지. 로컬은 `backend/app.db`를 지우고 서버 재시작 | 전 |
-| P16 | SQLite에만 있는 테이블 | 새 기능 테이블(`categories`, `roulette_prizes`, `staff_call_items`, `quiz_*`, `alerts`, `chat_*`)은 SQLite용 `SCHEMA`가 아직 없음 | 로컬 테스트용으로 store에 `SCHEMA`(SQLite 문법)를 추가하되 **컬럼명을 Supabase 스키마와 동일하게** 한다 | 준·석·재·수·성 |
+| P15 | Supabase에 이미 있는 테이블과 SQLite `SCHEMA`의 칸이 다름 | `CREATE TABLE IF NOT EXISTS`는 이미 있는 테이블을 **고치지 않음**. SQLite 코드 칸이 Supabase에 없으면 `column does not exist` | 새 칸이 필요하면 SQL Editor에서 `alter table` 직접 실행 + `docs/설계/DB_설계.md`·`docs/db/*.sql` 수정 + 팀 공지. 로컬은 `backend/app.db`를 지우고 서버 재시작 | 전 |
 
 ---
 
@@ -90,14 +83,11 @@
 | F4 | 주문 상태(접수/조리중)를 만들고 싶어짐 | — | 제품 규칙상 **상태 기능·UI 없음**. 만들지 않는다 | 전 |
 | F5 | 룰렛 칸 통째 교체 중 쿠폰·로그인 기록이 끊어질까 걱정 | `coupons.prize_id`, `table_logins.prize_id`는 `ON DELETE SET NULL` | 삭제 후 삽입으로 교체해도 안전. 한 트랜잭션 없이 `db.run` 반복이므로 삽입 도중 실패 시 칸이 비는 점은 주의(추정: 시연 규모에서는 문제 적음) | 석 |
 | F6 | 대시보드 오늘 매출이 오늘 주문이 없어도 과거 매출로 표시됨 | 추가 통계의 `last_day_revenue`(마지막 주문일 매출)를 오늘 카드에도 사용 | **수용 3번에서 해결**: KST 오늘의 `today_revenue`를 별도 계산하고 마지막 영업일과 구분. 고객 매출·테이블 순위의 제목과 기준일 안내도 실제 집계 기간으로 맞춤. 어제 주문만 있는 화면 테스트 통과 | 수 |
-| F7 | 전체 화면 테스트의 기존 룰렛 7개 실패 (2026-10-16) | `T/test_admin_events_page.py`는 예전 서비스 메뉴 5개·임의 확률 가중치를 기대하지만 현재 화면은 전체 메뉴 할인·추가 음료/주류·10% 단위 합계 100% 규칙을 사용 | 수용 3번 전체 테스트에서도 같은 7개 실패. 룰렛 담당자가 제품 규칙을 확인한 뒤 테스트와 구현 계약을 맞춰야 함. 테스트 skip·삭제로 우회하지 않고, 해결 전에는 PR 보류 | 석·수(보고) |
-| F8 | 대시보드 메뉴 품절이 실제 DB와 다르고 고객 목록 내용도 중복됨 | 품절은 더미 메뉴를 읽고 전체 회원·휴면·문자 수신 가능 카드를 별도로 반복 표시 | **2026-10-17 해결**: 하위 메뉴를 `메뉴`로 변경하고 중복 고객 카드 제거. `/admin/api/alerts`에서 DB 품절·판매 수량을 조회. AI/일반 주문 중 한쪽만 있는 경우에도 객단가를 표시하도록 수정. 서버 6개·화면 5개 신규 테스트 통과 | 수 |
 
 ---
 
 ## 6. 막혔을 때 확인 순서
 
-1. `grep -rn "dummy\." backend/app/routers`로 아직 더미인 라우트 확인
-2. 오류 메시지의 `psycopg.errors.…` 이름으로 위 표(P·E)에서 찾기
-3. `docs/DB_설계.md`와 `docs/db/fbgrowth_schema.sql`에서 제약·타입 확인
-4. 그래도 안 풀리면 PR 대신 팀 채널에 오류 전문과 실행한 SQL을 공유(비밀 키·DB 비밀번호 제외)
+1. 오류 메시지의 `psycopg.errors.…` 이름으로 위 표(P·E)에서 찾기
+2. `docs/설계/DB_설계.md`와 `docs/db/fbgrowth_schema.sql`에서 제약·타입 확인
+3. 그래도 안 풀리면 PR 대신 팀 채널에 오류 전문과 실행한 SQL을 공유(비밀 키·DB 비밀번호 제외)

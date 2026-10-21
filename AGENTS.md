@@ -29,11 +29,11 @@ streamlit run admin/app.py --server.port 8502   # 관리자 (APP_ENV=dev 면 토
 - `backend/app/`: `routers/`(손님 API는 기능별 파일: user.py(회원·로그인 기록), store/menus/orders/coupons/roulette/staff_calls/ai/content.py, auth.py, admin/) → `services/` → `stores/`(SQL은 여기만) , `seed/`.
 - `user/`, `admin/`: `app.py`는 진입점만. 화면은 `views/`, 공용 UI는 `ui/`, 세션 상태·계산은 `state/`. 폴더명을 `pages`로 쓰지 않는다(Streamlit 자동 멀티페이지 때문).
 - 화면 코드는 `api`를 직접 부르지 않고 `user/user_repository.py`, `admin/admin_repository.py`만 부른다.
-- API 경로: 손님 `/api/...`, 관리자 `/admin/api/...`. 기준 문서는 `docs/api/FBGrowth_API_경로_통합_정리_최종_v7_목록표만.md`, 담당 분배는 `docs/api/FBGrowth_API_담당_분배_3-2-2-2-1.md`.
+- API 경로: 손님 `/api/...`, 관리자 `/admin/api/...`. 기준 문서는 `docs/설계/API_설계.md`.
 - 담당자별 TODO: `docs/todo/TODO_{성호,재현,수용,서준,석원}.md`
-- 문서 목록: `docs/팀_공지.md`(팀원 공지, 어떤 문서를 언제 보는지), `docs/todo/`(담당자별 TODO), `docs/api/`(API 경로·담당 분배), `docs/TODO_충돌_오류.md`(충돌·오류), `docs/개발_가이드.md`·`docs/DB_설계.md`·`docs/기능흐름_*.md`·`docs/코드_둘러보기.md`.
-- TODO 진행 중 충돌·오류와 해결: `docs/TODO_충돌_오류.md`
-- 상세: `docs/개발_가이드.md`(API 추가 순서), `docs/DB_설계.md`(DB 설계), `docs/기능흐름_*.md`(기능 흐름), `docs/코드_둘러보기.md`.
+- 문서 목록: `docs/가이드/팀_공지.md`(팀원 공지, 어떤 문서를 언제 보는지), `docs/todo/`(담당자별 TODO), `docs/설계/`(DB·API·화면 설계), `docs/README.md`(전체 문서 지도), `docs/todo/TODO_충돌_오류.md`(충돌·오류), `docs/가이드/개발_가이드.md`·`docs/설계/DB_설계.md`·`docs/기능흐름/기능흐름_*.md`·`docs/가이드/코드_둘러보기.md`.
+- TODO 진행 중 충돌·오류와 해결: `docs/todo/TODO_충돌_오류.md`
+- 상세: `docs/가이드/개발_가이드.md`(API 추가 순서), `docs/설계/DB_설계.md`(DB 설계), `docs/기능흐름/기능흐름_*.md`(기능 흐름), `docs/가이드/코드_둘러보기.md`.
 
 ## 정해진 제품 규칙 (어기지 말 것)
 - 주문 상태 기능·UI는 없다(접수/조리중 같은 상태를 만들지 않는다).
@@ -43,7 +43,7 @@ streamlit run admin/app.py --server.port 8502   # 관리자 (APP_ENV=dev 면 토
 - AI 챗봇은 제미나이 무료 API를 쓰고 RAG 없이 DB 데이터를 근거로 답한다.
 - 문자 발송은 솔라피. `SMS_DRY_RUN=true`(기본)이면 실제 전송 없이 기록만 한다.
 - 관리자 인증은 Supabase Auth 이메일/비밀번호 + `owners` 등록 계정이다(`POST /api/auth/owner/login`, 계정 등록은 `docs/db/fbgrowth_owner_add.sql`). `SUPABASE_URL`·`SUPABASE_ANON_KEY`가 있으면 로그인 화면이 사장님 로그인으로 바뀐다. `ADMIN_TOKEN`은 개발용이며 `APP_ENV=prod`이고 Supabase가 설정되면 거부된다. 챗봇 대화방 주인은 로그인한 사장님이고, 토큰으로 들어오면 `CHAT_OWNER_ID`를 쓴다.
-- DB 설계는 `docs/DB_설계.md`와 `docs/db/fbgrowth_schema.sql`이 기준이며 Supabase `table-order` 프로젝트에 적용되어 있다. 서버 `stores/`는 아직 SQLite 호환 구조이므로 Supabase 스키마로 옮기는 작업이 남아 있다.
+- DB 설계는 `docs/설계/DB_설계.md`와 `docs/db/fbgrowth_schema.sql`이 기준이며 Supabase `table-order` 프로젝트에 적용되어 있다. 서버 `DATABASE_URL`이 Postgres면 이 스키마에 접속하고, 비어 있으면 로컬 SQLite(`backend/app.db`)를 개발·테스트용으로 쓴다.
 
 ## 작업 원칙
 - 수정하는 파일 수를 최대한 줄인다. 요청과 무관한 파일은 건드리지 않는다.
@@ -53,9 +53,9 @@ streamlit run admin/app.py --server.port 8502   # 관리자 (APP_ENV=dev 면 토
 
 ## 금지 구역
 - `.env`, 비밀 키(`SOLAPI_*`, `SUPABASE_SERVICE_ROLE_KEY`, `JWT_SECRET`, `ADMIN_TOKEN`)를 커밋하거나 화면·로그에 노출하지 않는다.
-- 스키마(`stores/*.py`의 `SCHEMA`, `docs/db/*.sql`)를 바꾸면 `docs/DB_설계.md`도 함께 고치고 팀에 알린다. 기존 `backend/app.db`에는 반영되지 않으므로 지우고 서버를 다시 켠다.
+- 스키마(`stores/*.py`의 `SCHEMA`, `docs/db/*.sql`)를 바꾸면 `docs/설계/DB_설계.md`도 함께 고치고 팀에 알린다. 기존 `backend/app.db`에는 반영되지 않으므로 지우고 서버를 다시 켠다.
 - 라우터에서 SQL을 쓰지 않는다(`stores/` 메서드만).
-- 테스트를 skip·삭제해서 통과시키지 않는다(더미 교체 시 skip 제거만 허용).
+- 테스트를 skip·삭제해서 통과시키지 않는다(skip된 테스트를 구현으로 살릴 때 skip 제거만 허용).
 
 ## Git 규칙
 - 조직 소유 본 리포를 팀원이 각자 **포크**해서 개발하고, **PR은 본 리포의 `dev` 브랜치로만** 보낸다. `main`으로 직접 PR·push 하지 않는다.
