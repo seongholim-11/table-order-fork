@@ -354,17 +354,20 @@ def _render_table_map(repo, preferences):
                 if not waiting:
                     st.caption("확인하지 않은 제안이 없어요.")
                 for number in waiting:
-                    st.html(card_html(number, suggestions[number]))
-                    if st.button("확인", key=f"mk_tip_ok_{keys[number]}"):
-                        save_check(number, True)
+                    # 카드 테두리(admin.css 의 mk_tip_card_)를 컨테이너가 그리므로 버튼이 카드 안에 들어간다
+                    with st.container(key=f"mk_tip_card_ok_{keys[number]}"):
+                        st.html(card_html(number, suggestions[number]))
+                        if st.button("확인", key=f"mk_tip_ok_{keys[number]}"):
+                            save_check(number, True)
             # 확인 영역: 이미 확인한 카드. 실수로 눌렀다면 '미확인으로 되돌리기'를 쓴다
             with st.expander(f"확인 ({len(checked)})", expanded=False):
                 if not checked:
                     st.caption("확인한 제안이 아직 없어요.")
                 for number in checked:
-                    st.html(card_html(number, suggestions[number]))
-                    if st.button("미확인으로 되돌리기", key=f"mk_tip_undo_{keys[number]}"):
-                        save_check(number, False)
+                    with st.container(key=f"mk_tip_card_undo_{keys[number]}"):
+                        st.html(card_html(number, suggestions[number]))
+                        if st.button("미확인으로 되돌리기", key=f"mk_tip_undo_{keys[number]}"):
+                            save_check(number, False)
 
 
 @st.fragment(run_every=POLL_SECONDS)  # 이 영역만 POLL_SECONDS 초마다 다시 실행해 새 로그인·주문을 확인한다

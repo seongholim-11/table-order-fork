@@ -315,5 +315,9 @@ button:focus-visible { outline: 3px solid rgba(232,89,12,.4) !important; outline
 .st-key-mk_live [data-stale="true"], .st-key-mk_live[data-stale="true"] { opacity: 1 !important; transition: none !important; }
 
 /* 배치도 오른쪽 응대 제안 패널: 한 줄씩, 라벨은 굵게 */
+/* 응대 제안 카드: 카드 모양은 컨테이너(key 가 mk_tip_card_ 로 시작)가 그리고, 안쪽 .rec 는 테두리를 없애 이중 테두리를 막는다.
+   확인 버튼도 같은 컨테이너 안에 있어서 카드 안에 보인다. */
+[class*="st-key-mk_tip_card_"] { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 20px; box-shadow: var(--shadow); gap: 10px; margin-bottom: 12px; }
+[class*="st-key-mk_tip_card_"] .rec { border: 0; box-shadow: none; padding: 0; background: none; }
 .table-suggestion .ts-row { font-size: 13.5px; line-height: 1.5; margin-top: 6px; color: var(--ink); }
 .table-suggestion .ts-row b { display: inline-block; min-width: 4.6em; color: var(--brand); font-weight: 700; }
