@@ -156,6 +156,9 @@ def table_suggestions(preferences: list[dict]) -> dict[int, dict]:
         # 메뉴 취향은 80% 이상 확인된 손님에게만 한 줄로 덧붙인다
         favorite = (preference.get("favorite_menu") if (preference.get("preference_rate") or 0) >= .8 else None)
         result[int(preference["today_table"])] = {
+            "member_id": preference.get("member_id"),            # 확인 상태를 저장할 때 쓰는 카드 식별값
+            "order_id": preference.get("current_order_id"),
+            "checked": bool(preference.get("checked")),         # DB에 저장된 확인 여부
             "nickname": preference["nickname"],
             "tag": EVENT_TAG.get(preference.get("special_event"), ""),
             "visit": visit,

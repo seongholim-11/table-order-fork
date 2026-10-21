@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel
 
 from app.core.settings import Settings, get_settings
 from app.routers.admin.common import grade_rule
@@ -90,4 +91,24 @@ def regular_preferences(request: Request, settings: Settings = Depends(get_setti
                           store.lines(1), store.menus(), today, dormant_days=rule["dormant"],
                           repeat_visits=rule["repeat"], regular_visits=rule["regular"],
                           weather_text=saved_weather.get("weather_text", ""), visits=store.visits(1))
+    # 사장님이 이미 '확인'한 제안인지 카드마다 표시해 화면이 미확인/확인 영역으로 나눌 수 있게 한다.
+    checked = store.checked_tips()
+    for note in notes:
+        note["checked"] = (note.get("member_id"), note.get("current_order_id")) in checked
     return {"preferences": notes}
+
+
+class TipCheck(BaseModel):
+    """응대 제안 카드 하나(손님+주문)와 확인 여부."""
+    member_id: int
+    order_id: int
+    checked: bool = True
+
+
+@router.put("/marketing/tip-checks")
+def set_tip_check(body: TipCheck, request: Request) -> dict:
+    """응대 제안 카드를 확인 처리하거나(checked=true) 미확인으로 되돌린다(false)."""
+    from app.stores.customer_notes import CustomerNotesStore
+
+    CustomerNotesStore(request.app.state.db).set_tip_checked(body.member_id, body.order_id, body.checked)
+    return {"member_id": body.member_id, "order_id": body.order_id, "checked": body.checked}

@@ -69,6 +69,7 @@
 | `order_item_components` | AI 조합 줄의 구성 메뉴(인기 메뉴 집계용) | order_item_id, menu_id, name, qty |
 | `staff_call_items` | 직원 호출 요청 항목(물·수저 등) | label(20자 이하·중복 불가), sort_order |
 | `staff_calls` | 직원 호출 기록 | table_no, items[], created_at, done_at |
+| `service_tip_checks` | 손님 응대 제안 카드의 '확인' 기록(행이 있으면 확인) | member_id, order_id(기본키 묶음), checked_at |
 
 ### AI 추천 콘텐츠
 

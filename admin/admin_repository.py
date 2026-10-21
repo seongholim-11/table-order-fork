@@ -505,8 +505,20 @@ class AdminRepository:
         # 더미는 admin_dummy_data의 1,000명 주문으로 시연하고, API 모드는 아래 DB 경로를 그대로 읽는다.
         # 실제 DB 연결: backend/app/stores/customer_notes.py -> members/orders/order_items/menus
         if self.source != "api":
-            return self.backend.regular_preferences()
+            # 더미 모드는 DB가 없으므로 확인한 카드를 메모리에만 기억한다
+            checked = getattr(self, "_tip_checks", set())
+            return [{**pref, "checked": (pref["member_id"], pref["current_order_id"]) in checked}
+                    for pref in self.backend.regular_preferences()]
         return api.get("/admin/api/marketing/regular-preferences", self.backend.token)["preferences"]
+
+    def set_tip_checked(self, member_id: int, order_id: int, checked: bool) -> None:
+        """응대 제안 카드를 확인(True)하거나 미확인(False)으로 되돌린 것을 저장한다."""
+        if self.source != "api":
+            checks = self.__dict__.setdefault("_tip_checks", set())
+            (checks.add if checked else checks.discard)((member_id, order_id))
+            return
+        api.put("/admin/api/marketing/tip-checks", self.backend.token,
+                json={"member_id": member_id, "order_id": order_id, "checked": checked})
 
     def live_activity(self) -> dict:
         """새 로그인·주문 확인용 폴링 조회. 더미 모드는 변화가 없는 고정 값을 돌려준다."""

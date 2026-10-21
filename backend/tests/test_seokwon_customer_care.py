@@ -112,3 +112,24 @@ def test_first_visit_anniversary_is_a_valid_recommendation_reason(client):
     row, = client.get(URL, headers=ADMIN).json()["preferences"]
     assert row["special_event"] == "visit_anniversary" and row["is_visit_anniversary"]
     assert "첫 방문일" in row["care_reason"] and "기념" in row["service_suggestion"]
+
+
+def test_tip_check_is_saved_and_can_be_undone(client):
+    """응대 제안 카드를 확인하면 DB에 남아 다시 조회해도 checked=true, 되돌리면 false."""
+    db = client.app.state.db
+    db.run("DELETE FROM menus")
+    db.run("INSERT INTO menus (id, category_id, name, price) VALUES ('care-egg', 'anju', '계란말이', 15000)")
+    member = client.app.state.members.upsert_login("care-check", "확인 손님")
+    db.run("UPDATE members SET visit_count=2, birthday=NULL WHERE id=?", (member["id"],))
+    _order(client, member["id"], 365, "care-egg", "계란말이", 8)
+    _order(client, member["id"], 0, "care-egg", "계란말이", 4)
+
+    row, = client.get(URL, headers=ADMIN).json()["preferences"]
+    assert row["checked"] is False
+    body = {"member_id": row["member_id"], "order_id": row["current_order_id"]}
+    assert client.put("/admin/api/marketing/tip-checks", json={**body, "checked": True}, headers=ADMIN).status_code == 200
+    # 같은 요청을 한 번 더 보내도 오류 없이 한 건만 남는다
+    assert client.put("/admin/api/marketing/tip-checks", json={**body, "checked": True}, headers=ADMIN).status_code == 200
+    assert client.get(URL, headers=ADMIN).json()["preferences"][0]["checked"] is True
+    client.put("/admin/api/marketing/tip-checks", json={**body, "checked": False}, headers=ADMIN)
+    assert client.get(URL, headers=ADMIN).json()["preferences"][0]["checked"] is False

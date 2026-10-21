@@ -3,9 +3,34 @@
 from app.stores.db import Database
 
 
+# 응대 제안 카드를 사장님이 '확인'한 기록. (손님, 주문) 한 쌍이 한 카드이므로 둘을 합쳐 기본키로 쓴다.
+SCHEMA = """\
+CREATE TABLE IF NOT EXISTS service_tip_checks (
+    member_id  INTEGER NOT NULL,
+    order_id   INTEGER NOT NULL,
+    checked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (member_id, order_id)
+);
+"""
+
+
 class CustomerNotesStore:
     def __init__(self, db: Database):
         self.db = db
+        self.db.script(SCHEMA)  # 표가 없으면 만든다(있으면 그대로 둔다)
+
+    def checked_tips(self) -> set[tuple[int, int]]:
+        """확인 처리된 응대 제안을 (member_id, order_id) 묶음으로 돌려준다."""
+        rows = self.db.all("SELECT member_id, order_id FROM service_tip_checks")
+        return {(row["member_id"], row["order_id"]) for row in rows}
+
+    def set_tip_checked(self, member_id: int, order_id: int, checked: bool) -> None:
+        """확인 기록을 남기거나(checked=True) 지운다(False). 이미 있어도 오류 없이 넘어간다."""
+        if checked:
+            self.db.run("INSERT INTO service_tip_checks (member_id, order_id) VALUES (?, ?) "
+                        "ON CONFLICT (member_id, order_id) DO NOTHING", (member_id, order_id))
+        else:
+            self.db.run("DELETE FROM service_tip_checks WHERE member_id=? AND order_id=?", (member_id, order_id))
 
     def orders(self, minimum_visits: int = 2) -> list[dict]:
         """두 번째 이상 방문한 회원의 과거·오늘 주문을 가져온다."""

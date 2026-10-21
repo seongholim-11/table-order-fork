@@ -240,6 +240,14 @@ create table if not exists staff_calls (
 );
 create index if not exists staff_calls_created_idx on staff_calls (created_at desc);
 
+-- 3-4. 손님 응대 제안 확인 기록 (PUT /admin/api/marketing/tip-checks). 행이 있으면 '확인', 없으면 '미확인'
+create table if not exists service_tip_checks (
+  member_id   bigint not null references members(id) on delete cascade,
+  order_id    bigint not null references orders(id) on delete cascade,
+  checked_at  timestamptz not null default now(),
+  primary key (member_id, order_id)
+);
+
 -- =====================================================================
 -- 4. AI 추천 콘텐츠 (GET /api/v1/ai/questions, /weather/current, /ai/recommendation-rules)
 -- =====================================================================
@@ -402,7 +410,7 @@ declare t text;
 begin
   foreach t in array array[
     'store_info','categories','menus','members','login_sessions','roulette_prizes','table_logins',
-    'recommendation_events','orders','order_items','order_item_components','coupons','staff_call_items','staff_calls',
+    'recommendation_events','orders','order_items','order_item_components','coupons','staff_call_items','staff_calls','service_tip_checks',
     'quiz_questions','quiz_options','weather_types','weather_current','recommendation_rules',
     'owners','app_settings','alerts','sms_logs','sms_log_recipients','external_context','chat_sessions','chat_messages']
   loop
