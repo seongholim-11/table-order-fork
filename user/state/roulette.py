@@ -42,6 +42,8 @@ def spin_roulette():
     server_result = server.play_roulette(ss.access_token, ss.table, row["id"]) if ss.access_token else None
     if server_result and server_result.get("error"):
         st.toast(server_result["error"], icon="⚠️")
+        # 서버가 거절한 기록은 더 돌릴 수 없으니 기회에서 뺀다(안 빼면 '기회 N번'만 남고 계속 안 돌아간다)
+        row["eligible"] = False
         return
     # 서버 연결이 되면 서버가 고른 결과를 사용하고, 연결이 안 될 때만 기존 로컬 추첨을 쓴다.
     idx = server_result["index"] if server_result else pick_prize_index(ctx.ROULETTE_PRIZES)
